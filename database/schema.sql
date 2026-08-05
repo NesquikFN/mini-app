@@ -1,0 +1,2 @@
+-- DormHub database schema
+-- Буде наповнено на Етапі 5

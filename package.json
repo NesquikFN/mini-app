@@ -1,0 +1,14 @@
+{
+  "name": "dormhub",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DormHub — Telegram Mini App для мешканців гуртожитку",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend"
+  }
+}
