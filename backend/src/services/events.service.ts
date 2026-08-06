@@ -36,24 +36,28 @@ function toEventResponse(event: Event): EventResponse {
   }
 }
 
-function getEventOrThrow(id: string): Event {
-  const event = eventsRepository.findById(id)
+async function getEventOrThrow(id: string): Promise<Event> {
+  const event = await eventsRepository.findById(id)
   if (!event) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
   return event
 }
 
-export function listEvents(): EventResponse[] {
-  return eventsRepository.findAll().map(toEventResponse)
+export async function listEvents(): Promise<EventResponse[]> {
+  const events = await eventsRepository.findAll()
+  return events.map(toEventResponse)
 }
 
-export function getEvent(id: string): EventResponse {
-  return toEventResponse(getEventOrThrow(id))
+export async function getEvent(id: string): Promise<EventResponse> {
+  return toEventResponse(await getEventOrThrow(id))
 }
 
-export function createEvent(creatorId: string, input: CreateEventInput): EventResponse {
-  const event = eventsRepository.insert({
+export async function createEvent(
+  creatorId: string,
+  input: CreateEventInput,
+): Promise<EventResponse> {
+  const event = await eventsRepository.insert({
     creatorId,
     title: input.title,
     description: input.description,
@@ -61,44 +65,37 @@ export function createEvent(creatorId: string, input: CreateEventInput): EventRe
     time: input.time,
     location: input.location,
     maxParticipants: input.maxParticipants,
-    participantIds: [creatorId],
-    createdAt: new Date().toISOString(),
   })
   return toEventResponse(event)
 }
 
-export function joinEvent(eventId: string, userId: string): EventResponse {
-  const event = getEventOrThrow(eventId)
-
-  if (event.participantIds.includes(userId)) {
-    throw new AppError(409, 'ALREADY_JOINED', 'Ви вже берете участь у цій події')
-  }
-
-  if (event.participantIds.length >= event.maxParticipants) {
-    throw new AppError(409, 'EVENT_FULL', 'Місць більше немає')
-  }
-
-  event.participantIds.push(userId)
-  return toEventResponse(event)
+export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {
+  // Перевірка ліміту місць і повторного приєднання відбувається
+  // атомарно всередині PostgreSQL-функції join_event (repository),
+  // тому тут немає окремого "прочитати → перевірити → вставити".
+  await eventsRepository.addParticipant(eventId, userId)
+  return toEventResponse(await getEventOrThrow(eventId))
 }
 
-export function leaveEvent(eventId: string, userId: string): EventResponse {
-  const event = getEventOrThrow(eventId)
+export async function leaveEvent(eventId: string, userId: string): Promise<EventResponse> {
+  await getEventOrThrow(eventId)
 
-  if (!event.participantIds.includes(userId)) {
+  const removed = await eventsRepository.removeParticipant(eventId, userId)
+  if (!removed) {
     throw new AppError(409, 'NOT_PARTICIPATING', 'Ви не берете участі у цій події')
   }
 
-  event.participantIds = event.participantIds.filter((id) => id !== userId)
-  return toEventResponse(event)
+  return toEventResponse(await getEventOrThrow(eventId))
 }
 
-export function listEventsForUser(userId: string): UserEvents {
-  const all = eventsRepository.findAll()
+export async function listEventsForUser(userId: string): Promise<UserEvents> {
+  const [created, participating] = await Promise.all([
+    eventsRepository.getUserCreatedEvents(userId),
+    eventsRepository.getUserParticipatingEvents(userId),
+  ])
+
   return {
-    created: all.filter((event) => event.creatorId === userId).map(toEventResponse),
-    participating: all
-      .filter((event) => event.participantIds.includes(userId))
-      .map(toEventResponse),
+    created: created.map(toEventResponse),
+    participating: participating.map(toEventResponse),
   }
 }

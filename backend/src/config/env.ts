@@ -5,6 +5,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   FRONTEND_URL: z.url().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  SUPABASE_URL: z.url('SUPABASE_URL має бути коректним URL проєкту Supabase'),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .min(1, 'SUPABASE_SERVICE_ROLE_KEY обовʼязковий (Supabase → Settings → API)'),
 })
 
 const parsed = envSchema.safeParse(process.env)

@@ -1,7 +1,11 @@
 import type { NextFunction, Request, Response } from 'express'
 import { getCurrentUser } from '../services/auth.service'
 
-export function currentUser(req: Request, _res: Response, next: NextFunction): void {
-  req.user = getCurrentUser()
-  next()
+export async function currentUser(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  try {
+    req.user = await getCurrentUser()
+    next()
+  } catch (error) {
+    next(error)
+  }
 }

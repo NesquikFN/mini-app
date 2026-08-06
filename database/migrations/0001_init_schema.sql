@@ -1,7 +1,8 @@
--- DormHub — повна PostgreSQL-схема для Supabase.
--- Виконати повністю один раз у Supabase SQL Editor (Project → SQL Editor → New query).
--- Та сама схема продубльована у database/migrations/0001_init_schema.sql
--- для майбутнього версіонування через Supabase CLI migrations.
+-- DormHub — migration 0001: початкова схема.
+-- Ідентична database/schema.sql (там — для ручного запуску одним файлом
+-- у Supabase SQL Editor; тут — для майбутнього supabase CLI / migration
+-- history). Зміни схеми додавайте новими файлами 0002_*.sql і т.д.,
+-- а не редагуванням цього файлу заднім числом.
 
 -- Потрібно для gen_random_uuid().
 create extension if not exists pgcrypto;

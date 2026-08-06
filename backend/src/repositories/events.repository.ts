@@ -1,63 +1,193 @@
+import { supabase } from '../config/supabase'
+import { AppError } from '../utils/AppError'
 import type { Event } from '../types/event'
-import { addDays, toISODate } from '../utils/date'
 
-const events: Event[] = []
-let nextId = 1
+interface EventRow {
+  id: string
+  creator_id: string
+  title: string
+  description: string | null
+  date: string
+  time: string
+  location: string
+  max_participants: number
+  created_at: string
+  event_participants: { user_id: string }[]
+}
 
-export type NewEvent = Omit<Event, 'id'>
+export interface NewEvent {
+  creatorId: string
+  title: string
+  description: string
+  date: string
+  time: string
+  location: string
+  maxParticipants: number
+}
+
+// event_participants(user_id) — вкладена вибірка: PostgREST підтягує
+// пов'язані рядки з event_participants в одному запиті, замість окремого
+// SELECT на кожну подію.
+const EVENT_SELECT = '*, event_participants(user_id)'
+
+function toEvent(row: EventRow): Event {
+  return {
+    id: row.id,
+    creatorId: row.creator_id,
+    title: row.title,
+    description: row.description ?? '',
+    date: row.date,
+    time: row.time,
+    location: row.location,
+    maxParticipants: row.max_participants,
+    participantIds: row.event_participants.map((participant) => participant.user_id),
+    createdAt: row.created_at,
+  }
+}
+
+/** Перекладає відомі помилки RPC join_event у доменні AppError. */
+function translateJoinError(error: { message: string }): never {
+  if (error.message === 'EVENT_NOT_FOUND') {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
+  if (error.message === 'ALREADY_JOINED') {
+    throw new AppError(409, 'ALREADY_JOINED', 'Ви вже берете участь у цій події')
+  }
+  if (error.message === 'EVENT_FULL') {
+    throw new AppError(409, 'EVENT_FULL', 'Місць більше немає')
+  }
+  throw error
+}
 
 export const eventsRepository = {
-  findAll(): Event[] {
-    return events
+  async findAll(): Promise<Event[]> {
+    const { data, error } = await supabase
+      .from('events')
+      .select(EVENT_SELECT)
+      .order('date', { ascending: true })
+      .returns<EventRow[]>()
+
+    if (error) throw error
+    return data.map(toEvent)
   },
 
-  findById(id: string): Event | undefined {
-    return events.find((event) => event.id === id)
+  async findById(id: string): Promise<Event | null> {
+    const { data, error } = await supabase
+      .from('events')
+      .select(EVENT_SELECT)
+      .eq('id', id)
+      .maybeSingle<EventRow>()
+
+    if (error) throw error
+    return data ? toEvent(data) : null
   },
 
-  insert(newEvent: NewEvent): Event {
-    const event: Event = { ...newEvent, id: `event-${nextId++}` }
-    events.push(event)
-    return event
+  async insert(newEvent: NewEvent): Promise<Event> {
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        creator_id: newEvent.creatorId,
+        title: newEvent.title,
+        description: newEvent.description || null,
+        date: newEvent.date,
+        time: newEvent.time,
+        location: newEvent.location,
+        max_participants: newEvent.maxParticipants,
+      })
+      .select('id')
+      .single<{ id: string }>()
+
+    if (error) throw error
+
+    // Творець автоматично стає учасником власної події. Той самий
+    // атомарний шлях (join_event), що й для звичайного приєднання —
+    // подія щойно створена з 0 учасників, тож EVENT_FULL тут неможливий.
+    await eventsRepository.addParticipant(data.id, newEvent.creatorId)
+
+    const created = await eventsRepository.findById(data.id)
+    if (!created) {
+      throw new Error('Не вдалося прочитати щойно створену подію')
+    }
+    return created
+  },
+
+  /** Атомарне приєднання через PostgreSQL-функцію join_event (RPC) —
+   * захищає від race condition при одночасних спробах зайняти останнє
+   * місце (див. database/schema.sql). */
+  async addParticipant(eventId: string, userId: string): Promise<void> {
+    const { error } = await supabase.rpc('join_event', {
+      p_event_id: eventId,
+      p_user_id: userId,
+    })
+
+    if (error) translateJoinError(error)
+  },
+
+  async removeParticipant(eventId: string, userId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('event_participants')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('user_id', userId)
+      .select('id')
+
+    if (error) throw error
+    return (data?.length ?? 0) > 0
+  },
+
+  async getParticipants(eventId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('event_participants')
+      .select('user_id')
+      .eq('event_id', eventId)
+
+    if (error) throw error
+    return (data ?? []).map((row) => row.user_id)
+  },
+
+  async isParticipant(eventId: string, userId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('event_participants')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (error) throw error
+    return data !== null
+  },
+
+  async getUserCreatedEvents(userId: string): Promise<Event[]> {
+    const { data, error } = await supabase
+      .from('events')
+      .select(EVENT_SELECT)
+      .eq('creator_id', userId)
+      .order('date', { ascending: true })
+      .returns<EventRow[]>()
+
+    if (error) throw error
+    return data.map(toEvent)
+  },
+
+  async getUserParticipatingEvents(userId: string): Promise<Event[]> {
+    const { data: participantRows, error: participantError } = await supabase
+      .from('event_participants')
+      .select('event_id')
+      .eq('user_id', userId)
+
+    if (participantError) throw participantError
+
+    const eventIds = (participantRows ?? []).map((row) => row.event_id)
+    if (eventIds.length === 0) return []
+
+    const { data, error } = await supabase
+      .from('events')
+      .select(EVENT_SELECT)
+      .in('id', eventIds)
+      .order('date', { ascending: true })
+      .returns<EventRow[]>()
+
+    if (error) throw error
+    return data.map(toEvent)
   },
 }
-
-function dateOffset(days: number): string {
-  return toISODate(addDays(new Date(), days))
-}
-
-eventsRepository.insert({
-  creatorId: 'user-2',
-  title: 'Кіновечір',
-  description: 'Дивимось разом новинку кінопрокату у кімнаті відпочинку.',
-  date: dateOffset(0),
-  time: '20:00',
-  location: 'Кімната відпочинку',
-  maxParticipants: 20,
-  participantIds: ['user-2', 'user-3', 'user-4'],
-  createdAt: new Date().toISOString(),
-})
-
-eventsRepository.insert({
-  creatorId: 'user-1',
-  title: 'Футбол',
-  description: 'Товариський матч 5 на 5 на спортивному майданчику гуртожитку.',
-  date: dateOffset(1),
-  time: '18:00',
-  location: 'Спортивний майданчик',
-  maxParticipants: 16,
-  participantIds: ['user-1', 'user-3'],
-  createdAt: new Date().toISOString(),
-})
-
-eventsRepository.insert({
-  creatorId: 'user-5',
-  title: 'Турнір FIFA',
-  description: 'Однокруговий турнір на PlayStation, лише 2 місця.',
-  date: dateOffset(2),
-  time: '17:00',
-  location: 'Кімната відпочинку',
-  maxParticipants: 2,
-  participantIds: ['user-5', 'user-6'],
-  createdAt: new Date().toISOString(),
-})
