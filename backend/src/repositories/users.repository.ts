@@ -38,6 +38,17 @@ export const usersRepository = {
     return data ? toAuthUser(data) : null
   },
 
+  async getUserById(id: string): Promise<AuthUser | null> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle<UserRow>()
+
+    if (error) throw error
+    return data ? toAuthUser(data) : null
+  },
+
   async createUser(input: NewUser): Promise<AuthUser> {
     const { data, error } = await supabase
       .from('users')

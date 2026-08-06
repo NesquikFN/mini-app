@@ -1,5 +1,6 @@
 import type { CreateEventInput, DormEvent } from '../types/event'
 import type { AuthUser } from '../types/user'
+import { getSessionToken } from './session'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -50,11 +51,14 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
 
+  const token = getSessionToken()
+
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
     })
@@ -135,4 +139,18 @@ export async function fetchCurrentUser(): Promise<AuthUser> {
 
 export async function fetchMyEvents(): Promise<MyEventsResponse> {
   return request<MyEventsResponse>('/me/events')
+}
+
+export interface TelegramAuthResponse {
+  user: AuthUser
+  token: string
+}
+
+export async function authenticateWithTelegram(
+  initData: string | undefined,
+): Promise<TelegramAuthResponse> {
+  return request<TelegramAuthResponse>('/auth/telegram', {
+    method: 'POST',
+    body: JSON.stringify({ initData }),
+  })
 }

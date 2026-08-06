@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { AuthProvider } from './context/AuthProvider'
 import { EventsProvider } from './context/EventsProvider'
 import { UserProvider } from './context/UserProvider'
 import { MainLayout } from './layouts/MainLayout'
@@ -10,21 +11,23 @@ import { ProfilePage } from './pages/ProfilePage'
 
 function App() {
   return (
-    <UserProvider>
-      <EventsProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/events" element={<EventsPage />} />
-              <Route path="/events/:id" element={<EventDetailPage />} />
-              <Route path="/create" element={<CreateEventPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </EventsProvider>
-    </UserProvider>
+    <AuthProvider>
+      <UserProvider>
+        <EventsProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route element={<MainLayout />}>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/events" element={<EventsPage />} />
+                <Route path="/events/:id" element={<EventDetailPage />} />
+                <Route path="/create" element={<CreateEventPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </EventsProvider>
+      </UserProvider>
+    </AuthProvider>
   )
 }
 
