@@ -5,10 +5,12 @@
   "description": "DormHub — Telegram Mini App для мешканців гуртожитку",
   "workspaces": [
     "frontend",
+    "frontend/admin",
     "backend"
   ],
   "scripts": {
     "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:admin": "npm run dev --workspace=admin",
     "dev:backend": "npm run dev --workspace=backend"
   }
 }

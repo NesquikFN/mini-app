@@ -1,7 +1,8 @@
 -- DormHub — повна PostgreSQL-схема для Supabase.
 -- Виконати повністю один раз у Supabase SQL Editor (Project → SQL Editor → New query).
--- Та сама схема продубльована у database/migrations/0001_init_schema.sql
--- для майбутнього версіонування через Supabase CLI migrations.
+-- Та сама схема продубльована у database/migrations/0001_init_schema.sql та
+-- database/migrations/0002_admin_users.sql для майбутнього версіонування
+-- через Supabase CLI migrations.
 
 -- Потрібно для gen_random_uuid().
 create extension if not exists pgcrypto;
@@ -56,6 +57,21 @@ create index if not exists idx_event_participants_event_id on event_participants
 create index if not exists idx_event_participants_user_id on event_participants (user_id);
 
 -- =========================================================
+-- Таблиця admin_users (див. migrations/0002_admin_users.sql)
+-- =========================================================
+-- Маркер "цей users.id — адміністратор". Окремого поля-прапорця на users
+-- не робимо: зв'язана таблиця дозволяє в майбутньому зберігати додаткові
+-- адмінські метадані, не чіпаючи основну таблицю users.
+create table if not exists admin_users (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint admin_users_user_id_key unique (user_id)
+);
+
+create index if not exists idx_admin_users_user_id on admin_users (user_id);
+
+-- =========================================================
 -- Row Level Security
 -- =========================================================
 -- Backend звертається до Supabase через SERVICE_ROLE_KEY, який ігнорує RLS
@@ -68,6 +84,7 @@ create index if not exists idx_event_participants_user_id on event_participants 
 alter table users enable row level security;
 alter table events enable row level security;
 alter table event_participants enable row level security;
+alter table admin_users enable row level security;
 
 -- =========================================================
 -- Атомарна функція приєднання до події (захист від race condition)

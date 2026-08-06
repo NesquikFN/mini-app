@@ -1,7 +1,7 @@
 import { eventsRepository } from '../repositories/events.repository'
 import { AppError } from '../utils/AppError'
 import type { Event } from '../types/event'
-import type { CreateEventInput } from '../validation/event.schemas'
+import type { CreateEventInput, UpdateEventInput } from '../validation/event.schemas'
 
 export interface EventResponse {
   id: string
@@ -67,6 +67,24 @@ export async function createEvent(
     maxParticipants: input.maxParticipants,
   })
   return toEventResponse(event)
+}
+
+/** Лише адмін-панель — звичайний Mini App редагування подій не пропонує. */
+export async function updateEvent(
+  id: string,
+  input: UpdateEventInput,
+): Promise<EventResponse> {
+  await getEventOrThrow(id)
+  return toEventResponse(await eventsRepository.update(id, input))
+}
+
+/** Лише адмін-панель. event_participants видаляються каскадом (FK ON
+ * DELETE CASCADE, див. database/schema.sql) — окремого запиту не треба. */
+export async function deleteEvent(id: string): Promise<void> {
+  const removed = await eventsRepository.remove(id)
+  if (!removed) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
 }
 
 export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {

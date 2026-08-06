@@ -25,6 +25,17 @@ export const createEventSchema = z.object({
 
 export type CreateEventInput = z.infer<typeof createEventSchema>
 
+// Той самий набір правил (дата не в минулому, формат часу тощо), але всі
+// поля опціональні — адмін-панель редагує подію частково (PATCH), а не
+// пересилає весь об'єкт заново.
+export const updateEventSchema = createEventSchema.partial()
+
+export type UpdateEventInput = z.infer<typeof updateEventSchema>
+
 export const eventIdParamSchema = z.object({
   id: z.string().min(1, 'Ідентифікатор події обовʼязковий'),
+})
+
+export const userIdParamSchema = z.object({
+  userId: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
 })

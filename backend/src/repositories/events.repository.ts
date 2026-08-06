@@ -111,6 +111,33 @@ export const eventsRepository = {
     return created
   },
 
+  /** Часткове оновлення — лише адмін-панель, звичайний Mini App редагування
+   * подій не пропонує. */
+  async update(id: string, patch: Partial<Omit<NewEvent, 'creatorId'>>): Promise<Event> {
+    const updatePayload: Record<string, unknown> = {}
+    if (patch.title !== undefined) updatePayload.title = patch.title
+    if (patch.description !== undefined) updatePayload.description = patch.description || null
+    if (patch.date !== undefined) updatePayload.date = patch.date
+    if (patch.time !== undefined) updatePayload.time = patch.time
+    if (patch.location !== undefined) updatePayload.location = patch.location
+    if (patch.maxParticipants !== undefined) updatePayload.max_participants = patch.maxParticipants
+
+    const { error } = await supabase.from('events').update(updatePayload).eq('id', id)
+    if (error) throw error
+
+    const updated = await eventsRepository.findById(id)
+    if (!updated) {
+      throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+    }
+    return updated
+  },
+
+  async remove(id: string): Promise<boolean> {
+    const { data, error } = await supabase.from('events').delete().eq('id', id).select('id')
+    if (error) throw error
+    return (data?.length ?? 0) > 0
+  },
+
   /** Атомарне приєднання через PostgreSQL-функцію join_event (RPC) —
    * захищає від race condition при одночасних спробах зайняти останнє
    * місце (див. database/schema.sql). */

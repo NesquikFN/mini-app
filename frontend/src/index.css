@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* admin/ — окремий Vite-застосунок зі своїм index.css; без цього Tailwind
+   v4 автоматично сканує його теж (він вкладений у frontend/) і тягне його
+   класи (напр. bg-red-600 з адмінської Button) у бандл звичайного Mini App. */
+@source not "../admin";
+
 @theme {
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }

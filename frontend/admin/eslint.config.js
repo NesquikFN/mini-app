@@ -6,10 +6,7 @@ import tseslint from 'typescript-eslint'
 import prettierConfig from 'eslint-config-prettier'
 
 export default tseslint.config(
-  // admin/ — окремий workspace зі своїм eslint.config.js/tsconfig.json
-  // (npm run lint --workspace=admin); без цього ESLint тут плутається між
-  // двома tsconfig.json під час обходу frontend/.
-  { ignores: ['dist', 'admin'] },
+  { ignores: ['dist'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

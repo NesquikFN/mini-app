@@ -1,5 +1,5 @@
 import { supabase } from '../config/supabase'
-import type { AuthUser } from '../types/user'
+import type { AdminUserView, AuthUser } from '../types/user'
 
 interface UserRow {
   id: string
@@ -17,6 +17,17 @@ function toAuthUser(row: UserRow): AuthUser {
     telegramId: row.telegram_id,
     firstName: row.first_name,
     username: row.username ?? undefined,
+  }
+}
+
+function toAdminUserView(row: UserRow): AdminUserView {
+  return {
+    id: row.id,
+    telegramId: row.telegram_id,
+    firstName: row.first_name,
+    lastName: row.last_name ?? undefined,
+    username: row.username ?? undefined,
+    createdAt: row.created_at,
   }
 }
 
@@ -62,5 +73,29 @@ export const usersRepository = {
 
     if (error) throw error
     return toAuthUser(data)
+  },
+
+  async getAllUsers(): Promise<AdminUserView[]> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .returns<UserRow[]>()
+
+    if (error) throw error
+    return data.map(toAdminUserView)
+  },
+
+  async getUsersByIds(ids: string[]): Promise<AdminUserView[]> {
+    if (ids.length === 0) return []
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', ids)
+      .returns<UserRow[]>()
+
+    if (error) throw error
+    return data.map(toAdminUserView)
   },
 }

@@ -9,10 +9,11 @@
  * Uses a telegram_id far outside the seed-data range so it never
  * collides with database/seed.sql or the DEV_AUTH demo user.
  */
-import { describe, it, before } from 'node:test'
+import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import { app } from '../app'
+import { supabase } from '../config/supabase'
 import { buildValidInitData, nowSeconds, telegramUserField } from '../test-utils/telegramInitData'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
@@ -87,6 +88,7 @@ describe('POST /api/auth/telegram', () => {
 describe('authenticated API access', () => {
   let token: string
   let userId: string
+  let createdEventId: string | undefined
 
   before(async () => {
     const res = await request(app)
@@ -94,6 +96,15 @@ describe('authenticated API access', () => {
       .send({ initData: validInitDataFor(TEST_TELEGRAM_ID) })
     token = res.body.token
     userId = res.body.user.id
+  })
+
+  // Regular users have no self-service delete endpoint (only admins do —
+  // see admin.integration.test.ts), so the row this suite creates is
+  // cleaned up directly here rather than left for a human to find.
+  after(async () => {
+    if (createdEventId) {
+      await supabase.from('events').delete().eq('id', createdEventId)
+    }
   })
 
   it('rejects requests with no Authorization header', async () => {
@@ -132,6 +143,7 @@ describe('authenticated API access', () => {
 
     assert.equal(createRes.status, 201)
     const eventId: string = createRes.body.event.id
+    createdEventId = eventId
     // Creator auto-joins on creation (see events.repository.insert).
     assert.ok(createRes.body.event.participants.includes(userId))
 
