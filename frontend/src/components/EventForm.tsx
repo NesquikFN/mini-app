@@ -128,7 +128,7 @@ export function EventForm({ onSubmit, submitting }: EventFormProps) {
         loading={submitting}
         disabled={submitting}
       >
-        Створити подію
+        {submitting ? 'Створюємо…' : 'Створити подію'}
       </Button>
     </form>
   )

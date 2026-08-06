@@ -18,7 +18,7 @@ const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
 ]
 
 export function EventsPage() {
-  const { events, status, reload } = useEvents()
+  const { events, status, errorMessage, reload } = useEvents()
   const [filter, setFilter] = useState<FilterValue>('all')
   const location = useLocation()
   const navigate = useNavigate()
@@ -64,6 +64,7 @@ export function EventsPage() {
           <EmptyState
             icon={<CalendarX size={40} />}
             title="Не вдалося завантажити події."
+            description={errorMessage ?? undefined}
             actionLabel="Спробувати ще раз"
             onAction={reload}
           />

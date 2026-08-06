@@ -35,6 +35,11 @@ export function formatEventDate(isoDate: string): string {
   return `${day} ${UKRAINIAN_MONTHS[month - 1]}`
 }
 
+/** Backend повертає час у форматі PostgreSQL `HH:MM:SS` — обрізаємо секунди для показу. */
+export function formatEventTime(time: string): string {
+  return time.slice(0, 5)
+}
+
 export function isSameDay(isoDate: string, compareDate: Date): boolean {
   return isoDate === toISODate(compareDate)
 }

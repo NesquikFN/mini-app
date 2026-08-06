@@ -10,9 +10,10 @@ import type { CreateEventInput, DormEvent } from '../types/event'
 import {
   createEventRequest,
   fetchEvents,
+  getErrorMessage,
   joinEventRequest,
   leaveEventRequest,
-} from '../services/mockApi'
+} from '../services/api'
 
 export function EventsProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<DormEvent[]>([])
@@ -26,9 +27,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         setEvents(data)
         setStatus('success')
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         setStatus('error')
-        setErrorMessage('Не вдалося завантажити події.')
+        setErrorMessage(getErrorMessage(error))
       })
   }, [])
 

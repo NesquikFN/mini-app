@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
-import { CalendarDays, Clock, MapPin, Users } from 'lucide-react'
+import { CalendarDays, Clock, MapPin, PartyPopper, Users } from 'lucide-react'
 import type { DormEvent } from '../types/event'
-import { formatEventDate } from '../utils/date'
+import { formatEventDate, formatEventTime } from '../utils/date'
 
 export function EventCard({ event }: { event: DormEvent }) {
-  const isFull = event.participantIds.length >= event.maxParticipants
+  const isFull = event.participants.length >= event.maxParticipants
 
   return (
     <Link
@@ -12,7 +12,9 @@ export function EventCard({ event }: { event: DormEvent }) {
       className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 active:bg-neutral-50"
     >
       <div className="flex items-start gap-3">
-        <span className="text-2xl leading-none">{event.emoji}</span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+          <PartyPopper size={20} />
+        </span>
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-semibold text-neutral-900">
             {event.title}
@@ -22,7 +24,7 @@ export function EventCard({ event }: { event: DormEvent }) {
               <CalendarDays size={14} /> {formatEventDate(event.date)}
             </span>
             <span className="inline-flex items-center gap-1">
-              <Clock size={14} /> {event.time}
+              <Clock size={14} /> {formatEventTime(event.time)}
             </span>
           </div>
           <span className="mt-1 inline-flex items-center gap-1 text-sm text-neutral-500">
@@ -34,7 +36,7 @@ export function EventCard({ event }: { event: DormEvent }) {
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1 text-sm text-neutral-500">
           <Users size={14} />
-          {event.participantIds.length} / {event.maxParticipants} учасників
+          {event.participants.length} / {event.maxParticipants} учасників
         </span>
         {isFull ? (
           <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-500">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { EventForm } from '../components/EventForm'
 import { useEvents } from '../hooks/useEvents'
+import { getErrorMessage } from '../services/api'
 import type { CreateEventInput } from '../types/event'
 
 export function CreateEventPage() {
@@ -20,9 +21,7 @@ export function CreateEventPage() {
         state: { successMessage: 'Подію успішно створено!' },
       })
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : 'Не вдалося створити подію',
-      )
+      setSubmitError(getErrorMessage(error))
     } finally {
       setSubmitting(false)
     }

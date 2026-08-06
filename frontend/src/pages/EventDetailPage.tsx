@@ -1,25 +1,67 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { CalendarDays, Clock, MapPin, Users } from 'lucide-react'
+import { CalendarDays, Clock, MapPin, PartyPopper, Users } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
-import { participantsById, currentUser } from '../services/mockData'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { PageHeader } from '../components/PageHeader'
-import { ParticipantList } from '../components/ParticipantList'
 import { Button } from '../components/Button'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
-import { formatEventDate } from '../utils/date'
+import { formatEventDate, formatEventTime } from '../utils/date'
+import { getErrorMessage } from '../services/api'
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { events, status, joinEvent, leaveEvent, pendingEventId } = useEvents()
+  const {
+    events,
+    status: eventsStatus,
+    errorMessage: eventsError,
+    reload: reloadEvents,
+    joinEvent,
+    leaveEvent,
+    pendingEventId,
+  } = useEvents()
+  const {
+    user,
+    status: userStatus,
+    errorMessage: userError,
+    reload: reloadUser,
+  } = useCurrentUser()
   const [actionError, setActionError] = useState<string | null>(null)
 
-  if (status === 'loading') {
+  if (eventsStatus === 'loading' || userStatus === 'loading') {
     return (
       <div className="flex flex-col">
         <PageHeader title="Подія" showBack />
         <LoadingState label="Завантажуємо подію…" />
+      </div>
+    )
+  }
+
+  if (eventsStatus === 'error') {
+    return (
+      <div className="flex flex-col">
+        <PageHeader title="Подія" showBack />
+        <EmptyState
+          title="Не вдалося завантажити подію"
+          description={eventsError ?? undefined}
+          actionLabel="Спробувати ще раз"
+          onAction={reloadEvents}
+        />
+      </div>
+    )
+  }
+
+  if (userStatus === 'error' || !user) {
+    return (
+      <div className="flex flex-col">
+        <PageHeader title="Подія" showBack />
+        <EmptyState
+          title="Не вдалося завантажити профіль"
+          description={userError ?? undefined}
+          actionLabel="Спробувати ще раз"
+          onAction={reloadUser}
+        />
       </div>
     )
   }
@@ -38,13 +80,9 @@ export function EventDetailPage() {
     )
   }
 
-  const isJoined = event.participantIds.includes(currentUser.id)
-  const isFull = event.participantIds.length >= event.maxParticipants
+  const isJoined = event.participants.includes(user.id)
+  const isFull = event.participants.length >= event.maxParticipants
   const isPending = pendingEventId === event.id
-  const participants = event.participantIds
-    .map((participantId) => participantsById[participantId])
-    .filter(Boolean)
-
   const eventId = event.id
 
   const handleToggleParticipation = async () => {
@@ -56,9 +94,7 @@ export function EventDetailPage() {
         await joinEvent(eventId)
       }
     } catch (error) {
-      setActionError(
-        error instanceof Error ? error.message : 'Щось пішло не так',
-      )
+      setActionError(getErrorMessage(error))
     }
   }
 
@@ -68,7 +104,9 @@ export function EventDetailPage() {
 
       <div className="flex flex-col gap-5 px-4 py-4 pb-8">
         <div className="flex items-center gap-3">
-          <span className="text-4xl leading-none">{event.emoji}</span>
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+            <PartyPopper size={24} />
+          </span>
           <h1 className="text-xl font-semibold text-neutral-900">
             {event.title}
           </h1>
@@ -80,7 +118,8 @@ export function EventDetailPage() {
             {formatEventDate(event.date)}
           </span>
           <span className="inline-flex items-center gap-2">
-            <Clock size={16} className="text-neutral-400" /> {event.time}
+            <Clock size={16} className="text-neutral-400" />{' '}
+            {formatEventTime(event.time)}
           </span>
           <span className="inline-flex items-center gap-2">
             <MapPin size={16} className="text-neutral-400" /> {event.location}
@@ -98,15 +137,12 @@ export function EventDetailPage() {
           </section>
         )}
 
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-neutral-900">Учасники</h2>
-            <span className="inline-flex items-center gap-1 text-sm text-neutral-500">
-              <Users size={14} /> {event.participantIds.length} /{' '}
-              {event.maxParticipants}
-            </span>
-          </div>
-          <ParticipantList participants={participants} />
+        <section className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-neutral-900">Учасники</h2>
+          <span className="inline-flex items-center gap-1 text-sm text-neutral-500">
+            <Users size={14} /> {event.participants.length} /{' '}
+            {event.maxParticipants}
+          </span>
         </section>
 
         {actionError && <p className="text-sm text-red-500">{actionError}</p>}
@@ -123,7 +159,13 @@ export function EventDetailPage() {
             disabled={isPending}
             onClick={handleToggleParticipation}
           >
-            {isJoined ? 'Скасувати участь' : 'Взяти участь'}
+            {isPending
+              ? isJoined
+                ? 'Скасовую…'
+                : 'Приєднуюсь…'
+              : isJoined
+                ? 'Скасувати участь'
+                : 'Взяти участь'}
           </Button>
         )}
       </div>

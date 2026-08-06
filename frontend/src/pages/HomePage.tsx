@@ -9,7 +9,7 @@ import { isPastDate } from '../utils/date'
 const DORM_NAME = 'Гуртожиток №5'
 
 export function HomePage() {
-  const { events, status, reload } = useEvents()
+  const { events, status, errorMessage, reload } = useEvents()
 
   const upcoming = [...events]
     .filter((event) => !isPastDate(event.date))
@@ -39,6 +39,7 @@ export function HomePage() {
           <EmptyState
             icon={<CalendarX size={40} />}
             title="Не вдалося завантажити події"
+            description={errorMessage ?? undefined}
             actionLabel="Спробувати ще раз"
             onAction={reload}
           />
