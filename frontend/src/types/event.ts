@@ -9,6 +9,8 @@ export interface DormEvent {
   maxParticipants: number
   participants: string[]
   createdAt: string
+  /** FK на dormitories.id — гуртожиток творця на момент створення. */
+  dormitoryId: string
 }
 
 export interface CreateEventInput {

@@ -1,6 +1,8 @@
 import { eventsRepository } from '../repositories/events.repository'
+import { usersRepository } from '../repositories/users.repository'
 import { AppError } from '../utils/AppError'
 import type { Event } from '../types/event'
+import type { PublicUser } from '../types/user'
 import type { CreateEventInput, UpdateEventInput } from '../validation/event.schemas'
 
 export interface EventResponse {
@@ -14,6 +16,7 @@ export interface EventResponse {
   maxParticipants: number
   participants: string[]
   createdAt: string
+  dormitoryId: string
 }
 
 export interface UserEvents {
@@ -33,6 +36,7 @@ function toEventResponse(event: Event): EventResponse {
     maxParticipants: event.maxParticipants,
     participants: event.participantIds,
     createdAt: event.createdAt,
+    dormitoryId: event.dormitoryId,
   }
 }
 
@@ -44,7 +48,25 @@ async function getEventOrThrow(id: string): Promise<Event> {
   return event
 }
 
-export async function listEvents(): Promise<EventResponse[]> {
+export type EventsScope = 'mine' | 'all'
+
+/**
+ * scope='mine' — сервер сам вирішує, що таке "мій гуртожиток", виключно
+ * з `userDormitoryId` (req.user.dormitoryId із сесії). Клієнт не може
+ * передати довільний dormitoryId для фільтрації чужого гуртожитку —
+ * єдиний вибір, який залишається frontend, це scope='all' (побачити
+ * геть усі події) або 'mine' (свої, за замовчуванням).
+ */
+export async function listEvents(
+  scope: EventsScope,
+  userDormitoryId: string | undefined,
+): Promise<EventResponse[]> {
+  if (scope === 'mine') {
+    if (!userDormitoryId) return []
+    const events = await eventsRepository.findAll(userDormitoryId)
+    return events.map(toEventResponse)
+  }
+
   const events = await eventsRepository.findAll()
   return events.map(toEventResponse)
 }
@@ -53,10 +75,50 @@ export async function getEvent(id: string): Promise<EventResponse> {
   return toEventResponse(await getEventOrThrow(id))
 }
 
+export interface EventMembers {
+  creator: PublicUser
+  participants: PublicUser[]
+}
+
+/** Публічні профілі організатора й учасників для сторінки деталей події
+ * (звичайний Mini App — не адмінка, тому лише PublicUser, без telegram_id
+ * чи дати реєстрації). Один запит на всіх задіяних users одразу: творець
+ * не завжди входить до participants (може вийти зі своєї ж події), тож
+ * об'єднуємо id перед запитом, а не припускаємо підмножину. */
+export async function getEventMembers(event: EventResponse): Promise<EventMembers> {
+  const ids = Array.from(new Set([event.creatorId, ...event.participants]))
+  const users = await usersRepository.getPublicUsersByIds(ids)
+  const byId = new Map(users.map((user) => [user.id, user]))
+  const resolve = (id: string): PublicUser =>
+    byId.get(id) ?? { id, firstName: 'Учасник DormHub' }
+
+  return {
+    creator: resolve(event.creatorId),
+    participants: event.participants.map(resolve),
+  }
+}
+
+/**
+ * `creatorDormitoryId` — гуртожиток творця, зчитаний з req.user (тобто з
+ * users.dormitory_id через сесію), а не з тіла запиту. `input` навмисно
+ * типізований як CreateEventInput, чия Zod-схема не має поля dormitoryId
+ * взагалі — навіть якщо клієнт надішле його в тілі, воно відкидається
+ * ще на validation-шарі й сюди просто не долітає. Немає способу для
+ * frontend підмінити гуртожиток створюваної події.
+ */
 export async function createEvent(
   creatorId: string,
+  creatorDormitoryId: string | undefined,
   input: CreateEventInput,
 ): Promise<EventResponse> {
+  if (creatorDormitoryId === undefined) {
+    throw new AppError(
+      400,
+      'DORMITORY_REQUIRED',
+      'Спочатку оберіть гуртожиток у профілі',
+    )
+  }
+
   const event = await eventsRepository.insert({
     creatorId,
     title: input.title,
@@ -65,6 +127,7 @@ export async function createEvent(
     time: input.time,
     location: input.location,
     maxParticipants: input.maxParticipants,
+    dormitoryId: creatorDormitoryId,
   })
   return toEventResponse(event)
 }

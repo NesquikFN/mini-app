@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ShieldAlert } from 'lucide-react'
 import { AuthContext, type AuthStatus } from './AuthContext'
-import { LoadingState } from '../components/LoadingState'
 import { EmptyState } from '../components/EmptyState'
+import { SplashScreen } from '../components/SplashScreen'
 import { authenticateWithTelegram, getErrorMessage } from '../services/api'
 import { bootstrapTelegramWebApp, getTelegramInitData } from '../services/telegram'
 import { setSessionToken, clearSessionToken } from '../services/session'
@@ -10,6 +10,10 @@ import { setSessionToken, clearSessionToken } from '../services/session'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('authenticating')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Independent from `status`: the splash plays its own close-out
+  // (current bounce -> final hop -> logo reveal -> fade) after status
+  // resolves, rather than being torn down the instant auth settles.
+  const [splashDone, setSplashDone] = useState(false)
 
   const runAuth = useCallback(() => {
     bootstrapTelegramWebApp()
@@ -34,35 +38,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const retry = useCallback(() => {
     setStatus('authenticating')
     setErrorMessage(null)
+    setSplashDone(false)
     runAuth()
   }, [runAuth])
 
-  if (status === 'authenticating') {
-    return (
-      <FullScreenCenter>
-        <LoadingState label="Підключення до Telegram…" />
-      </FullScreenCenter>
-    )
-  }
-
-  if (status === 'error') {
-    return (
-      <FullScreenCenter>
-        <EmptyState
-          icon={<ShieldAlert size={40} />}
-          title="Не вдалося підтвердити Telegram-користувача."
-          description={errorMessage ?? undefined}
-          actionLabel="Спробувати ще раз"
-          onAction={retry}
-        />
-      </FullScreenCenter>
-    )
-  }
-
   return (
-    <AuthContext.Provider value={{ status, errorMessage, retry }}>
-      {children}
-    </AuthContext.Provider>
+    <>
+      {/* Mounts as soon as auth succeeds — while the splash is still
+          playing its exit animation on top, everything underneath
+          (UserProvider/DormitoriesProvider/EventsProvider) is already
+          fetching, so by the time the splash fades there is often
+          nothing left to wait for. */}
+      {status === 'authenticated' && (
+        <AuthContext.Provider value={{ status, errorMessage, retry }}>
+          {children}
+        </AuthContext.Provider>
+      )}
+
+      {status === 'error' && splashDone && (
+        <FullScreenCenter>
+          <EmptyState
+            icon={<ShieldAlert size={40} />}
+            title="Не вдалося підтвердити Telegram-користувача."
+            description={errorMessage ?? undefined}
+            actionLabel="Спробувати ще раз"
+            onAction={retry}
+          />
+        </FullScreenCenter>
+      )}
+
+      {!splashDone && (
+        <SplashScreen
+          appState={status === 'authenticated' ? 'ready' : status === 'error' ? 'error' : 'loading'}
+          onFinished={() => setSplashDone(true)}
+        />
+      )}
+    </>
   )
 }
 

@@ -8,6 +8,9 @@
  *
  * Uses a telegram_id far outside the seed-data range so it never
  * collides with database/seed.sql or the DEV_AUTH demo user.
+ *
+ * REQUIRES database/migrations/0004_dormitories.sql to already be
+ * applied — event creation now needs a dormitory on the user.
  */
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -96,6 +99,17 @@ describe('authenticated API access', () => {
       .send({ initData: validInitDataFor(TEST_TELEGRAM_ID) })
     token = res.body.token
     userId = res.body.user.id
+
+    // Event creation now requires a dormitory (see
+    // dormitory.integration.test.ts) — this suite creates events below.
+    const dormitoriesRes = await request(app)
+      .get('/api/dormitories')
+      .set('Authorization', `Bearer ${token}`)
+    const dormitoryId: string = dormitoriesRes.body.dormitories[0].id
+    await request(app)
+      .patch('/api/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dormitoryId })
   })
 
   // Regular users have no self-service delete endpoint (only admins do —
@@ -158,6 +172,58 @@ describe('authenticated API access', () => {
       .set('Authorization', `Bearer ${token}`)
     assert.equal(joinRes.status, 200)
     assert.ok(joinRes.body.event.participants.includes(userId))
+  })
+
+  it('GET /api/events/:id includes public creator/participants info without leaking private fields', async () => {
+    const createRes = await request(app)
+      .post('/api/events')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Event detail members test',
+        description: 'Створено автотестом, безпечно видалити.',
+        date: '2026-12-29',
+        time: '11:00',
+        location: 'Test room',
+        maxParticipants: 3,
+      })
+    assert.equal(createRes.status, 201)
+    const eventId: string = createRes.body.event.id
+
+    try {
+      const res = await request(app)
+        .get(`/api/events/${eventId}`)
+        .set('Authorization', `Bearer ${token}`)
+      assert.equal(res.status, 200)
+
+      // Existing lightweight shape stays untouched (used by list/join/leave
+      // and by the frontend's shared EventsContext) — this is additive.
+      assert.equal(res.body.event.creatorId, userId)
+      assert.ok(Array.isArray(res.body.event.participants))
+      assert.ok(res.body.event.participants.includes(userId))
+
+      // New enriched fields: creator + full participant profiles.
+      assert.equal(res.body.creator.id, userId)
+      assert.equal(res.body.creator.firstName, 'Тестовий Юзер')
+      assert.ok(Array.isArray(res.body.participants))
+      assert.ok(res.body.participants.some((p: { id: string }) => p.id === userId))
+
+      // Only the public-safe fields — nothing that could leak auth
+      // internals or other private data. dormitoryId is intentional
+      // (see PublicUser in types/user.ts) — this app is built entirely
+      // around dormitories, it's not sensitive.
+      const allowedKeys = new Set(['id', 'firstName', 'username', 'photoUrl', 'dormitoryId'])
+      for (const member of [res.body.creator, ...res.body.participants]) {
+        for (const key of Object.keys(member)) {
+          assert.ok(allowedKeys.has(key), `unexpected field "${key}" on a public member`)
+        }
+      }
+      const serialized = JSON.stringify(res.body)
+      for (const forbidden of ['telegramId', 'token', 'session', 'BOT_TOKEN', 'JWT_SECRET', 'service_role']) {
+        assert.ok(!serialized.includes(forbidden), `response leaked "${forbidden}"`)
+      }
+    } finally {
+      await supabase.from('events').delete().eq('id', eventId)
+    }
   })
 
   it('GET /api/me/events includes events created by the authenticated user', async () => {

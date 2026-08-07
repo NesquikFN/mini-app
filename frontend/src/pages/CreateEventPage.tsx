@@ -32,7 +32,7 @@ export function CreateEventPage() {
       <PageHeader title="Створити подію" />
       <div className="px-4 py-4">
         {submitError && (
-          <p className="mb-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+          <p className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
             {submitError}
           </p>
         )}

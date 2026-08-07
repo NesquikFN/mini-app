@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { EventsContext, type EventsStatus } from './EventsContext'
+import { EventsContext, type EventsScope, type EventsStatus } from './EventsContext'
 import type { CreateEventInput, DormEvent } from '../types/event'
 import {
   createEventRequest,
@@ -20,9 +20,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<EventsStatus>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pendingEventId, setPendingEventId] = useState<string | null>(null)
+  const [scope, setScopeState] = useState<EventsScope>('mine')
 
   const runFetch = useCallback(() => {
-    fetchEvents()
+    fetchEvents(scope)
       .then((data) => {
         setEvents(data)
         setStatus('success')
@@ -31,7 +32,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         setStatus('error')
         setErrorMessage(getErrorMessage(error))
       })
-  }, [])
+  }, [scope])
 
   useEffect(() => {
     runFetch()
@@ -42,6 +43,17 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     setErrorMessage(null)
     runFetch()
   }, [runFetch])
+
+  // Викликається лише з click-хендлерів (перемикач "Мій гуртожиток / Усі
+  // гуртожитки" на EventsPage) — синхронний скидання статусу тут, а не в
+  // ефекті, той самий патерн, що й reload(). Зміна scope міняє identity
+  // runFetch (залежність [scope]), тож useEffect вище сам перезапустить
+  // фактичний запит.
+  const setScope = useCallback((next: EventsScope) => {
+    setStatus('loading')
+    setErrorMessage(null)
+    setScopeState(next)
+  }, [])
 
   const createEvent = useCallback(async (input: CreateEventInput) => {
     const event = await createEventRequest(input)
@@ -79,6 +91,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       status,
       errorMessage,
       pendingEventId,
+      scope,
+      setScope,
       reload,
       createEvent,
       joinEvent,
@@ -89,6 +103,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       status,
       errorMessage,
       pendingEventId,
+      scope,
+      setScope,
       reload,
       createEvent,
       joinEvent,

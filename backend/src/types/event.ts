@@ -9,4 +9,6 @@ export interface Event {
   maxParticipants: number
   participantIds: string[]
   createdAt: string
+  /** FK на dormitories.id — гуртожиток творця на момент створення. */
+  dormitoryId: string
 }

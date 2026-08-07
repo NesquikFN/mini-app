@@ -135,8 +135,8 @@ export function EventForm({ onSubmit, submitting }: EventFormProps) {
 }
 
 function inputClass(hasError: boolean): string {
-  return `w-full rounded-xl border bg-white px-4 py-3 text-[15px] text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-violet-500 ${
-    hasError ? 'border-red-400' : 'border-neutral-200'
+  return `w-full rounded-xl border bg-[var(--surface-card-alt)] px-4 py-3 text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-light)] ${
+    hasError ? 'border-red-400' : 'border-[var(--surface-border)]'
   }`
 }
 
@@ -151,9 +151,9 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-neutral-700">{label}</span>
+      <span className="text-sm font-medium text-[var(--text-secondary)]">{label}</span>
       {children}
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error && <span className="text-xs text-red-400">{error}</span>}
     </label>
   )
 }

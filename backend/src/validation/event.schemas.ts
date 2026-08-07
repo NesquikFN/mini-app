@@ -36,6 +36,12 @@ export const eventIdParamSchema = z.object({
   id: z.string().min(1, 'Ідентифікатор події обовʼязковий'),
 })
 
+// 'mine' за замовчуванням — сервер сам вирішує, що таке "мій гуртожиток"
+// (req.user.dormitoryId), клієнт лише обирає між своїм і "усі".
+export const eventsListQuerySchema = z.object({
+  scope: z.enum(['mine', 'all']).catch('mine'),
+})
+
 export const userIdParamSchema = z.object({
   userId: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
 })

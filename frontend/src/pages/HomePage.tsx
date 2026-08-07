@@ -4,13 +4,15 @@ import { useEvents } from '../hooks/useEvents'
 import { EventCard } from '../components/EventCard'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
+import { DormitorySelector } from '../components/DormitorySelector'
 import { isPastDate } from '../utils/date'
-
-const DORM_NAME = 'Гуртожиток №5'
 
 export function HomePage() {
   const { events, status, errorMessage, reload } = useEvents()
 
+  // EventsContext за замовчуванням тримає scope='mine' — backend уже
+  // віддає лише події свого гуртожитку, тут фільтруємо лише за датою.
+  // Повний перемикач "Мій гуртожиток / Усі гуртожитки" живе на /events.
   const upcoming = [...events]
     .filter((event) => !isPastDate(event.date))
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
@@ -18,17 +20,17 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-8">
-      <div>
-        <p className="text-xl font-semibold text-neutral-900">👋 Привіт!</p>
-        <p className="mt-1 text-sm text-neutral-500">{DORM_NAME}</p>
+      <div className="flex flex-col gap-4">
+        <p className="text-xl font-semibold text-[var(--text-primary)]">👋 Привіт!</p>
+        <DormitorySelector />
       </div>
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-neutral-900">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
             Найближчі події
           </h2>
-          <Link to="/events" className="text-sm font-medium text-violet-600">
+          <Link to="/events" className="text-sm font-medium text-[var(--accent)]">
             Переглянути всі
           </Link>
         </div>

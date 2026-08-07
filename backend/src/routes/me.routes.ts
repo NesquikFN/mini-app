@@ -4,4 +4,5 @@ import * as meController from '../controllers/me.controller'
 export const meRouter = Router()
 
 meRouter.get('/', meController.getMe)
+meRouter.patch('/', meController.updateMe)
 meRouter.get('/events', meController.getMyEvents)

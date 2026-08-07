@@ -10,7 +10,7 @@ const items = [
 
 export function BottomNavigation() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-neutral-200 bg-white/95 backdrop-blur">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--surface-border)] bg-[var(--surface-bg)]/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-[560px] items-stretch justify-between px-2 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {items.map(({ to, label, icon: Icon, end }) => (
           <NavLink
@@ -18,8 +18,8 @@ export function BottomNavigation() {
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex flex-1 flex-col items-center gap-1 rounded-xl py-2 text-xs font-medium transition-colors ${
-                isActive ? 'text-violet-600' : 'text-neutral-400'
+              `flex flex-1 flex-col items-center gap-1 rounded-xl py-2 text-xs font-medium transition-all active:scale-90 ${
+                isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'
               }`
             }
           >

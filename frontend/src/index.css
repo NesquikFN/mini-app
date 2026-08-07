@@ -1,12 +1,161 @@
 @import 'tailwindcss';
 
-/* admin/ — окремий Vite-застосунок зі своїм index.css; без цього Tailwind
-   v4 автоматично сканує його теж (він вкладений у frontend/) і тягне його
-   класи (напр. bg-red-600 з адмінської Button) у бандл звичайного Mini App. */
-@source not "../admin";
-
 @theme {
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/*
+ * Semantic color tokens. Defaults below match the app's original light
+ * theme byte-for-byte (used as-is by /admin, which stays untouched).
+ * `.theme-dorm` (wraps the main app in MainLayout) overrides them with
+ * the black+orange palette — components read the vars, so the same
+ * shared components (Button, EventCard, ConfirmDialog, ...) render
+ * correctly in both surfaces without duplication.
+ */
+:root {
+  --surface-bg: #fafafa;
+  --surface-card: #ffffff;
+  --surface-card-alt: #f5f5f5;
+  --surface-border: #e5e5e5;
+  --text-primary: #171717;
+  --text-secondary: #737373;
+  --text-disabled: #a3a3a3;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-light: #8b5cf6;
+  --accent-soft-bg: #f5f3ff;
+}
+
+.theme-dorm {
+  --surface-bg: #0b0b0b;
+  --surface-card: #151515;
+  --surface-card-alt: #1e1e1e;
+  --surface-border: #262626;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-disabled: #5c5c5c;
+  --accent: #ff7a00;
+  --accent-hover: #e56d00;
+  --accent-light: #ff9a3d;
+  --accent-soft-bg: rgba(255, 122, 0, 0.14);
+}
+
+@keyframes dormhub-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dormhub-slide-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/*
+ * Splash screen (SplashScreen.tsx). Seamless infinite bounce: 0%/100%
+ * are identical (ground contact, squashed) so looping never jumps.
+ * Squash on impact, brief stretch leaving the ground, normal scale
+ * mid-flight — kept subtle on purpose (not cartoonish).
+ */
+@keyframes dormhub-splash-bounce {
+  0% {
+    transform: translateY(0) scaleX(1.12) scaleY(0.88);
+  }
+  7% {
+    transform: translateY(-6%) scaleX(0.94) scaleY(1.06);
+  }
+  20% {
+    transform: translateY(-45%) scaleX(1) scaleY(1);
+  }
+  47% {
+    transform: translateY(-100%) scaleX(1) scaleY(1);
+  }
+  76% {
+    transform: translateY(-40%) scaleX(1) scaleY(1);
+  }
+  93% {
+    transform: translateY(-4%) scaleX(1.03) scaleY(0.97);
+  }
+  100% {
+    transform: translateY(0) scaleX(1.12) scaleY(0.88);
+  }
+}
+
+/* Same timing family as the dot, but only opacity/width change — the
+ * shadow never moves vertically, it just reacts to how "high" the dot
+ * currently is (wide+faint at apex, tight+darker at ground). */
+@keyframes dormhub-splash-shadow {
+  0% {
+    transform: scaleX(1) scaleY(1);
+    opacity: 0.32;
+  }
+  47% {
+    transform: scaleX(1.7) scaleY(1.7);
+    opacity: 0.06;
+  }
+  100% {
+    transform: scaleX(1) scaleY(1);
+    opacity: 0.32;
+  }
+}
+
+/* Very small, slow, independent-period drift so the frame never reads
+ * as fully static — deliberately not synced 1:1 with the bounce. */
+@keyframes dormhub-splash-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-3px, 2px);
+  }
+}
+
+/* One-shot smaller hop that closes the loading loop once the app is
+ * ready — lands exactly back at the shared ground/center point where
+ * the logo begins drawing. */
+@keyframes dormhub-splash-final-hop {
+  0% {
+    transform: translateY(0) scaleX(1.12) scaleY(0.88);
+  }
+  10% {
+    transform: translateY(-8%) scaleX(0.94) scaleY(1.06);
+  }
+  50% {
+    transform: translateY(-60%) scaleX(1) scaleY(1);
+  }
+  88% {
+    transform: translateY(-6%) scaleX(1) scaleY(1);
+  }
+  100% {
+    transform: translateY(0) scaleX(1.14) scaleY(0.82);
+  }
+}
+
+@keyframes dormhub-splash-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dormhub-splash-dot,
+  .dormhub-splash-shadow,
+  .dormhub-splash-camera {
+    animation: none !important;
+  }
 }
 
 html,
@@ -22,6 +171,6 @@ html {
 body {
   margin: 0;
   overflow-x: hidden;
-  background-color: #fafafa;
+  background-color: #0b0b0b;
   font-family: var(--font-sans);
 }

@@ -1,52 +1,210 @@
 import { adminRepository } from '../repositories/admin.repository'
 import { usersRepository } from '../repositories/users.repository'
+import { eventsRepository, type EventDateFilter } from '../repositories/events.repository'
 import * as eventsService from './events.service'
-import type { EventResponse } from './events.service'
-import type { AdminUserView } from '../types/user'
-import { todayISODate } from '../utils/date'
+import { AppError } from '../utils/AppError'
+import type {
+  AdminStats,
+  AdminUserListItem,
+  AdminUsersResponse,
+  AdminUserDetail,
+  AdminEventListItem,
+  AdminEventsResponse,
+  AdminEventDetail,
+  AdminListItem,
+  Pagination,
+} from '../types/admin'
 
-export interface AdminStats {
-  totalUsers: number
-  totalEvents: number
-  eventsToday: number
-  totalParticipations: number
-  activeUsers: number
+function buildPagination(page: number, limit: number, total: number): Pagination {
+  return { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) }
 }
 
 export async function getStats(): Promise<AdminStats> {
-  const [totalUsers, totalEvents, eventsToday, totalParticipations, activeUsers] =
-    await Promise.all([
-      adminRepository.countUsers(),
-      adminRepository.countEvents(),
-      adminRepository.countEventsOnDate(todayISODate()),
-      adminRepository.countParticipations(),
-      adminRepository.countActiveUsers(),
-    ])
+  const [users, events, activeEvents, participants] = await Promise.all([
+    adminRepository.countUsers(),
+    adminRepository.countEvents(),
+    adminRepository.countUpcomingEvents(),
+    adminRepository.countParticipations(),
+  ])
 
-  return { totalUsers, totalEvents, eventsToday, totalParticipations, activeUsers }
+  return { users, events, activeEvents, participants }
 }
 
-export async function listUsers(): Promise<AdminUserView[]> {
-  return usersRepository.getAllUsers()
+export async function listUsers(
+  page: number,
+  limit: number,
+  search?: string,
+): Promise<AdminUsersResponse> {
+  const { users, total } = await usersRepository.getUsersPaginated(page, limit, search)
+  const eventCounts = await adminRepository.countEventsByCreatorIds(users.map((user) => user.id))
+
+  const items: AdminUserListItem[] = users.map((user) => ({
+    ...user,
+    eventsCreatedCount: eventCounts.get(user.id) ?? 0,
+  }))
+
+  return { users: items, pagination: buildPagination(page, limit, total) }
 }
 
-export interface EventDetailResponse {
-  event: EventResponse
-  participants: AdminUserView[]
+export async function getUserDetail(id: string): Promise<AdminUserDetail> {
+  const user = await usersRepository.getAdminUserById(id)
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
+  }
+
+  const { created, participating } = await eventsService.listEventsForUser(id)
+
+  return {
+    user,
+    stats: {
+      createdEvents: created.length,
+      participatingEvents: participating.length,
+    },
+    createdEvents: created,
+    participatingEvents: participating,
+  }
 }
 
-export async function getEventDetail(id: string): Promise<EventDetailResponse> {
+export async function listEvents(
+  page: number,
+  limit: number,
+  search?: string,
+  dateFilter: EventDateFilter = 'all',
+): Promise<AdminEventsResponse> {
+  const { events, total } = await eventsRepository.findPaginated(page, limit, search, dateFilter)
+
+  const creatorIds = Array.from(new Set(events.map((event) => event.creatorId)))
+  const creators = await usersRepository.getPublicUsersByIds(creatorIds)
+  const creatorById = new Map(creators.map((creator) => [creator.id, creator]))
+
+  const items: AdminEventListItem[] = events.map((event) => ({
+    id: event.id,
+    title: event.title,
+    description: event.description,
+    date: event.date,
+    time: event.time,
+    location: event.location,
+    maxParticipants: event.maxParticipants,
+    participantsCount: event.participantIds.length,
+    creator: creatorById.get(event.creatorId) ?? {
+      id: event.creatorId,
+      firstName: 'Учасник DormHub',
+    },
+    createdAt: event.createdAt,
+  }))
+
+  return { events: items, pagination: buildPagination(page, limit, total) }
+}
+
+export async function getEventDetail(id: string): Promise<AdminEventDetail> {
   const event = await eventsService.getEvent(id)
-  const participants = await usersRepository.getUsersByIds(event.participants)
-  return { event, participants }
+  const { creator, participants } = await eventsService.getEventMembers(event)
+  return { event, creator, participants }
 }
 
-/** Адмін знімає довільного користувача з події — та сама доменна дія, що
- * й "вийти з події" від імені самого учасника, тому переюзаємо
- * eventsService.leaveEvent замість повторної реалізації. */
-export async function removeParticipant(
-  eventId: string,
-  userId: string,
-): Promise<EventResponse> {
-  return eventsService.leaveEvent(eventId, userId)
+export async function deleteEvent(id: string): Promise<void> {
+  await eventsService.deleteEvent(id)
+}
+
+/** Адмін знімає довільного користувача з довільної події. Перевіряємо
+ * існування події окремо (getEvent кине 404 EVENT_NOT_FOUND), а вже потім
+ * питаємо репозиторій прибрати конкретний рядок участі — якщо його не
+ * було, це 404 PARTICIPANT_NOT_FOUND, а не мовчазний "успіх".
+ *
+ * Організатора не можна зняти цією кнопкою: він завжди в
+ * event_participants (автоприєднання при створенні), але видалення
+ * організатора — окрема операція (видалення/передача самої події), яку
+ * зараз не реалізовано. */
+export async function removeParticipant(eventId: string, userId: string): Promise<void> {
+  const event = await eventsService.getEvent(eventId)
+
+  if (event.creatorId === userId) {
+    throw new AppError(
+      400,
+      'CANNOT_REMOVE_ORGANIZER',
+      'Не можна видалити організатора як учасника — це окрема операція',
+    )
+  }
+
+  const removed = await eventsRepository.removeParticipant(eventId, userId)
+  if (!removed) {
+    throw new AppError(404, 'PARTICIPANT_NOT_FOUND', 'Учасника не знайдено')
+  }
+}
+
+/** Список адмінів — деталі профілю домальовуються батчем через
+ * usersRepository.getUsersByIds (той самий патерн, що й для creators у
+ * listEvents), a не по одному запиту на людину. */
+export async function listAdmins(): Promise<AdminListItem[]> {
+  const adminRows = await adminRepository.listAdmins()
+  if (adminRows.length === 0) return []
+
+  const users = await usersRepository.getUsersByIds(adminRows.map((row) => row.userId))
+  const userById = new Map(users.map((user) => [user.id, user]))
+
+  return adminRows
+    .map((row) => {
+      const user = userById.get(row.userId)
+      if (!user) return null
+      return { ...user, adminSince: row.adminSince }
+    })
+    .filter((item): item is AdminListItem => item !== null)
+}
+
+/** Додавання адміна відбувається через Telegram ID, а не через users.id —
+ * зручніше для оператора (той самий ID, що видно в Telegram), і не
+ * дозволяє призначити адміном рядок, якого ще нема (людина повинна хоч
+ * раз відкрити застосунок і пройти Telegram-автентифікацію). Upsert у
+ * репозиторії гарантує відсутність дублікатів при повторному виклику. */
+export async function addAdminByTelegramId(telegramId: number): Promise<AdminListItem> {
+  const user = await usersRepository.getUserByTelegramId(telegramId)
+  if (!user) {
+    throw new AppError(
+      404,
+      'USER_NOT_FOUND',
+      'Користувача з таким Telegram ID ще немає в системі — попросіть спочатку відкрити застосунок',
+    )
+  }
+
+  const adminRow = await adminRepository.addAdmin(user.id)
+  const adminView = await usersRepository.getAdminUserById(user.id)
+  if (!adminView) {
+    throw new Error('Не вдалося прочитати щойно доданого адміністратора')
+  }
+
+  return { ...adminView, adminSince: adminRow.adminSince }
+}
+
+/**
+ * Аналіз поточної моделі: admin_users — плаский список без поняття
+ * "головного"/системного адміна (жодного окремого прапорця чи ролі).
+ * Мінімальний безпечний варіант захисту без зміни схеми: заборонити
+ * видаляти останнього адміна, що лишився — інакше ніхто більше не зможе
+ * керувати admin_users і сама адмін-панель стане недосяжною.
+ *
+ * Винесено в чисту функцію (без звернень до Supabase) навмисно — щоб цю
+ * межову умову можна було юніт-тестувати (admin.service.test.ts) не
+ * чіпаючи реальний admin_users у живій базі (там зараз справжні
+ * адміністратори, включно з обліковим записом власника проєкту).
+ */
+export function canRemoveAdmin(totalAdminCount: number): boolean {
+  return totalAdminCount > 1
+}
+
+export async function removeAdmin(userId: string): Promise<void> {
+  const isTargetAdmin = await adminRepository.isAdmin(userId)
+  if (!isTargetAdmin) {
+    throw new AppError(404, 'ADMIN_NOT_FOUND', 'Цей користувач не є адміністратором')
+  }
+
+  const total = await adminRepository.countAdmins()
+  if (!canRemoveAdmin(total)) {
+    throw new AppError(
+      409,
+      'LAST_ADMIN_CANNOT_BE_REMOVED',
+      'Не можна видалити останнього адміністратора',
+    )
+  }
+
+  await adminRepository.removeAdmin(userId)
 }

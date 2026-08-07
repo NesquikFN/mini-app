@@ -1,19 +1,29 @@
 import type { Request, Response } from 'express'
 import * as eventsService from '../services/events.service'
-import { createEventSchema, eventIdParamSchema } from '../validation/event.schemas'
+import {
+  createEventSchema,
+  eventIdParamSchema,
+  eventsListQuerySchema,
+} from '../validation/event.schemas'
 
-export async function listEvents(_req: Request, res: Response): Promise<void> {
-  res.json({ events: await eventsService.listEvents() })
+export async function listEvents(req: Request, res: Response): Promise<void> {
+  const { scope } = eventsListQuerySchema.parse(req.query)
+  res.json({ events: await eventsService.listEvents(scope, req.user.dormitoryId) })
 }
 
 export async function getEvent(req: Request, res: Response): Promise<void> {
   const { id } = eventIdParamSchema.parse(req.params)
-  res.json({ event: await eventsService.getEvent(id) })
+  const event = await eventsService.getEvent(id)
+  const { creator, participants } = await eventsService.getEventMembers(event)
+  res.json({ event, creator, participants })
 }
 
 export async function createEvent(req: Request, res: Response): Promise<void> {
   const input = createEventSchema.parse(req.body)
-  const event = await eventsService.createEvent(req.user.id, input)
+  // dormitoryId навмисно НЕ входить у createEventSchema — навіть якщо
+  // req.body містить це поле, Zod його відкидає. Реальне значення завжди
+  // береться з req.user.dormitoryId (users.dormitory_id поточної сесії).
+  const event = await eventsService.createEvent(req.user.id, req.user.dormitoryId, input)
   res.status(201).json({ event })
 }
 

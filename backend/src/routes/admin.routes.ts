@@ -1,20 +1,20 @@
 import { Router } from 'express'
 import * as adminController from '../controllers/admin.controller'
-import * as eventsController from '../controllers/events.controller'
 
 export const adminRouter = Router()
 
+adminRouter.get('/check', adminController.check)
 adminRouter.get('/stats', adminController.getStats)
 
 adminRouter.get('/users', adminController.listUsers)
+adminRouter.get('/users/:id', adminController.getUserDetail)
 
-// Список і створення подій — та сама логіка, що й у звичайному Mini App
-// API (events.controller.ts), тому переюзаємо контролери напряму замість
-// повторної реалізації.
-adminRouter.get('/events', eventsController.listEvents)
-adminRouter.post('/events', eventsController.createEvent)
-
+adminRouter.get('/events', adminController.listEvents)
 adminRouter.get('/events/:id', adminController.getEventDetail)
-adminRouter.patch('/events/:id', adminController.updateEvent)
 adminRouter.delete('/events/:id', adminController.deleteEvent)
+adminRouter.get('/events/:id/participants', adminController.getEventParticipants)
 adminRouter.delete('/events/:id/participants/:userId', adminController.removeParticipant)
+
+adminRouter.get('/admins', adminController.listAdmins)
+adminRouter.post('/admins', adminController.addAdmin)
+adminRouter.delete('/admins/:userId', adminController.removeAdmin)

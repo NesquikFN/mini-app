@@ -1,11 +1,36 @@
 -- DormHub — повна PostgreSQL-схема для Supabase.
 -- Виконати повністю один раз у Supabase SQL Editor (Project → SQL Editor → New query).
--- Та сама схема продубльована у database/migrations/0001_init_schema.sql та
--- database/migrations/0002_admin_users.sql для майбутнього версіонування
--- через Supabase CLI migrations.
+-- Та сама схема продубльована у database/migrations/0001_init_schema.sql,
+-- database/migrations/0002_admin_users.sql та
+-- database/migrations/0004_dormitories.sql для майбутнього версіонування
+-- через Supabase CLI migrations. migrations/0003_dormitory.sql — проміжний
+-- крок (smallint-поле dormitory), повністю замінений 0004 на нормальну
+-- таблицю dormitories з FK; цей файл одразу відображає фінальний стан.
 
 -- Потрібно для gen_random_uuid().
 create extension if not exists pgcrypto;
+
+-- =========================================================
+-- Таблиця dormitories
+-- =========================================================
+create table if not exists dormitories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  short_name text,
+  created_at timestamptz not null default now(),
+  constraint dormitories_name_key unique (name)
+);
+
+-- Детерміновані id — узгоджені з migrations/0004_dormitories.sql, щоб
+-- обидва шляхи встановлення (цей файл або послідовні migrations) давали
+-- однаковий результат.
+insert into dormitories (id, name, short_name) values
+  ('00000000-0000-0000-0000-000000000101', 'Гуртожиток №1', '№1'),
+  ('00000000-0000-0000-0000-000000000102', 'Гуртожиток №2', '№2'),
+  ('00000000-0000-0000-0000-000000000103', 'Гуртожиток №3', '№3'),
+  ('00000000-0000-0000-0000-000000000104', 'Гуртожиток №4', '№4'),
+  ('00000000-0000-0000-0000-000000000105', 'Гуртожиток №5', '№5')
+on conflict (name) do nothing;
 
 -- =========================================================
 -- Таблиця users
@@ -17,11 +42,18 @@ create table if not exists users (
   first_name text not null,
   last_name text,
   photo_url text,
+  -- Гуртожиток користувача. Nullable: новий користувач обирає його при
+  -- онбордингу (frontend), обов'язковість не форсується на рівні БД. FK
+  -- без ON DELETE CASCADE/SET NULL навмисно — видалення гуртожитка, до
+  -- якого досі належать users, має бути заблоковане (RESTRICT), а не
+  -- тихо лишати людей без гуртожитку.
+  dormitory_id uuid references dormitories (id),
   created_at timestamptz not null default now(),
   constraint users_telegram_id_key unique (telegram_id)
 );
 
 create index if not exists idx_users_telegram_id on users (telegram_id);
+create index if not exists idx_users_dormitory_id on users (dormitory_id);
 
 -- =========================================================
 -- Таблиця events
@@ -35,12 +67,19 @@ create table if not exists events (
   time time not null,
   location text not null,
   max_participants integer not null,
+  -- Гуртожиток, до якого належить подія — завжди береться з creator's
+  -- users.dormitory_id на backend, ніколи з клієнтського запиту (див.
+  -- events.service.createEvent). NOT NULL: кожна подія завжди належить
+  -- конкретному гуртожитку. Той самий RESTRICT-за-замовчуванням FK, що
+  -- й для users.
+  dormitory_id uuid not null references dormitories (id),
   created_at timestamptz not null default now(),
   constraint events_max_participants_positive check (max_participants > 0)
 );
 
 create index if not exists idx_events_creator_id on events (creator_id);
 create index if not exists idx_events_date on events (date);
+create index if not exists idx_events_dormitory_id on events (dormitory_id);
 
 -- =========================================================
 -- Таблиця event_participants
@@ -85,6 +124,7 @@ alter table users enable row level security;
 alter table events enable row level security;
 alter table event_participants enable row level security;
 alter table admin_users enable row level security;
+alter table dormitories enable row level security;
 
 -- =========================================================
 -- Атомарна функція приєднання до події (захист від race condition)

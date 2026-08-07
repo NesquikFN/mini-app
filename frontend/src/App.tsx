@@ -2,31 +2,59 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthProvider'
 import { EventsProvider } from './context/EventsProvider'
 import { UserProvider } from './context/UserProvider'
+import { DormitoriesProvider } from './context/DormitoriesProvider'
+import { AdminStatusProvider } from './context/AdminStatusProvider'
+import { AdminGuard } from './layouts/AdminGuard'
+import { DormitoryGate } from './layouts/DormitoryGate'
 import { MainLayout } from './layouts/MainLayout'
+import { AdminLayout } from './layouts/AdminLayout'
 import { HomePage } from './pages/HomePage'
 import { EventsPage } from './pages/EventsPage'
 import { EventDetailPage } from './pages/EventDetailPage'
 import { CreateEventPage } from './pages/CreateEventPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { AdminOverviewPage } from './pages/admin/AdminOverviewPage'
+import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+import { AdminUserDetailPage } from './pages/admin/AdminUserDetailPage'
+import { AdminEventsPage } from './pages/admin/AdminEventsPage'
+import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
+import { AdminAdminsPage } from './pages/admin/AdminAdminsPage'
 
 function App() {
   return (
     <AuthProvider>
-      <UserProvider>
-        <EventsProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/events" element={<EventsPage />} />
-                <Route path="/events/:id" element={<EventDetailPage />} />
-                <Route path="/create" element={<CreateEventPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
-        </EventsProvider>
-      </UserProvider>
+      <AdminStatusProvider>
+        <UserProvider>
+          <DormitoriesProvider>
+            <EventsProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route element={<DormitoryGate />}>
+                    <Route element={<MainLayout />}>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/events" element={<EventsPage />} />
+                      <Route path="/events/:id" element={<EventDetailPage />} />
+                      <Route path="/create" element={<CreateEventPage />} />
+                      <Route path="/profile" element={<ProfilePage />} />
+                    </Route>
+                  </Route>
+
+                  <Route element={<AdminGuard />}>
+                    <Route element={<AdminLayout />}>
+                      <Route path="/admin" element={<AdminOverviewPage />} />
+                      <Route path="/admin/users" element={<AdminUsersPage />} />
+                      <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
+                      <Route path="/admin/events" element={<AdminEventsPage />} />
+                      <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
+                      <Route path="/admin/admins" element={<AdminAdminsPage />} />
+                    </Route>
+                  </Route>
+                </Routes>
+              </BrowserRouter>
+            </EventsProvider>
+          </DormitoriesProvider>
+        </UserProvider>
+      </AdminStatusProvider>
     </AuthProvider>
   )
 }

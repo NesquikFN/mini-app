@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 
-type Variant = 'primary' | 'secondary' | 'outline'
+type Variant = 'primary' | 'secondary' | 'outline' | 'danger'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
@@ -12,11 +12,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    'bg-violet-600 text-white active:bg-violet-700 disabled:bg-neutral-200 disabled:text-neutral-400',
+    'bg-[var(--accent)] text-white active:bg-[var(--accent-hover)] disabled:bg-[var(--surface-card-alt)] disabled:text-[var(--text-disabled)]',
   secondary:
-    'bg-neutral-100 text-neutral-900 active:bg-neutral-200 disabled:text-neutral-400',
+    'bg-[var(--surface-card-alt)] text-[var(--text-primary)] active:opacity-80 disabled:text-[var(--text-disabled)]',
   outline:
-    'border border-neutral-300 text-neutral-900 active:bg-neutral-50 disabled:border-neutral-200 disabled:text-neutral-400',
+    'border border-[var(--surface-border)] text-[var(--text-primary)] active:bg-[var(--surface-card-alt)] disabled:border-[var(--surface-border)] disabled:text-[var(--text-disabled)]',
+  danger:
+    'bg-red-600 text-white active:bg-red-700 disabled:bg-[var(--surface-card-alt)] disabled:text-[var(--text-disabled)]',
 }
 
 export function Button({
@@ -32,7 +34,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled || loading}
-      className={`inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 text-[15px] font-semibold transition-colors disabled:cursor-not-allowed ${variantClasses[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
+      className={`inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 text-[15px] font-semibold transition-all duration-100 active:scale-[0.97] disabled:cursor-not-allowed disabled:active:scale-100 ${variantClasses[variant]} ${fullWidth ? 'w-full' : ''} ${className}`}
       {...rest}
     >
       {loading && <Loader2 size={18} className="animate-spin" />}

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarX } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CalendarX, Home, Settings } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { Avatar } from '../components/Avatar'
 import { EventCard } from '../components/EventCard'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useAdminStatus } from '../hooks/useAdminStatus'
+import { useDormitories } from '../hooks/useDormitories'
 import {
   fetchMyEvents,
   getErrorMessage,
@@ -21,6 +24,8 @@ export function ProfilePage() {
     errorMessage: userErrorMessage,
     reload: reloadUser,
   } = useCurrentUser()
+  const { status: adminStatus } = useAdminStatus()
+  const { getDormitoryName } = useDormitories()
 
   const [myEvents, setMyEvents] = useState<MyEventsResponse | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -74,14 +79,28 @@ export function ProfilePage() {
             <div className="flex items-center gap-4">
               <Avatar name={user.firstName} size={56} />
               <div>
-                <p className="text-lg font-semibold text-neutral-900">
+                <p className="text-lg font-semibold text-[var(--text-primary)]">
                   {user.firstName}
                 </p>
                 {user.username && (
-                  <p className="text-sm text-neutral-500">@{user.username}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">@{user.username}</p>
                 )}
+                <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-[var(--text-secondary)]">
+                  <Home size={14} />{' '}
+                  {getDormitoryName(user.dormitoryId) || 'Гуртожиток не вказано'}
+                </p>
               </div>
             </div>
+
+            {adminStatus === 'admin' && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition-transform active:scale-[0.98] active:bg-[var(--surface-card-alt)]"
+              >
+                <Settings size={18} className="text-[var(--accent)]" />
+                Адмін-панель
+              </Link>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <StatCard
@@ -95,7 +114,7 @@ export function ProfilePage() {
             </div>
 
             <section className="flex flex-col gap-3">
-              <h2 className="text-base font-semibold text-neutral-900">
+              <h2 className="text-base font-semibold text-[var(--text-primary)]">
                 Мої створені події
               </h2>
               {myEvents.created.length === 0 ? (
@@ -111,7 +130,7 @@ export function ProfilePage() {
             </section>
 
             <section className="flex flex-col gap-3">
-              <h2 className="text-base font-semibold text-neutral-900">
+              <h2 className="text-base font-semibold text-[var(--text-primary)]">
                 Події, у яких беру участь
               </h2>
               {myEvents.participating.length === 0 ? (
@@ -134,9 +153,9 @@ export function ProfilePage() {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 text-center">
-      <p className="text-2xl font-semibold text-neutral-900">{value}</p>
-      <p className="mt-1 text-xs text-neutral-500">{label}</p>
+    <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 text-center">
+      <p className="text-2xl font-semibold text-[var(--accent)]">{value}</p>
+      <p className="mt-1 text-xs text-[var(--text-secondary)]">{label}</p>
     </div>
   )
 }

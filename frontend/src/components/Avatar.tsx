@@ -1,5 +1,8 @@
+import { useState } from 'react'
+
 interface AvatarProps {
   name: string
+  photoUrl?: string
   size?: number
 }
 
@@ -17,8 +20,22 @@ function colorForName(name: string): string {
   return COLORS[index]
 }
 
-export function Avatar({ name, size = 36 }: AvatarProps) {
+export function Avatar({ name, photoUrl, size = 36 }: AvatarProps) {
+  const [imageFailed, setImageFailed] = useState(false)
   const initial = name.trim().charAt(0).toUpperCase()
+
+  if (photoUrl && !imageFailed) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        onError={() => setImageFailed(true)}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    )
+  }
+
   return (
     <div
       className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${colorForName(name)}`}

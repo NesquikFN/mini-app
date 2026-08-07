@@ -7,6 +7,7 @@ import { EventCard } from '../components/EventCard'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { FilterTabs } from '../components/FilterTabs'
+import type { EventsScope } from '../context/EventsContext'
 import { isSameDay, isWithinNextDays } from '../utils/date'
 
 type FilterValue = 'all' | 'today' | 'week'
@@ -17,8 +18,13 @@ const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
   { value: 'week', label: 'Цього тижня' },
 ]
 
+const DORM_FILTER_OPTIONS: { value: EventsScope; label: string }[] = [
+  { value: 'mine', label: 'Мій гуртожиток' },
+  { value: 'all', label: 'Усі гуртожитки' },
+]
+
 export function EventsPage() {
-  const { events, status, errorMessage, reload } = useEvents()
+  const { events, status, errorMessage, reload, scope, setScope } = useEvents()
   const [filter, setFilter] = useState<FilterValue>('all')
   const location = useLocation()
   const navigate = useNavigate()
@@ -33,6 +39,8 @@ export function EventsPage() {
     return () => clearTimeout(timer)
   }, [successMessage, navigate, location.pathname])
 
+  // dormitory-фільтрація (scope) відбувається на backend — тут лишається
+  // лише фільтр за датою, той самий client-side предикат, що й раніше.
   const filtered = events
     .filter((event) => {
       if (filter === 'today') return isSameDay(event.date, new Date())
@@ -46,16 +54,13 @@ export function EventsPage() {
       <PageHeader title="Події" />
 
       {successMessage && (
-        <div className="mx-4 mt-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+        <div className="mx-4 mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-400">
           {successMessage}
         </div>
       )}
 
-      <FilterTabs
-        options={FILTER_OPTIONS}
-        value={filter}
-        onChange={setFilter}
-      />
+      <FilterTabs options={DORM_FILTER_OPTIONS} value={scope} onChange={setScope} />
+      <FilterTabs options={FILTER_OPTIONS} value={filter} onChange={setFilter} />
 
       <div className="flex flex-col gap-3 px-4 py-4">
         {status === 'loading' && <LoadingState label="Завантажуємо події…" />}

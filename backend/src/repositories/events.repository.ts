@@ -1,6 +1,9 @@
 import { supabase } from '../config/supabase'
 import { AppError } from '../utils/AppError'
+import { addDays, todayISODate, toISODate } from '../utils/date'
 import type { Event } from '../types/event'
+
+export type EventDateFilter = 'today' | 'week' | 'all'
 
 interface EventRow {
   id: string
@@ -12,6 +15,7 @@ interface EventRow {
   location: string
   max_participants: number
   created_at: string
+  dormitory_id: string
   event_participants: { user_id: string }[]
 }
 
@@ -23,6 +27,9 @@ export interface NewEvent {
   time: string
   location: string
   maxParticipants: number
+  /** Береться з creator's users.dormitory_id на рівні сервісу — сюди
+   * ніколи не потрапляє значення з клієнтського запиту. */
+  dormitoryId: string
 }
 
 // event_participants(user_id) — вкладена вибірка: PostgREST підтягує
@@ -42,6 +49,7 @@ function toEvent(row: EventRow): Event {
     maxParticipants: row.max_participants,
     participantIds: row.event_participants.map((participant) => participant.user_id),
     createdAt: row.created_at,
+    dormitoryId: row.dormitory_id,
   }
 }
 
@@ -60,15 +68,56 @@ function translateJoinError(error: { message: string }): never {
 }
 
 export const eventsRepository = {
-  async findAll(): Promise<Event[]> {
-    const { data, error } = await supabase
-      .from('events')
-      .select(EVENT_SELECT)
+  /** dormitoryId — необов'язковий server-side фільтр (звідки саме він
+   * узятий і чи довіряти йому, вирішує events.service, не тут). Без
+   * нього — усі гуртожитки. */
+  async findAll(dormitoryId?: string): Promise<Event[]> {
+    let query = supabase.from('events').select(EVENT_SELECT)
+    if (dormitoryId) {
+      query = query.eq('dormitory_id', dormitoryId)
+    }
+
+    const { data, error } = await query
       .order('date', { ascending: true })
       .returns<EventRow[]>()
 
     if (error) throw error
     return data.map(toEvent)
+  },
+
+  /** Адмінський список подій — сторінками, з пошуком по назві та
+   * фільтром по даті. Той самий EVENT_SELECT, що й скрізь, тож
+   * participantIds доступні одразу без окремого запиту на лічильник. */
+  async findPaginated(
+    page: number,
+    limit: number,
+    search?: string,
+    dateFilter: EventDateFilter = 'all',
+  ): Promise<{ events: Event[]; total: number }> {
+    let query = supabase.from('events').select(EVENT_SELECT, { count: 'exact' })
+
+    const trimmedSearch = search?.trim()
+    if (trimmedSearch) {
+      const escaped = trimmedSearch.replace(/[%_]/g, (char) => `\\${char}`)
+      query = query.ilike('title', `%${escaped}%`)
+    }
+
+    if (dateFilter === 'today') {
+      query = query.eq('date', todayISODate())
+    } else if (dateFilter === 'week') {
+      query = query.gte('date', todayISODate()).lte('date', toISODate(addDays(new Date(), 7)))
+    }
+
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    const { data, error, count } = await query
+      .order('date', { ascending: true })
+      .range(from, to)
+      .returns<EventRow[]>()
+
+    if (error) throw error
+    return { events: data.map(toEvent), total: count ?? 0 }
   },
 
   async findById(id: string): Promise<Event | null> {
@@ -93,6 +142,7 @@ export const eventsRepository = {
         time: newEvent.time,
         location: newEvent.location,
         max_participants: newEvent.maxParticipants,
+        dormitory_id: newEvent.dormitoryId,
       })
       .select('id')
       .single<{ id: string }>()

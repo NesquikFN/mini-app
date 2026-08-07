@@ -2,12 +2,18 @@ import { createContext } from 'react'
 import type { CreateEventInput, DormEvent } from '../types/event'
 
 export type EventsStatus = 'loading' | 'success' | 'error'
+export type EventsScope = 'mine' | 'all'
 
 export interface EventsContextValue {
   events: DormEvent[]
   status: EventsStatus
   errorMessage: string | null
   pendingEventId: string | null
+  /** 'mine' (за замовчуванням) — backend сам фільтрує за гуртожитком
+   * поточного користувача; 'all' — усі гуртожитки. Перемикається через
+   * setScope, а не клієнтським фільтром уже завантаженого списку. */
+  scope: EventsScope
+  setScope: (scope: EventsScope) => void
   reload: () => void
   createEvent: (input: CreateEventInput) => Promise<DormEvent>
   joinEvent: (eventId: string) => Promise<void>

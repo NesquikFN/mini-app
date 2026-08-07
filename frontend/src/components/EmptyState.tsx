@@ -18,9 +18,9 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
-      {icon && <div className="text-neutral-300">{icon}</div>}
-      <p className="text-base font-semibold text-neutral-800">{title}</p>
-      {description && <p className="text-sm text-neutral-500">{description}</p>}
+      {icon && <div className="text-[var(--text-disabled)]">{icon}</div>}
+      <p className="text-base font-semibold text-[var(--text-primary)]">{title}</p>
+      {description && <p className="text-sm text-[var(--text-secondary)]">{description}</p>}
       {actionLabel && onAction && (
         <Button variant="outline" onClick={onAction} className="mt-2">
           {actionLabel}

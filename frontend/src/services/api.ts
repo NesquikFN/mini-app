@@ -1,5 +1,16 @@
 import type { CreateEventInput, DormEvent } from '../types/event'
-import type { AuthUser } from '../types/user'
+import type { AuthUser, PublicUser } from '../types/user'
+import type { Dormitory } from '../types/dormitory'
+import type { EventsScope } from '../context/EventsContext'
+import type {
+  AdminStats,
+  AdminUsersResponse,
+  AdminUserDetail,
+  AdminEventsResponse,
+  AdminEventDetail,
+  AdminEventDateFilter,
+  AdminListItem,
+} from '../types/admin'
 import { getSessionToken } from './session'
 
 const API_URL = import.meta.env.VITE_API_URL
@@ -98,14 +109,27 @@ export interface MyEventsResponse {
   participating: DormEvent[]
 }
 
-export async function fetchEvents(): Promise<DormEvent[]> {
-  const data = await request<EventsListResponse>('/events')
+export async function fetchEvents(scope: EventsScope = 'mine'): Promise<DormEvent[]> {
+  const data = await request<EventsListResponse>(`/events?scope=${scope}`)
   return data.events
 }
 
 export async function fetchEventById(id: string): Promise<DormEvent> {
   const data = await request<EventResponseBody>(`/events/${id}`)
   return data.event
+}
+
+export interface EventDetailResponse {
+  event: DormEvent
+  creator: PublicUser
+  participants: PublicUser[]
+}
+
+/** Той самий GET /events/:id, але забирає ще й публічні профілі
+ * організатора та учасників (backend додає ці поля до існуючої
+ * відповіді, не змінюючи форму `event`). */
+export async function fetchEventDetail(id: string): Promise<EventDetailResponse> {
+  return request<EventDetailResponse>(`/events/${id}`)
 }
 
 export async function createEventRequest(
@@ -137,6 +161,19 @@ export async function fetchCurrentUser(): Promise<AuthUser> {
   return data.user
 }
 
+export async function updateMyDormitory(dormitoryId: string): Promise<AuthUser> {
+  const data = await request<MeResponse>('/me', {
+    method: 'PATCH',
+    body: JSON.stringify({ dormitoryId }),
+  })
+  return data.user
+}
+
+export async function fetchDormitories(): Promise<Dormitory[]> {
+  const data = await request<{ dormitories: Dormitory[] }>('/dormitories')
+  return data.dormitories
+}
+
 export async function fetchMyEvents(): Promise<MyEventsResponse> {
   return request<MyEventsResponse>('/me/events')
 }
@@ -153,4 +190,73 @@ export async function authenticateWithTelegram(
     method: 'POST',
     body: JSON.stringify({ initData }),
   })
+}
+
+// ---------------------------------------------------------------------
+// Адмін-панель (/admin) — усі запити йдуть з тим самим Bearer-токеном,
+// backend перевіряє requireTelegramAuth + requireAdmin на кожен з них.
+// ---------------------------------------------------------------------
+
+export async function fetchAdminCheck(): Promise<{ isAdmin: boolean }> {
+  return request<{ isAdmin: boolean }>('/admin/check')
+}
+
+export async function fetchAdminStats(): Promise<AdminStats> {
+  return request<AdminStats>('/admin/stats')
+}
+
+export async function fetchAdminUsers(
+  page: number,
+  limit: number,
+  search?: string,
+): Promise<AdminUsersResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (search) params.set('search', search)
+  return request<AdminUsersResponse>(`/admin/users?${params.toString()}`)
+}
+
+export async function fetchAdminUserDetail(id: string): Promise<AdminUserDetail> {
+  return request<AdminUserDetail>(`/admin/users/${id}`)
+}
+
+export async function fetchAdminEvents(
+  page: number,
+  limit: number,
+  search: string | undefined,
+  date: AdminEventDateFilter,
+): Promise<AdminEventsResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit), date })
+  if (search) params.set('search', search)
+  return request<AdminEventsResponse>(`/admin/events?${params.toString()}`)
+}
+
+export async function fetchAdminEventDetail(id: string): Promise<AdminEventDetail> {
+  return request<AdminEventDetail>(`/admin/events/${id}`)
+}
+
+export async function deleteAdminEvent(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/events/${id}`, { method: 'DELETE' })
+}
+
+export async function removeAdminParticipant(eventId: string, userId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/events/${eventId}/participants/${userId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function fetchAdminAdmins(): Promise<AdminListItem[]> {
+  const data = await request<{ admins: AdminListItem[] }>('/admin/admins')
+  return data.admins
+}
+
+export async function addAdminByTelegramId(telegramId: number): Promise<AdminListItem> {
+  const data = await request<{ admin: AdminListItem }>('/admin/admins', {
+    method: 'POST',
+    body: JSON.stringify({ telegramId }),
+  })
+  return data.admin
+}
+
+export async function removeAdmin(userId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/admins/${userId}`, { method: 'DELETE' })
 }

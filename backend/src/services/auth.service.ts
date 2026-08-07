@@ -27,13 +27,22 @@ export async function authenticateTelegramUser(initData: unknown): Promise<Teleg
   const telegramUser = resolveTelegramUser(initData)
 
   const existing = await usersRepository.getUserByTelegramId(telegramUser.id)
-  const user =
-    existing ??
-    (await usersRepository.createUser({
-      telegramId: telegramUser.id,
-      firstName: telegramUser.first_name,
-      username: telegramUser.username,
-    }))
+  // Telegram надсилає поточні first_name/username/photo_url при кожному
+  // вході — синхронізуємо збережений профіль, а не лише створюємо його
+  // один раз, інакше зміна імені чи аватара в Telegram ніколи б не
+  // відобразилась у DormHub.
+  const user = existing
+    ? await usersRepository.updateProfile(existing.id, {
+        firstName: telegramUser.first_name,
+        username: telegramUser.username,
+        photoUrl: telegramUser.photo_url,
+      })
+    : await usersRepository.createUser({
+        telegramId: telegramUser.id,
+        firstName: telegramUser.first_name,
+        username: telegramUser.username,
+        photoUrl: telegramUser.photo_url,
+      })
 
   const token = signSession({ sub: user.id, telegramId: user.telegramId }, env.JWT_SECRET)
 

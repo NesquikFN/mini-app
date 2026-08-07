@@ -13,7 +13,7 @@ export async function requireAdmin(
   try {
     const isAdmin = await adminRepository.isAdmin(req.user.id)
     if (!isAdmin) {
-      throw new AppError(403, 'FORBIDDEN', 'Потрібні права адміністратора')
+      throw new AppError(403, 'ADMIN_ACCESS_REQUIRED', 'Недостатньо прав')
     }
     next()
   } catch (error) {
