@@ -1,11 +1,15 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
+import { ImagePlus, MonitorPlay, X } from 'lucide-react'
 import { Button } from './Button'
-import type { CreateEventInput } from '../types/event'
+import type { CreateEventInput, DormEvent } from '../types/event'
 import { todayISODate } from '../utils/date'
 
 interface EventFormProps {
   onSubmit: (input: CreateEventInput) => Promise<void> | void
   submitting: boolean
+  initialValues?: DormEvent
+  submitLabel?: string
+  submittingLabel?: string
 }
 
 interface FormErrors {
@@ -14,15 +18,29 @@ interface FormErrors {
   time?: string
   location?: string
   maxParticipants?: string
+  image?: string
+  groupUrl?: string
 }
 
-export function EventForm({ onSubmit, submitting }: EventFormProps) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
-  const [location, setLocation] = useState('')
-  const [maxParticipants, setMaxParticipants] = useState('')
+export function EventForm({
+  onSubmit,
+  submitting,
+  initialValues,
+  submitLabel = 'Створити подію',
+  submittingLabel = 'Створюємо…',
+}: EventFormProps) {
+  const [title, setTitle] = useState(initialValues?.title ?? '')
+  const [description, setDescription] = useState(initialValues?.description ?? '')
+  const [date, setDate] = useState(initialValues?.date ?? '')
+  const [time, setTime] = useState(initialValues?.time?.slice(0, 5) ?? '')
+  const [location, setLocation] = useState(initialValues?.isOnline ? '' : initialValues?.location ?? '')
+  const [maxParticipants, setMaxParticipants] = useState(
+    initialValues ? String(initialValues.maxParticipants) : '',
+  )
+  const [groupUrl, setGroupUrl] = useState(initialValues?.groupUrl ?? '')
+  const [isOnline, setIsOnline] = useState(initialValues?.isOnline ?? false)
+  const [imageFile, setImageFile] = useState<File | undefined>()
+  const [imagePreview, setImagePreview] = useState<string | undefined>(initialValues?.imageUrl)
   const [errors, setErrors] = useState<FormErrors>({})
 
   function validate(): FormErrors {
@@ -34,12 +52,48 @@ export function EventForm({ onSubmit, submitting }: EventFormProps) {
       nextErrors.date = 'Дата не може бути в минулому'
     }
     if (!time) nextErrors.time = 'Вкажіть час'
-    if (!location.trim()) nextErrors.location = 'Вкажіть місце'
+    if (!isOnline && !location.trim()) nextErrors.location = 'Вкажіть місце'
     const maxNum = Number(maxParticipants)
     if (!maxParticipants || Number.isNaN(maxNum) || maxNum <= 0) {
       nextErrors.maxParticipants = 'Має бути більше 0'
     }
+    if (groupUrl.trim()) {
+      const value = groupUrl.trim()
+      if (!/^@[A-Za-z0-9_]+$/.test(value)) {
+        try {
+          const url = new URL(value)
+          if (!['t.me', 'telegram.me'].includes(url.hostname)) {
+            nextErrors.groupUrl = 'Вкажіть @name або посилання на Telegram-групу'
+          }
+        } catch {
+          nextErrors.groupUrl = 'Вкажіть @name або коректне посилання'
+        }
+      }
+    }
     return nextErrors
+  }
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setErrors((current) => ({ ...current, image: 'Оберіть JPG, PNG або WebP' }))
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((current) => ({ ...current, image: 'Фото має бути менше 5 МБ' }))
+      return
+    }
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+    setErrors((current) => ({ ...current, image: undefined }))
+  }
+
+  function removeImage() {
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImageFile(undefined)
+    setImagePreview(initialValues?.imageUrl)
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -53,8 +107,11 @@ export function EventForm({ onSubmit, submitting }: EventFormProps) {
       description: description.trim(),
       date,
       time,
-      location: location.trim(),
+      location: isOnline ? 'Онлайн' : location.trim(),
       maxParticipants: Number(maxParticipants),
+      groupUrl: groupUrl.trim() || undefined,
+      isOnline,
+      imageFile,
     })
   }
 
@@ -79,6 +136,44 @@ export function EventForm({ onSubmit, submitting }: EventFormProps) {
         />
       </Field>
 
+      <Field label="Фотографія події" error={errors.image}>
+        {imagePreview ? (
+          <div className="relative overflow-hidden rounded-2xl">
+            <img src={imagePreview} alt="Попередній перегляд" className="h-44 w-full object-cover" />
+            {imageFile && (
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/65 text-white"
+                aria-label="Скасувати нову фотографію"
+              >
+                <X size={18} />
+              </button>
+            )}
+            <label className="absolute bottom-2 right-2 cursor-pointer rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white">
+              Замінити
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleImageChange}
+                className="sr-only"
+              />
+            </label>
+          </div>
+        ) : (
+          <span className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-4 py-7 text-sm text-[var(--text-secondary)]">
+            <ImagePlus size={22} className="text-[var(--accent)]" />
+            Додати фотографію
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleImageChange}
+              className="sr-only"
+            />
+          </span>
+        )}
+      </Field>
+
       <div className="grid grid-cols-2 gap-3">
         <Field label="Дата" error={errors.date}>
           <input
@@ -99,12 +194,43 @@ export function EventForm({ onSubmit, submitting }: EventFormProps) {
         </Field>
       </div>
 
-      <Field label="Місце" error={errors.location}>
+      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] p-4">
+        <span className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
+            <MonitorPlay size={20} />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-[var(--text-primary)]">Онлайн-подія</span>
+            <span className="block text-xs text-[var(--text-secondary)]">Без фізичного місця проведення</span>
+          </span>
+        </span>
         <input
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="Наприклад, Кімната відпочинку"
-          className={inputClass(!!errors.location)}
+          type="checkbox"
+          checked={isOnline}
+          onChange={(event) => setIsOnline(event.target.checked)}
+          className="h-5 w-5 accent-[var(--accent)]"
+        />
+      </label>
+
+      {!isOnline && (
+        <Field label="Місце" error={errors.location}>
+          <input
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Наприклад, Кімната відпочинку"
+            className={inputClass(!!errors.location)}
+          />
+        </Field>
+      )}
+
+      <Field label="Посилання на Telegram-групу" error={errors.groupUrl}>
+        <input
+          type="text"
+          inputMode="url"
+          value={groupUrl}
+          onChange={(e) => setGroupUrl(e.target.value)}
+          placeholder="@name або https://t.me/name"
+          className={inputClass(!!errors.groupUrl)}
         />
       </Field>
 
@@ -128,7 +254,7 @@ export function EventForm({ onSubmit, submitting }: EventFormProps) {
         loading={submitting}
         disabled={submitting}
       >
-        {submitting ? 'Створюємо…' : 'Створити подію'}
+        {submitting ? submittingLabel : submitLabel}
       </Button>
     </form>
   )

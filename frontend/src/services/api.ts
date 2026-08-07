@@ -10,6 +10,9 @@ import type {
   AdminEventDetail,
   AdminEventDateFilter,
   AdminListItem,
+  AdminUserView,
+  EventTemplate,
+  EventTemplateInput,
 } from '../types/admin'
 import { getSessionToken } from './session'
 
@@ -135,9 +138,50 @@ export async function fetchEventDetail(id: string): Promise<EventDetailResponse>
 export async function createEventRequest(
   input: CreateEventInput,
 ): Promise<DormEvent> {
+  const { imageFile, ...payload } = input
   const data = await request<EventResponseBody>('/events', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify(payload),
+  })
+  if (!imageFile) return data.event
+
+  const uploaded = await request<EventResponseBody>(`/events/${data.event.id}/image`, {
+    method: 'PUT',
+    headers: { 'Content-Type': imageFile.type },
+    body: imageFile,
+  })
+  return uploaded.event
+}
+
+export async function updateEventRequest(
+  id: string,
+  input: CreateEventInput,
+): Promise<DormEvent> {
+  const { imageFile, ...payload } = input
+  const data = await request<EventResponseBody>(`/events/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+  if (!imageFile) return data.event
+
+  const uploaded = await request<EventResponseBody>(`/events/${id}/image`, {
+    method: 'PUT',
+    headers: { 'Content-Type': imageFile.type },
+    body: imageFile,
+  })
+  return uploaded.event
+}
+
+export async function deleteEventRequest(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/events/${id}`, { method: 'DELETE' })
+}
+
+export async function removeEventParticipantRequest(
+  eventId: string,
+  userId: string,
+): Promise<DormEvent> {
+  const data = await request<EventResponseBody>(`/events/${eventId}/participants/${userId}`, {
+    method: 'DELETE',
   })
   return data.event
 }
@@ -219,6 +263,33 @@ export async function fetchAdminUserDetail(id: string): Promise<AdminUserDetail>
   return request<AdminUserDetail>(`/admin/users/${id}`)
 }
 
+export async function deleteAdminUser(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/users/${id}`, { method: 'DELETE' })
+}
+
+export type BanDuration = 'week' | 'forever' | 'custom'
+
+export async function banAdminUser(
+  id: string,
+  duration: BanDuration,
+  until?: string,
+): Promise<AdminUserView> {
+  const data = await request<{ user: AdminUserView }>(`/admin/users/${id}/ban`, {
+    method: 'PUT',
+    body: JSON.stringify({ duration, ...(until ? { until } : {}) }),
+  })
+  return data.user
+}
+
+export async function unbanAdminUser(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/users/${id}/ban`, { method: 'DELETE' })
+}
+
+export async function fetchBannedUsers(): Promise<AdminUserView[]> {
+  const data = await request<{ users: AdminUserView[] }>('/admin/banned-users')
+  return data.users
+}
+
 export async function fetchAdminEvents(
   page: number,
   limit: number,
@@ -259,4 +330,51 @@ export async function addAdminByTelegramId(telegramId: number): Promise<AdminLis
 
 export async function removeAdmin(userId: string): Promise<void> {
   await request<{ success: boolean }>(`/admin/admins/${userId}`, { method: 'DELETE' })
+}
+
+export async function fetchEventTemplates(): Promise<EventTemplate[]> {
+  const data = await request<{ templates: EventTemplate[] }>('/admin/event-templates')
+  return data.templates
+}
+
+export async function createEventTemplate(input: EventTemplateInput): Promise<EventTemplate> {
+  const { imageFile, ...payload } = input
+  const data = await request<{ template: EventTemplate }>('/admin/event-templates', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return imageFile ? uploadEventTemplateImage(data.template.id, imageFile) : data.template
+}
+
+export async function updateEventTemplate(
+  id: string,
+  input: EventTemplateInput,
+): Promise<EventTemplate> {
+  const { imageFile, ...payload } = input
+  const data = await request<{ template: EventTemplate }>(`/admin/event-templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  return imageFile ? uploadEventTemplateImage(id, imageFile) : data.template
+}
+
+async function uploadEventTemplateImage(id: string, imageFile: File): Promise<EventTemplate> {
+  const data = await request<{ template: EventTemplate }>(`/admin/event-templates/${id}/image`, {
+    method: 'PUT',
+    headers: { 'Content-Type': imageFile.type },
+    body: imageFile,
+  })
+  return data.template
+}
+
+export async function deleteEventTemplate(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/event-templates/${id}`, { method: 'DELETE' })
+}
+
+export async function createEventFromTemplate(id: string): Promise<DormEvent> {
+  const data = await request<{ event: DormEvent }>(
+    `/admin/event-templates/${id}/create-event`,
+    { method: 'POST' },
+  )
+  return data.event
 }

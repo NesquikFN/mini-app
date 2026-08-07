@@ -95,13 +95,13 @@ export function AdminAdminsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-neutral-900">Адміністратори</h1>
+      <h1 className="text-lg font-semibold text-[var(--text-primary)]">Адміністратори</h1>
 
       <form
         onSubmit={handleAdd}
-        className="flex flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-4"
+        className="flex flex-col gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4"
       >
-        <label className="text-sm font-medium text-neutral-700" htmlFor="admin-telegram-id">
+        <label className="text-sm font-medium text-[var(--text-primary)]" htmlFor="admin-telegram-id">
           Додати адміністратора за Telegram ID
         </label>
         <div className="flex gap-2">
@@ -112,7 +112,7 @@ export function AdminAdminsPage() {
             value={telegramIdInput}
             onChange={(event) => setTelegramIdInput(event.target.value)}
             placeholder="Наприклад, 939697036"
-            className="h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-violet-500"
+            className="h-11 flex-1 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-disabled)] focus:border-[var(--accent)]"
           />
           <Button type="submit" loading={adding} disabled={adding}>
             <UserPlus size={16} /> Додати
@@ -141,22 +141,22 @@ export function AdminAdminsPage() {
           {admins.map((admin) => (
             <div
               key={admin.id}
-              className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-3"
+              className="flex items-center gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-3"
             >
               <Avatar name={admin.firstName} photoUrl={admin.photoUrl} size={44} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-neutral-900">
+                <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                   {admin.firstName}
                   {admin.lastName ? ` ${admin.lastName}` : ''}
                 </p>
                 {admin.username && (
-                  <p className="truncate text-xs text-neutral-500">@{admin.username}</p>
+                  <p className="truncate text-xs text-[var(--text-secondary)]">@{admin.username}</p>
                 )}
-                <p className="font-mono text-xs text-neutral-400">
+                <p className="font-mono text-xs text-[var(--text-disabled)]">
                   telegram_id: {admin.telegramId}
                 </p>
                 {getDormitoryName(admin.dormitoryId) && (
-                  <p className="text-xs text-neutral-400">{getDormitoryName(admin.dormitoryId)}</p>
+                  <p className="text-xs text-[var(--text-disabled)]">{getDormitoryName(admin.dormitoryId)}</p>
                 )}
               </div>
               <Button

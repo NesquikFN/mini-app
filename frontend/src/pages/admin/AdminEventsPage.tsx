@@ -98,7 +98,7 @@ export function AdminEventsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-neutral-900">Події</h1>
+      <h1 className="text-lg font-semibold text-[var(--text-primary)]">Події</h1>
       <SearchInput value={search} onChange={setSearch} placeholder="Назва події" />
       <FilterTabs options={DATE_OPTIONS} value={dateFilter} onChange={setDateFilter} />
 
@@ -129,10 +129,10 @@ export function AdminEventsPage() {
             {data.events.map((event) => (
               <div
                 key={event.id}
-                className="flex flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-4"
+                className="flex flex-col gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4"
               >
-                <p className="text-base font-semibold text-neutral-900">{event.title}</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-500">
+                <p className="text-base font-semibold text-[var(--text-primary)]">{event.title}</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--text-secondary)]">
                   <span className="inline-flex items-center gap-1">
                     <CalendarDays size={14} /> {formatEventDate(event.date)}
                   </span>
@@ -143,7 +143,7 @@ export function AdminEventsPage() {
                     <MapPin size={14} /> {event.location}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-500">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--text-secondary)]">
                   <span className="inline-flex items-center gap-1">
                     <User size={14} /> {event.creator.firstName}
                   </span>

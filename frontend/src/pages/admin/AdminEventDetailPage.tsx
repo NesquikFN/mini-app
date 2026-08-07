@@ -112,7 +112,7 @@ export function AdminEventDetailPage() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-3">
-        <h1 className="text-lg font-semibold text-neutral-900">{event.title}</h1>
+        <h1 className="text-lg font-semibold text-[var(--text-primary)]">{event.title}</h1>
         <Button variant="danger" onClick={() => setConfirmingDeleteEvent(true)}>
           <Trash2 size={16} /> Видалити подію
         </Button>
@@ -122,42 +122,42 @@ export function AdminEventDetailPage() {
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{actionError}</p>
       )}
 
-      <div className="flex flex-col gap-2 rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
+      <div className="flex flex-col gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-primary)]">
         <span className="inline-flex items-center gap-2">
-          <CalendarDays size={16} className="text-neutral-400" /> {formatEventDate(event.date)}
+          <CalendarDays size={16} className="text-[var(--text-disabled)]" /> {formatEventDate(event.date)}
         </span>
         <span className="inline-flex items-center gap-2">
-          <Clock size={16} className="text-neutral-400" /> {formatEventTime(event.time)}
+          <Clock size={16} className="text-[var(--text-disabled)]" /> {formatEventTime(event.time)}
         </span>
         <span className="inline-flex items-center gap-2">
-          <MapPin size={16} className="text-neutral-400" /> {event.location}
+          <MapPin size={16} className="text-[var(--text-disabled)]" /> {event.location}
         </span>
         {getDormitoryName(event.dormitoryId) && (
           <span className="inline-flex items-center gap-2">
-            <Home size={16} className="text-neutral-400" /> {getDormitoryName(event.dormitoryId)}
+            <Home size={16} className="text-[var(--text-disabled)]" /> {getDormitoryName(event.dormitoryId)}
           </span>
         )}
       </div>
 
       {event.description && (
         <section>
-          <h2 className="mb-1 text-sm font-semibold text-neutral-900">Опис</h2>
-          <p className="text-sm leading-relaxed text-neutral-600">{event.description}</p>
+          <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Опис</h2>
+          <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{event.description}</p>
         </section>
       )}
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-neutral-900">Організатор</h2>
+      <section className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+        <h2 className="text-sm font-semibold text-[var(--text-primary)]">Організатор</h2>
         <UserRow user={creator} />
       </section>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-neutral-900">
+      <section className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+        <h2 className="text-sm font-semibold text-[var(--text-primary)]">
           Учасники {participants.length}/{event.maxParticipants}
         </h2>
 
         {participants.length === 0 ? (
-          <p className="text-sm text-neutral-500">Поки що ніхто не приєднався</p>
+          <p className="text-sm text-[var(--text-secondary)]">Поки що ніхто не приєднався</p>
         ) : (
           <div className="flex flex-col gap-2">
             {participants.map((participant) => {
@@ -165,11 +165,11 @@ export function AdminEventDetailPage() {
               return (
                 <div
                   key={participant.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 p-2"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--surface-border)] p-2"
                 >
                   <UserRow user={participant} />
                   {isOrganizer ? (
-                    <span className="shrink-0 rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-500">
+                    <span className="shrink-0 rounded-full bg-[var(--surface-card-alt)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                       Організатор
                     </span>
                   ) : (

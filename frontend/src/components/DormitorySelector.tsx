@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, ChevronDown, Home, Loader2 } from 'lucide-react'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
+import { useEvents } from '../hooks/useEvents'
 import { updateMyDormitory, getErrorMessage } from '../services/api'
 
 /** Гуртожиток користувача — джерело правди Supabase через
@@ -12,6 +13,7 @@ import { updateMyDormitory, getErrorMessage } from '../services/api'
 export function DormitorySelector() {
   const { user, reload } = useCurrentUser()
   const { dormitories, getDormitoryName } = useDormitories()
+  const { reload: reloadEvents } = useEvents()
   const [open, setOpen] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -23,6 +25,7 @@ export function DormitorySelector() {
     setError(null)
     try {
       await updateMyDormitory(id)
+      reloadEvents()
       reload()
       setOpen(false)
     } catch (err) {

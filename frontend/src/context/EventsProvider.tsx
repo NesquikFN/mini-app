@@ -9,10 +9,13 @@ import { EventsContext, type EventsScope, type EventsStatus } from './EventsCont
 import type { CreateEventInput, DormEvent } from '../types/event'
 import {
   createEventRequest,
+  deleteEventRequest,
   fetchEvents,
   getErrorMessage,
   joinEventRequest,
   leaveEventRequest,
+  removeEventParticipantRequest,
+  updateEventRequest,
 } from '../services/api'
 
 export function EventsProvider({ children }: { children: ReactNode }) {
@@ -61,6 +64,22 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     return event
   }, [])
 
+  const updateEvent = useCallback(async (eventId: string, input: CreateEventInput) => {
+    const event = await updateEventRequest(eventId, input)
+    setEvents((prev) => prev.map((item) => (item.id === eventId ? event : item)))
+    return event
+  }, [])
+
+  const deleteEvent = useCallback(async (eventId: string) => {
+    await deleteEventRequest(eventId)
+    setEvents((prev) => prev.filter((item) => item.id !== eventId))
+  }, [])
+
+  const removeParticipant = useCallback(async (eventId: string, userId: string) => {
+    const event = await removeEventParticipantRequest(eventId, userId)
+    setEvents((prev) => prev.map((item) => (item.id === eventId ? event : item)))
+  }, [])
+
   const joinEvent = useCallback(async (eventId: string) => {
     setPendingEventId(eventId)
     try {
@@ -95,6 +114,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       setScope,
       reload,
       createEvent,
+      updateEvent,
+      deleteEvent,
+      removeParticipant,
       joinEvent,
       leaveEvent,
     }),
@@ -107,6 +129,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       setScope,
       reload,
       createEvent,
+      updateEvent,
+      deleteEvent,
+      removeParticipant,
       joinEvent,
       leaveEvent,
     ],

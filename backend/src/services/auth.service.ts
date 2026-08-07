@@ -5,6 +5,7 @@ import { validateTelegramInitData } from './telegram-auth.service'
 import type { AuthUser } from '../types/user'
 import type { TelegramUser } from '../types/telegram'
 import { AppError } from '../utils/AppError'
+import { bannedMessage, isUserBanned } from '../utils/ban'
 
 /**
  * Local-dev-only stand-in profile. Only reachable when
@@ -43,6 +44,10 @@ export async function authenticateTelegramUser(initData: unknown): Promise<Teleg
         username: telegramUser.username,
         photoUrl: telegramUser.photo_url,
       })
+
+  if (isUserBanned(user)) {
+    throw new AppError(403, 'USER_BANNED', bannedMessage(user))
+  }
 
   const token = signSession({ sub: user.id, telegramId: user.telegramId }, env.JWT_SECRET)
 

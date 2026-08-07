@@ -16,6 +16,9 @@ export interface EventsContextValue {
   setScope: (scope: EventsScope) => void
   reload: () => void
   createEvent: (input: CreateEventInput) => Promise<DormEvent>
+  updateEvent: (eventId: string, input: CreateEventInput) => Promise<DormEvent>
+  deleteEvent: (eventId: string) => Promise<void>
+  removeParticipant: (eventId: string, userId: string) => Promise<void>
   joinEvent: (eventId: string) => Promise<void>
   leaveEvent: (eventId: string) => Promise<void>
 }

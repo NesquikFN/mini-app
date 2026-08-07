@@ -17,11 +17,11 @@ export function PaginationControls({ pagination, onPageChange }: PaginationContr
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
         aria-label="Попередня сторінка"
-        className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-600 disabled:opacity-30 active:bg-neutral-100"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-secondary)] disabled:opacity-30 active:bg-[var(--surface-card-alt)]"
       >
         <ChevronLeft size={18} />
       </button>
-      <span className="text-xs text-neutral-500">
+      <span className="text-xs text-[var(--text-secondary)]">
         Сторінка {page} з {pages} · Усього {total}
       </span>
       <button
@@ -29,7 +29,7 @@ export function PaginationControls({ pagination, onPageChange }: PaginationContr
         disabled={page >= pages}
         onClick={() => onPageChange(page + 1)}
         aria-label="Наступна сторінка"
-        className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-600 disabled:opacity-30 active:bg-neutral-100"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--text-secondary)] disabled:opacity-30 active:bg-[var(--surface-card-alt)]"
       >
         <ChevronRight size={18} />
       </button>

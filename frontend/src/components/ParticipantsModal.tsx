@@ -1,12 +1,25 @@
 import { UserRow } from './UserRow'
+import { UserX } from 'lucide-react'
+import { Button } from './Button'
 import type { PublicUser } from '../types/user'
 
 interface ParticipantsModalProps {
   participants: PublicUser[]
   onClose: () => void
+  removable?: boolean
+  creatorId?: string
+  pendingUserId?: string | null
+  onRemove?: (user: PublicUser) => void
 }
 
-export function ParticipantsModal({ participants, onClose }: ParticipantsModalProps) {
+export function ParticipantsModal({
+  participants,
+  onClose,
+  removable = false,
+  creatorId,
+  pendingUserId,
+  onRemove,
+}: ParticipantsModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 animate-[dormhub-fade-in_0.15s_ease]"
@@ -31,7 +44,21 @@ export function ParticipantsModal({ participants, onClose }: ParticipantsModalPr
         <div className="flex-1 overflow-y-auto px-4 py-3">
           <div className="flex flex-col gap-4">
             {participants.map((participant) => (
-              <UserRow key={participant.id} user={participant} />
+              <div key={participant.id} className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <UserRow user={participant} />
+                </div>
+                {removable && participant.id !== creatorId && onRemove && (
+                  <Button
+                    variant="outline"
+                    loading={pendingUserId === participant.id}
+                    disabled={pendingUserId !== null && pendingUserId !== participant.id}
+                    onClick={() => onRemove(participant)}
+                  >
+                    <UserX size={15} />
+                  </Button>
+                )}
+              </div>
             ))}
           </div>
         </div>

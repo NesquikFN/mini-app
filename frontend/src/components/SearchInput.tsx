@@ -12,14 +12,14 @@ export function SearchInput({ value, onChange, placeholder = 'Пошук…' }: 
     <div className="relative">
       <Search
         size={16}
-        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400"
+        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[var(--text-disabled)]"
       />
       <input
         type="text"
         value={value}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-11 w-full rounded-xl border border-neutral-200 bg-white pl-9 pr-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-violet-500"
+        className="h-11 w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-disabled)] focus:border-[var(--accent)]"
       />
     </div>
   )

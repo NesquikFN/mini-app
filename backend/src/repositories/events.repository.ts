@@ -10,12 +10,16 @@ interface EventRow {
   creator_id: string
   title: string
   description: string | null
+  image_url: string | null
+  group_url: string | null
+  is_online: boolean
   date: string
   time: string
   location: string
   max_participants: number
   created_at: string
   dormitory_id: string
+  source_template_id: string | null
   event_participants: { user_id: string }[]
 }
 
@@ -23,6 +27,9 @@ export interface NewEvent {
   creatorId: string
   title: string
   description: string
+  imageUrl?: string
+  groupUrl?: string
+  isOnline: boolean
   date: string
   time: string
   location: string
@@ -30,6 +37,7 @@ export interface NewEvent {
   /** Береться з creator's users.dormitory_id на рівні сервісу — сюди
    * ніколи не потрапляє значення з клієнтського запиту. */
   dormitoryId: string
+  sourceTemplateId?: string
 }
 
 // event_participants(user_id) — вкладена вибірка: PostgREST підтягує
@@ -43,6 +51,9 @@ function toEvent(row: EventRow): Event {
     creatorId: row.creator_id,
     title: row.title,
     description: row.description ?? '',
+    imageUrl: row.image_url ?? undefined,
+    groupUrl: row.group_url ?? undefined,
+    isOnline: row.is_online,
     date: row.date,
     time: row.time,
     location: row.location,
@@ -50,6 +61,7 @@ function toEvent(row: EventRow): Event {
     participantIds: row.event_participants.map((participant) => participant.user_id),
     createdAt: row.created_at,
     dormitoryId: row.dormitory_id,
+    sourceTemplateId: row.source_template_id ?? undefined,
   }
 }
 
@@ -74,7 +86,9 @@ export const eventsRepository = {
   async findAll(dormitoryId?: string): Promise<Event[]> {
     let query = supabase.from('events').select(EVENT_SELECT)
     if (dormitoryId) {
-      query = query.eq('dormitory_id', dormitoryId)
+      // Physical events stay scoped to the selected dormitory, while
+      // online events are global and must be visible to everyone.
+      query = query.or(`dormitory_id.eq.${dormitoryId},is_online.eq.true`)
     }
 
     const { data, error } = await query
@@ -138,11 +152,15 @@ export const eventsRepository = {
         creator_id: newEvent.creatorId,
         title: newEvent.title,
         description: newEvent.description || null,
+        image_url: newEvent.imageUrl || null,
+        group_url: newEvent.groupUrl || null,
+        is_online: newEvent.isOnline,
         date: newEvent.date,
         time: newEvent.time,
         location: newEvent.location,
         max_participants: newEvent.maxParticipants,
         dormitory_id: newEvent.dormitoryId,
+        source_template_id: newEvent.sourceTemplateId ?? null,
       })
       .select('id')
       .single<{ id: string }>()
@@ -167,6 +185,9 @@ export const eventsRepository = {
     const updatePayload: Record<string, unknown> = {}
     if (patch.title !== undefined) updatePayload.title = patch.title
     if (patch.description !== undefined) updatePayload.description = patch.description || null
+    if (patch.imageUrl !== undefined) updatePayload.image_url = patch.imageUrl || null
+    if (patch.groupUrl !== undefined) updatePayload.group_url = patch.groupUrl || null
+    if (patch.isOnline !== undefined) updatePayload.is_online = patch.isOnline
     if (patch.date !== undefined) updatePayload.date = patch.date
     if (patch.time !== undefined) updatePayload.time = patch.time
     if (patch.location !== undefined) updatePayload.location = patch.location
@@ -186,6 +207,11 @@ export const eventsRepository = {
     const { data, error } = await supabase.from('events').delete().eq('id', id).select('id')
     if (error) throw error
     return (data?.length ?? 0) > 0
+  },
+
+  async removeByCreatorId(creatorId: string): Promise<void> {
+    const { error } = await supabase.from('events').delete().eq('creator_id', creatorId)
+    if (error) throw error
   },
 
   /** Атомарне приєднання через PostgreSQL-функцію join_event (RPC) —

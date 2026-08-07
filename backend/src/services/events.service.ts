@@ -10,6 +10,9 @@ export interface EventResponse {
   creatorId: string
   title: string
   description: string
+  imageUrl?: string
+  groupUrl?: string
+  isOnline: boolean
   date: string
   time: string
   location: string
@@ -30,6 +33,9 @@ function toEventResponse(event: Event): EventResponse {
     creatorId: event.creatorId,
     title: event.title,
     description: event.description,
+    imageUrl: event.imageUrl,
+    groupUrl: event.groupUrl,
+    isOnline: event.isOnline,
     date: event.date,
     time: event.time,
     location: event.location,
@@ -110,6 +116,7 @@ export async function createEvent(
   creatorId: string,
   creatorDormitoryId: string | undefined,
   input: CreateEventInput,
+  sourceTemplateId?: string,
 ): Promise<EventResponse> {
   if (creatorDormitoryId === undefined) {
     throw new AppError(
@@ -123,11 +130,14 @@ export async function createEvent(
     creatorId,
     title: input.title,
     description: input.description,
+    groupUrl: input.groupUrl,
+    isOnline: input.isOnline,
     date: input.date,
     time: input.time,
     location: input.location,
     maxParticipants: input.maxParticipants,
     dormitoryId: creatorDormitoryId,
+    sourceTemplateId,
   })
   return toEventResponse(event)
 }
@@ -141,6 +151,28 @@ export async function updateEvent(
   return toEventResponse(await eventsRepository.update(id, input))
 }
 
+export async function updateOwnEvent(
+  id: string,
+  creatorId: string,
+  input: UpdateEventInput,
+): Promise<EventResponse> {
+  const event = await getEventOrThrow(id)
+  if (event.creatorId !== creatorId) {
+    throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Редагувати подію може лише її автор')
+  }
+  if (
+    input.maxParticipants !== undefined &&
+    input.maxParticipants < event.participantIds.length
+  ) {
+    throw new AppError(
+      400,
+      'MAX_PARTICIPANTS_TOO_SMALL',
+      'Ліміт не може бути меншим за поточну кількість учасників',
+    )
+  }
+  return toEventResponse(await eventsRepository.update(id, input))
+}
+
 /** Лише адмін-панель. event_participants видаляються каскадом (FK ON
  * DELETE CASCADE, див. database/schema.sql) — окремого запиту не треба. */
 export async function deleteEvent(id: string): Promise<void> {
@@ -148,6 +180,33 @@ export async function deleteEvent(id: string): Promise<void> {
   if (!removed) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
+}
+
+export async function deleteOwnEvent(id: string, creatorId: string): Promise<void> {
+  const event = await getEventOrThrow(id)
+  if (event.creatorId !== creatorId) {
+    throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Видалити подію може лише її автор')
+  }
+  await deleteEvent(id)
+}
+
+export async function removeOwnEventParticipant(
+  eventId: string,
+  creatorId: string,
+  participantId: string,
+): Promise<EventResponse> {
+  const event = await getEventOrThrow(eventId)
+  if (event.creatorId !== creatorId) {
+    throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Видаляти учасників може лише автор події')
+  }
+  if (participantId === creatorId) {
+    throw new AppError(400, 'CANNOT_REMOVE_ORGANIZER', 'Організатора не можна видалити з події')
+  }
+  const removed = await eventsRepository.removeParticipant(eventId, participantId)
+  if (!removed) {
+    throw new AppError(404, 'PARTICIPANT_NOT_FOUND', 'Учасника не знайдено')
+  }
+  return toEventResponse(await getEventOrThrow(eventId))
 }
 
 export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {

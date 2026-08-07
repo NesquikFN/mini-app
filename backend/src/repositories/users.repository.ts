@@ -9,6 +9,8 @@ interface UserRow {
   last_name: string | null
   photo_url: string | null
   dormitory_id: string | null
+  banned_until: string | null
+  banned_permanently: boolean
   created_at: string
 }
 
@@ -19,6 +21,8 @@ function toAuthUser(row: UserRow): AuthUser {
     firstName: row.first_name,
     username: row.username ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
+    bannedUntil: row.banned_until ?? undefined,
+    bannedPermanently: row.banned_permanently,
   }
 }
 
@@ -32,6 +36,8 @@ function toAdminUserView(row: UserRow): AdminUserView {
     photoUrl: row.photo_url ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
     createdAt: row.created_at,
+    bannedUntil: row.banned_until ?? undefined,
+    bannedPermanently: row.banned_permanently,
   }
 }
 
@@ -223,5 +229,41 @@ export const usersRepository = {
 
     if (error) throw error
     return { users: data.map(toAdminUserView), total: count ?? 0 }
+  },
+
+  async remove(id: string): Promise<boolean> {
+    const { data, error } = await supabase.from('users').delete().eq('id', id).select('id')
+    if (error) throw error
+    return (data?.length ?? 0) > 0
+  },
+
+  async ban(id: string, bannedUntil: string | null, bannedPermanently: boolean): Promise<void> {
+    const { error } = await supabase
+      .from('users')
+      .update({ banned_until: bannedUntil, banned_permanently: bannedPermanently })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async unban(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('users')
+      .update({ banned_until: null, banned_permanently: false })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async getBannedUsers(): Promise<AdminUserView[]> {
+    const now = new Date().toISOString()
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .or(`banned_permanently.eq.true,banned_until.gt.${now}`)
+      .order('banned_permanently', { ascending: false })
+      .order('banned_until', { ascending: true })
+      .returns<UserRow[]>()
+
+    if (error) throw error
+    return data.map(toAdminUserView)
   },
 }

@@ -65,3 +65,19 @@ export interface AdminListItem extends AdminUserView {
   /** admin_users.created_at — відколи цей users.id має права адміна. */
   adminSince: string
 }
+
+export interface EventTemplate {
+  id: string
+  title: string
+  description: string
+  weekday: number
+  time: string
+  location: string
+  isOnline: boolean
+  maxParticipants: number
+  groupUrl?: string
+  imageUrl?: string
+  dormitoryId?: string
+  createdAt: string
+  updatedAt: string
+}

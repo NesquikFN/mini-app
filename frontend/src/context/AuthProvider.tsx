@@ -3,13 +3,14 @@ import { ShieldAlert } from 'lucide-react'
 import { AuthContext, type AuthStatus } from './AuthContext'
 import { EmptyState } from '../components/EmptyState'
 import { SplashScreen } from '../components/SplashScreen'
-import { authenticateWithTelegram, getErrorMessage } from '../services/api'
+import { ApiError, authenticateWithTelegram, getErrorMessage } from '../services/api'
 import { bootstrapTelegramWebApp, getTelegramInitData } from '../services/telegram'
 import { setSessionToken, clearSessionToken } from '../services/session'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('authenticating')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [accessBlocked, setAccessBlocked] = useState(false)
   // Independent from `status`: the splash plays its own close-out
   // (current bounce -> final hop -> logo reveal -> fade) after status
   // resolves, rather than being torn down the instant auth settles.
@@ -20,12 +21,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initData = getTelegramInitData()
 
     authenticateWithTelegram(initData)
-      .then(({ token }) => {
+      .then(async ({ token }) => {
+        // DEV-only diagnostic: ?debugRealSplash=<ms> artificially delays
+        // appReady on the REAL AuthProvider/SplashScreen lifecycle, to
+        // reproduce timing-dependent bugs that a near-instant local
+        // dev-auth response never exercises. Never active in production
+        // builds (import.meta.env.DEV is statically false there) and
+        // never changes what actually gets authenticated — only when
+        // `setStatus('authenticated')` fires.
+        if (import.meta.env.DEV) {
+          const raw = new URLSearchParams(location.search).get('debugRealSplash')
+          if (raw !== null) {
+            const ms = Number(raw) || 1000
+
+            console.log(`[AuthProvider] debugRealSplash: delaying appReady by ${ms}ms`)
+            await new Promise((resolve) => setTimeout(resolve, ms))
+          }
+        }
         setSessionToken(token)
         setStatus('authenticated')
       })
       .catch((error: unknown) => {
         clearSessionToken()
+        setAccessBlocked(error instanceof ApiError && error.code === 'USER_BANNED')
         setErrorMessage(getErrorMessage(error))
         setStatus('error')
       })
@@ -38,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const retry = useCallback(() => {
     setStatus('authenticating')
     setErrorMessage(null)
+    setAccessBlocked(false)
     setSplashDone(false)
     runAuth()
   }, [runAuth])
@@ -59,10 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         <FullScreenCenter>
           <EmptyState
             icon={<ShieldAlert size={40} />}
-            title="Не вдалося підтвердити Telegram-користувача."
+            title={accessBlocked ? 'Доступ заблоковано' : 'Не вдалося підтвердити Telegram-користувача.'}
             description={errorMessage ?? undefined}
-            actionLabel="Спробувати ще раз"
-            onAction={retry}
+            actionLabel={accessBlocked ? undefined : 'Спробувати ще раз'}
+            onAction={accessBlocked ? undefined : retry}
           />
         </FullScreenCenter>
       )}

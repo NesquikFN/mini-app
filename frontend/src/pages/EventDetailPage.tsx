@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { CalendarDays, Clock, Home, MapPin, PartyPopper } from 'lucide-react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { CalendarDays, Clock, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -10,6 +10,7 @@ import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { UserRow } from '../components/UserRow'
 import { ParticipantsModal } from '../components/ParticipantsModal'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { formatEventDate, formatEventTime } from '../utils/date'
 import { fetchEventDetail, getErrorMessage, type EventDetailResponse } from '../services/api'
 
@@ -26,6 +27,8 @@ export function EventDetailPage() {
     reload: reloadEvents,
     joinEvent,
     leaveEvent,
+    deleteEvent,
+    removeParticipant: removeParticipantFromEvent,
     pendingEventId,
   } = useEvents()
   const {
@@ -35,11 +38,18 @@ export function EventDetailPage() {
     reload: reloadUser,
   } = useCurrentUser()
   const { getDormitoryName } = useDormitories()
+  const navigate = useNavigate()
   const [actionError, setActionError] = useState<string | null>(null)
 
   const [members, setMembers] = useState<EventDetailResponse | null>(null)
   const [membersStatus, setMembersStatus] = useState<MembersStatus>('loading')
   const [showAllParticipants, setShowAllParticipants] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [participantPendingRemoval, setParticipantPendingRemoval] = useState<
+    EventDetailResponse['participants'][number] | null
+  >(null)
+  const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null)
 
   const loadMembers = useCallback(() => {
     if (!id) return
@@ -57,7 +67,7 @@ export function EventDetailPage() {
     loadMembers()
   }, [loadMembers])
 
-  if (eventsStatus === 'loading' || userStatus === 'loading') {
+  if (userStatus === 'loading' || (eventsStatus === 'loading' && membersStatus === 'loading')) {
     return (
       <div className="flex flex-col">
         <PageHeader title="Подія" showBack />
@@ -66,7 +76,7 @@ export function EventDetailPage() {
     )
   }
 
-  if (eventsStatus === 'error') {
+  if (eventsStatus === 'error' && membersStatus === 'error') {
     return (
       <div className="flex flex-col">
         <PageHeader title="Подія" showBack />
@@ -94,7 +104,19 @@ export function EventDetailPage() {
     )
   }
 
-  const event = events.find((item) => item.id === id)
+  // Detail data is authoritative here. The shared events list may be
+  // filtered to the current dormitory, while profile links can point to
+  // an event from a different dormitory.
+  const event = events.find((item) => item.id === id) ?? members?.event
+
+  if (!event && membersStatus === 'loading') {
+    return (
+      <div className="flex flex-col">
+        <PageHeader title="Подія" showBack />
+        <LoadingState label="Завантажуємо подію…" />
+      </div>
+    )
+  }
 
   if (!event) {
     return (
@@ -111,7 +133,13 @@ export function EventDetailPage() {
   const isJoined = event.participants.includes(user.id)
   const isFull = event.participants.length >= event.maxParticipants
   const isPending = pendingEventId === event.id
+  const isCreator = event.creatorId === user.id
   const eventId = event.id
+  const dormitoryName = getDormitoryName(event.dormitoryId)
+  const dormitoryNumber = dormitoryName?.match(/№?\s*(\d+)/)?.[1]
+  const telegramGroupUrl = event.groupUrl
+    ? normalizeTelegramGroupUrl(event.groupUrl)
+    : undefined
 
   const handleToggleParticipation = async () => {
     setActionError(null)
@@ -130,6 +158,34 @@ export function EventDetailPage() {
     }
   }
 
+  async function handleDeleteEvent() {
+    setDeleting(true)
+    setActionError(null)
+    try {
+      await deleteEvent(eventId)
+      navigate('/events', { replace: true, state: { successMessage: 'Подію видалено.' } })
+    } catch (error) {
+      setActionError(getErrorMessage(error))
+      setDeleting(false)
+      setConfirmingDelete(false)
+    }
+  }
+
+  async function handleRemoveParticipant() {
+    if (!participantPendingRemoval) return
+    setRemovingParticipantId(participantPendingRemoval.id)
+    setActionError(null)
+    try {
+      await removeParticipantFromEvent(eventId, participantPendingRemoval.id)
+      setParticipantPendingRemoval(null)
+      loadMembers()
+    } catch (error) {
+      setActionError(getErrorMessage(error))
+    } finally {
+      setRemovingParticipantId(null)
+    }
+  }
+
   const previewParticipants = members?.participants.slice(0, PARTICIPANTS_PREVIEW_COUNT) ?? []
   const hasMoreParticipants = (members?.participants.length ?? 0) > PARTICIPANTS_PREVIEW_COUNT
 
@@ -138,6 +194,34 @@ export function EventDetailPage() {
       <PageHeader title={event.title} showBack />
 
       <div className="flex flex-col gap-5 px-4 py-4 pb-8">
+        {event.imageUrl && (
+          <div className="relative overflow-hidden rounded-2xl">
+            <img
+              src={event.imageUrl}
+              alt={`Фотографія події «${event.title}»`}
+              className="h-72 w-full object-cover"
+            />
+            <div className="absolute inset-x-0 top-0 flex flex-nowrap items-center gap-1 bg-gradient-to-b from-black/80 via-black/35 to-transparent px-2 pb-10 pt-2">
+              <MetaBadge icon={<CalendarDays size={15} />}>
+                {formatEventDate(event.date)}
+              </MetaBadge>
+              <MetaBadge icon={<Clock size={15} />}>
+                {formatEventTime(event.time)}
+              </MetaBadge>
+              <MetaBadge
+                icon={event.isOnline ? <MonitorPlay size={15} /> : <MapPin size={15} />}
+                flexible
+              >
+                {event.isOnline ? 'Онлайн' : event.location}
+              </MetaBadge>
+              {dormitoryNumber && (
+                <MetaBadge icon={<Home size={15} />}>
+                  №{dormitoryNumber}
+                </MetaBadge>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
             <PartyPopper size={24} />
@@ -147,25 +231,46 @@ export function EventDetailPage() {
           </h1>
         </div>
 
-        <div className="flex flex-col gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-primary)]">
-          <span className="inline-flex items-center gap-2">
-            <CalendarDays size={16} className="text-[var(--text-secondary)]" />{' '}
-            {formatEventDate(event.date)}
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <Clock size={16} className="text-[var(--text-secondary)]" />{' '}
-            {formatEventTime(event.time)}
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <MapPin size={16} className="text-[var(--text-secondary)]" /> {event.location}
-          </span>
-          {getDormitoryName(event.dormitoryId) && (
+        {isCreator && (
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              to={`/events/${event.id}/edit`}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--surface-border)] text-sm font-semibold text-[var(--text-primary)] active:bg-[var(--surface-card-alt)]"
+            >
+              <Pencil size={16} /> Редагувати
+            </Link>
+            <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+              <Trash2 size={16} /> Видалити
+            </Button>
+          </div>
+        )}
+
+        {!event.imageUrl && (
+          <div className="flex flex-col gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-primary)]">
             <span className="inline-flex items-center gap-2">
-              <Home size={16} className="text-[var(--text-secondary)]" />{' '}
-              {getDormitoryName(event.dormitoryId)}
+              <CalendarDays size={16} className="text-[var(--text-secondary)]" />{' '}
+              {formatEventDate(event.date)}
             </span>
-          )}
-        </div>
+            <span className="inline-flex items-center gap-2">
+              <Clock size={16} className="text-[var(--text-secondary)]" />{' '}
+              {formatEventTime(event.time)}
+            </span>
+            <span className="inline-flex items-center gap-2">
+              {event.isOnline ? (
+                <MonitorPlay size={16} className="text-[var(--accent)]" />
+              ) : (
+                <MapPin size={16} className="text-[var(--text-secondary)]" />
+              )}
+              {event.isOnline ? 'Онлайн' : event.location}
+            </span>
+            {dormitoryName && (
+              <span className="inline-flex items-center gap-2">
+                <Home size={16} className="text-[var(--text-secondary)]" />{' '}
+                {dormitoryName}
+              </span>
+            )}
+          </div>
+        )}
 
         {event.description && (
           <section>
@@ -220,7 +325,20 @@ export function EventDetailPage() {
               ) : (
                 <div className="flex flex-col gap-3">
                   {previewParticipants.map((participant) => (
-                    <UserRow key={participant.id} user={participant} />
+                    <div key={participant.id} className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <UserRow user={participant} />
+                      </div>
+                      {isCreator && participant.id !== event.creatorId && (
+                        <Button
+                          variant="outline"
+                          loading={removingParticipantId === participant.id}
+                          onClick={() => setParticipantPendingRemoval(participant)}
+                        >
+                          <UserX size={15} />
+                        </Button>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -239,6 +357,24 @@ export function EventDetailPage() {
         </section>
 
         {actionError && <p className="text-sm text-red-400">{actionError}</p>}
+
+        {telegramGroupUrl && (
+          <a
+            href={telegramGroupUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(clickEvent) => {
+              const openTelegramLink = window.Telegram?.WebApp?.openTelegramLink
+              if (!openTelegramLink) return
+              clickEvent.preventDefault()
+              openTelegramLink.call(window.Telegram?.WebApp, telegramGroupUrl)
+            }}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-soft-bg)] px-5 text-[15px] font-semibold text-[var(--accent)] transition-transform active:scale-[0.97]"
+          >
+            <MessageCircle size={19} />
+            Приєднатися до групи
+          </a>
+        )}
 
         {isFull && !isJoined ? (
           <Button variant="secondary" fullWidth disabled>
@@ -266,9 +402,60 @@ export function EventDetailPage() {
       {showAllParticipants && members && (
         <ParticipantsModal
           participants={members.participants}
+          removable={isCreator}
+          creatorId={event.creatorId}
+          pendingUserId={removingParticipantId}
+          onRemove={setParticipantPendingRemoval}
           onClose={() => setShowAllParticipants(false)}
         />
       )}
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          title="Видалити подію?"
+          description={`«${event.title}» буде видалено разом зі списком учасників.`}
+          confirmLabel="Видалити"
+          loading={deleting}
+          onConfirm={handleDeleteEvent}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+
+      {participantPendingRemoval && (
+        <ConfirmDialog
+          title="Видалити учасника?"
+          description={`${participantPendingRemoval.firstName} більше не братиме участі в цій події.`}
+          confirmLabel="Видалити"
+          loading={removingParticipantId !== null}
+          onConfirm={handleRemoveParticipant}
+          onCancel={() => setParticipantPendingRemoval(null)}
+        />
+      )}
     </div>
+  )
+}
+
+function normalizeTelegramGroupUrl(value: string): string {
+  return value.startsWith('@') ? `https://t.me/${value.slice(1)}` : value
+}
+
+function MetaBadge({
+  icon,
+  children,
+  flexible = false,
+}: {
+  icon: ReactNode
+  children: ReactNode
+  flexible?: boolean
+}) {
+  return (
+    <span
+      className={`inline-flex min-w-0 items-center gap-1 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-sm ${
+        flexible ? 'max-w-[40%] shrink' : 'shrink-0'
+      }`}
+    >
+      <span className="shrink-0 text-orange-400">{icon}</span>
+      <span className="truncate">{children}</span>
+    </span>
   )
 }

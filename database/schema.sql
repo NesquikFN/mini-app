@@ -42,6 +42,8 @@ create table if not exists users (
   first_name text not null,
   last_name text,
   photo_url text,
+  banned_until timestamptz,
+  banned_permanently boolean not null default false,
   -- Гуртожиток користувача. Nullable: новий користувач обирає його при
   -- онбордингу (frontend), обов'язковість не форсується на рівні БД. FK
   -- без ON DELETE CASCADE/SET NULL навмисно — видалення гуртожитка, до
@@ -54,6 +56,7 @@ create table if not exists users (
 
 create index if not exists idx_users_telegram_id on users (telegram_id);
 create index if not exists idx_users_dormitory_id on users (dormitory_id);
+create index if not exists idx_users_active_ban on users (banned_permanently, banned_until);
 
 -- =========================================================
 -- Таблиця events
@@ -63,6 +66,9 @@ create table if not exists events (
   creator_id uuid not null references users (id),
   title text not null,
   description text,
+  image_url text,
+  group_url text,
+  is_online boolean not null default false,
   date date not null,
   time time not null,
   location text not null,
@@ -72,7 +78,7 @@ create table if not exists events (
   -- events.service.createEvent). NOT NULL: кожна подія завжди належить
   -- конкретному гуртожитку. Той самий RESTRICT-за-замовчуванням FK, що
   -- й для users.
-  dormitory_id uuid not null references dormitories (id),
+  dormitory_id uuid references dormitories (id),
   created_at timestamptz not null default now(),
   constraint events_max_participants_positive check (max_participants > 0)
 );
@@ -80,6 +86,35 @@ create table if not exists events (
 create index if not exists idx_events_creator_id on events (creator_id);
 create index if not exists idx_events_date on events (date);
 create index if not exists idx_events_dormitory_id on events (dormitory_id);
+
+-- =========================================================
+-- Регулярні шаблони ігор для адмін-панелі
+-- =========================================================
+create table if not exists event_templates (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  weekday smallint not null check (weekday between 0 and 6),
+  time time not null,
+  location text not null,
+  is_online boolean not null default false,
+  max_participants integer not null check (max_participants > 0),
+  group_url text,
+  image_url text,
+  dormitory_id uuid references dormitories (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_event_templates_weekday on event_templates (weekday);
+create index if not exists idx_event_templates_dormitory_id on event_templates (dormitory_id);
+
+alter table events
+  add column if not exists source_template_id uuid references event_templates (id) on delete set null;
+
+create unique index if not exists idx_events_template_date_unique
+  on events (source_template_id, date)
+  where source_template_id is not null;
 
 -- =========================================================
 -- Таблиця event_participants

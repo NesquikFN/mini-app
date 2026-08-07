@@ -3,6 +3,7 @@ import { env } from '../config/env'
 import { usersRepository } from '../repositories/users.repository'
 import { verifySession } from '../services/session.service'
 import { AppError } from '../utils/AppError'
+import { bannedMessage, isUserBanned } from '../utils/ban'
 
 export async function requireTelegramAuth(
   req: Request,
@@ -19,6 +20,9 @@ export async function requireTelegramAuth(
     const user = await usersRepository.getUserById(payload.sub)
     if (!user) {
       throw new AppError(401, 'UNAUTHORIZED', 'Користувача сесії не знайдено')
+    }
+    if (isUserBanned(user)) {
+      throw new AppError(403, 'USER_BANNED', bannedMessage(user))
     }
 
     req.user = user

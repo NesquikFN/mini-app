@@ -10,12 +10,13 @@ import { FilterTabs } from '../components/FilterTabs'
 import type { EventsScope } from '../context/EventsContext'
 import { isSameDay, isWithinNextDays } from '../utils/date'
 
-type FilterValue = 'all' | 'today' | 'week'
+type FilterValue = 'all' | 'today' | 'week' | 'online'
 
 const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
   { value: 'all', label: 'Усі' },
   { value: 'today', label: 'Сьогодні' },
   { value: 'week', label: 'Цього тижня' },
+  { value: 'online', label: 'Онлайн' },
 ]
 
 const DORM_FILTER_OPTIONS: { value: EventsScope; label: string }[] = [
@@ -45,6 +46,7 @@ export function EventsPage() {
     .filter((event) => {
       if (filter === 'today') return isSameDay(event.date, new Date())
       if (filter === 'week') return isWithinNextDays(event.date, 7)
+      if (filter === 'online') return event.isOnline
       return true
     })
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))

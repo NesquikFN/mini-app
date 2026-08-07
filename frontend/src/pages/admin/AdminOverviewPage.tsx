@@ -36,7 +36,7 @@ export function AdminOverviewPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-neutral-900">Огляд</h1>
+      <h1 className="text-lg font-semibold text-[var(--text-primary)]">Огляд</h1>
 
       {status === 'loading' && <LoadingState label="Завантажуємо статистику…" />}
 
@@ -63,13 +63,13 @@ export function AdminOverviewPage() {
 
 function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+    <div className="flex items-center gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
         {icon}
       </span>
       <div>
-        <p className="text-xl font-semibold text-neutral-900">{value}</p>
-        <p className="text-xs text-neutral-500">{label}</p>
+        <p className="text-xl font-semibold text-[var(--text-primary)]">{value}</p>
+        <p className="text-xs text-[var(--text-secondary)]">{label}</p>
       </div>
     </div>
   )

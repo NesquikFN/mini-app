@@ -3,6 +3,9 @@ export interface Event {
   creatorId: string
   title: string
   description: string
+  imageUrl?: string
+  groupUrl?: string
+  isOnline: boolean
   date: string
   time: string
   location: string
@@ -11,4 +14,5 @@ export interface Event {
   createdAt: string
   /** FK на dormitories.id — гуртожиток творця на момент створення. */
   dormitoryId: string
+  sourceTemplateId?: string
 }

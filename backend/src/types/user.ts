@@ -5,6 +5,8 @@ export interface AuthUser {
   username?: string
   /** FK на dormitories.id. Ще не обраний користувачем — undefined. */
   dormitoryId?: string
+  bannedUntil?: string
+  bannedPermanently: boolean
 }
 
 /** Ширший погляд на users-рядок для адмін-панелі — включає поля, які
@@ -19,6 +21,8 @@ export interface AdminUserView {
   photoUrl?: string
   dormitoryId?: string
   createdAt: string
+  bannedUntil?: string
+  bannedPermanently: boolean
 }
 
 /** Мінімальний публічний профіль — усе, що будь-який автентифікований

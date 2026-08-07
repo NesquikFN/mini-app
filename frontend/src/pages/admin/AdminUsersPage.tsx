@@ -20,6 +20,7 @@ export function AdminUsersPage() {
   const [data, setData] = useState<AdminUsersResponse | null>(null)
   const [status, setStatus] = useState<Status>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [now] = useState(() => Date.now())
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -53,7 +54,7 @@ export function AdminUsersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-neutral-900">Користувачі</h1>
+      <h1 className="text-lg font-semibold text-[var(--text-primary)]">Користувачі</h1>
       <SearchInput value={search} onChange={setSearch} placeholder="Ім'я, username або telegram_id" />
 
       {status === 'loading' && <LoadingState label="Завантажуємо користувачів…" />}
@@ -78,18 +79,26 @@ export function AdminUsersPage() {
               <Link
                 key={user.id}
                 to={`/admin/users/${user.id}`}
-                className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-3 active:bg-neutral-50"
+                className="flex items-center gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-3 active:bg-[var(--surface-bg)]"
               >
                 <Avatar name={user.firstName} photoUrl={user.photoUrl} size={44} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-neutral-900">
-                    {user.firstName}
-                    {user.lastName ? ` ${user.lastName}` : ''}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                      {user.firstName}
+                      {user.lastName ? ` ${user.lastName}` : ''}
+                    </p>
+                    {(user.bannedPermanently ||
+                      (user.bannedUntil && new Date(user.bannedUntil).getTime() > now)) && (
+                      <span className="shrink-0 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400">
+                        У ЧС
+                      </span>
+                    )}
+                  </div>
                   {user.username && (
-                    <p className="truncate text-xs text-neutral-500">@{user.username}</p>
+                    <p className="truncate text-xs text-[var(--text-secondary)]">@{user.username}</p>
                   )}
-                  <p className="text-xs text-neutral-400">
+                  <p className="text-xs text-[var(--text-disabled)]">
                     {user.eventsCreatedCount} {pluralizeEvents(user.eventsCreatedCount)}
                   </p>
                 </div>

@@ -26,6 +26,8 @@ export interface AdminUserView {
   photoUrl?: string
   dormitoryId?: string
   createdAt: string
+  bannedUntil?: string
+  bannedPermanently: boolean
 }
 
 export interface AdminListItem extends AdminUserView {
@@ -75,4 +77,33 @@ export interface AdminEventDetail {
   event: DormEvent
   creator: PublicUser
   participants: PublicUser[]
+}
+
+export interface EventTemplate {
+  id: string
+  title: string
+  description: string
+  weekday: number
+  time: string
+  location: string
+  isOnline: boolean
+  maxParticipants: number
+  groupUrl?: string
+  imageUrl?: string
+  dormitoryId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EventTemplateInput {
+  title: string
+  description: string
+  weekday: number
+  time: string
+  location: string
+  isOnline: boolean
+  maxParticipants: number
+  groupUrl?: string
+  imageFile?: File
+  dormitoryId?: string
 }

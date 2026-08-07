@@ -3,6 +3,11 @@ import { usersRepository } from '../repositories/users.repository'
 import { eventsRepository, type EventDateFilter } from '../repositories/events.repository'
 import * as eventsService from './events.service'
 import { AppError } from '../utils/AppError'
+import type { AdminUserView } from '../types/user'
+import { eventTemplatesRepository } from '../repositories/event-templates.repository'
+import { addDays, toISODate } from '../utils/date'
+import type { EventTemplate } from '../types/admin'
+import type { EventTemplateInput } from '../repositories/event-templates.repository'
 import type {
   AdminStats,
   AdminUserListItem,
@@ -62,6 +67,166 @@ export async function getUserDetail(id: string): Promise<AdminUserDetail> {
     },
     createdEvents: created,
     participatingEvents: participating,
+  }
+}
+
+export async function deleteUser(actorId: string, userId: string): Promise<void> {
+  if (actorId === userId) {
+    throw new AppError(409, 'CANNOT_DELETE_SELF', 'Не можна видалити власний акаунт')
+  }
+
+  const user = await usersRepository.getAdminUserById(userId)
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
+  }
+
+  if (await adminRepository.isAdmin(userId)) {
+    const totalAdmins = await adminRepository.countAdmins()
+    if (!canRemoveAdmin(totalAdmins)) {
+      throw new AppError(
+        409,
+        'LAST_ADMIN_CANNOT_BE_REMOVED',
+        'Не можна видалити останнього адміністратора',
+      )
+    }
+  }
+
+  // events.creator_id intentionally uses RESTRICT, so delete authored
+  // events first. Their participants are removed by the DB cascade;
+  // the user's remaining participations and admin marker cascade when
+  // the users row is deleted.
+  await eventsRepository.removeByCreatorId(userId)
+  const removed = await usersRepository.remove(userId)
+  if (!removed) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
+  }
+}
+
+export type BanDuration = 'week' | 'forever' | 'custom'
+
+export async function banUser(
+  actorId: string,
+  userId: string,
+  duration: BanDuration,
+  customUntil?: string,
+): Promise<AdminUserView> {
+  if (actorId === userId) {
+    throw new AppError(409, 'CANNOT_BAN_SELF', 'Не можна заблокувати власний акаунт')
+  }
+
+  const user = await usersRepository.getAdminUserById(userId)
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
+  }
+
+  if (await adminRepository.isAdmin(userId)) {
+    const totalAdmins = await adminRepository.countAdmins()
+    if (!canRemoveAdmin(totalAdmins)) {
+      throw new AppError(
+        409,
+        'LAST_ADMIN_CANNOT_BE_BANNED',
+        'Не можна заблокувати останнього адміністратора',
+      )
+    }
+  }
+
+  const bannedPermanently = duration === 'forever'
+  const bannedUntil =
+    duration === 'week'
+      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      : duration === 'custom'
+        ? customUntil ?? null
+        : null
+
+  await usersRepository.ban(userId, bannedUntil, bannedPermanently)
+  const updated = await usersRepository.getAdminUserById(userId)
+  if (!updated) throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
+  return updated
+}
+
+export async function listBannedUsers(): Promise<AdminUserView[]> {
+  return usersRepository.getBannedUsers()
+}
+
+export async function unbanUser(userId: string): Promise<void> {
+  const user = await usersRepository.getAdminUserById(userId)
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
+  await usersRepository.unban(userId)
+}
+
+export async function listEventTemplates(): Promise<EventTemplate[]> {
+  return eventTemplatesRepository.findAll()
+}
+
+export async function createEventTemplate(input: EventTemplateInput): Promise<EventTemplate> {
+  return eventTemplatesRepository.insert(input)
+}
+
+export async function updateEventTemplate(
+  id: string,
+  input: EventTemplateInput,
+): Promise<EventTemplate> {
+  const template = await eventTemplatesRepository.update(id, input)
+  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+  return template
+}
+
+export async function updateEventTemplateImage(id: string, imageUrl: string): Promise<EventTemplate> {
+  const template = await eventTemplatesRepository.updateImage(id, imageUrl)
+  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+  return template
+}
+
+export async function deleteEventTemplate(id: string): Promise<void> {
+  const removed = await eventTemplatesRepository.remove(id)
+  if (!removed) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+}
+
+function nextTemplateDate(weekday: number, time: string): string {
+  const now = new Date()
+  let daysAhead = (weekday - now.getDay() + 7) % 7
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  if (daysAhead === 0 && time <= currentTime) daysAhead = 7
+  return toISODate(addDays(now, daysAhead))
+}
+
+export async function createEventFromTemplate(
+  templateId: string,
+  adminId: string,
+  adminDormitoryId?: string,
+): Promise<eventsService.EventResponse> {
+  const template = await eventTemplatesRepository.findById(templateId)
+  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+
+  try {
+    const event = await eventsService.createEvent(
+      adminId,
+      template.dormitoryId ?? adminDormitoryId,
+      {
+        title: template.title,
+        description: template.description,
+        date: nextTemplateDate(template.weekday, template.time.slice(0, 5)),
+        time: template.time.slice(0, 5),
+        location: template.isOnline ? 'Онлайн' : template.location,
+        isOnline: template.isOnline,
+        maxParticipants: template.maxParticipants,
+        groupUrl: template.groupUrl,
+      },
+      template.id,
+    )
+    return template.imageUrl
+      ? await eventsService.updateEvent(event.id, { imageUrl: template.imageUrl })
+      : event
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505'
+    ) {
+      throw new AppError(409, 'EVENT_ALREADY_CREATED', 'Найближчу подію з цього шаблону вже створено')
+    }
+    throw error
   }
 }
 
