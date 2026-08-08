@@ -250,6 +250,19 @@ export async function leaveEventRequest(eventId: string): Promise<DormEvent> {
   return data.event
 }
 
+/** Тільки шаблони, доступні гуртожитку поточного юзера (глобальні + свого). */
+export async function fetchAvailableEventTemplates(): Promise<EventTemplate[]> {
+  const data = await request<{ templates: EventTemplate[] }>('/events/templates')
+  return data.templates
+}
+
+export async function createEventFromAvailableTemplate(id: string): Promise<DormEvent> {
+  const data = await request<{ event: DormEvent }>(`/events/templates/${id}/create-event`, {
+    method: 'POST',
+  })
+  return data.event
+}
+
 export async function fetchCurrentUser(): Promise<AuthUser> {
   const data = await request<MeResponse>('/me')
   return data.user

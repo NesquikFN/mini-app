@@ -1,8 +1,11 @@
 import { eventsRepository } from '../repositories/events.repository'
 import { usersRepository } from '../repositories/users.repository'
+import { eventTemplatesRepository } from '../repositories/event-templates.repository'
 import { AppError } from '../utils/AppError'
+import { addDays, toISODate } from '../utils/date'
 import type { Event } from '../types/event'
 import type { PublicUser } from '../types/user'
+import type { EventTemplate } from '../types/admin'
 import type { CreateEventInput, UpdateEventInput } from '../validation/event.schemas'
 import { settingsRepository } from '../repositories/settings.repository'
 import { sendEventAnnouncement } from './telegram-notifications.service'
@@ -257,5 +260,73 @@ export async function listEventsForUser(userId: string): Promise<UserEvents> {
   return {
     created: created.map(toEventResponse),
     participating: participating.map(toEventResponse),
+  }
+}
+
+/** Шаблони без dormitoryId доступні всім гуртожиткам; решта — лише своєму. */
+export async function listAvailableEventTemplates(dormitoryId?: string): Promise<EventTemplate[]> {
+  const templates = await eventTemplatesRepository.findAll()
+  return templates.filter((template) => !template.dormitoryId || template.dormitoryId === dormitoryId)
+}
+
+function nextTemplateDate(weekday: number, time: string): string {
+  const now = new Date()
+  let daysAhead = (weekday - now.getDay() + 7) % 7
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  if (daysAhead === 0 && time <= currentTime) daysAhead = 7
+  return toISODate(addDays(now, daysAhead))
+}
+
+export async function createEventFromTemplate(
+  templateId: string,
+  creatorId: string,
+  creatorDormitoryId?: string,
+  // Адмін керує всіма гуртожитками й може використати будь-який шаблон;
+  // для звичайного юзера — лише глобальні шаблони або шаблони свого
+  // гуртожитку, інакше подія створиться не в тому гуртожитку.
+  options?: { restrictToOwnDormitory?: boolean },
+): Promise<EventResponse> {
+  const template = await eventTemplatesRepository.findById(templateId)
+  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+  if (
+    options?.restrictToOwnDormitory &&
+    template.dormitoryId &&
+    template.dormitoryId !== creatorDormitoryId
+  ) {
+    throw new AppError(403, 'TEMPLATE_FORBIDDEN', 'Цей шаблон недоступний для вашого гуртожитку')
+  }
+
+  try {
+    const event = await createEvent(
+      creatorId,
+      template.dormitoryId ?? creatorDormitoryId,
+      {
+        title: template.title,
+        description: template.description,
+        date: nextTemplateDate(template.weekday, template.time.slice(0, 5)),
+        time: template.time.slice(0, 5),
+        location: template.isOnline ? 'Онлайн' : template.location,
+        isOnline: template.isOnline,
+        maxParticipants: template.maxParticipants,
+        groupUrl: template.groupUrl,
+        deferNotification: Boolean(template.imageUrl),
+      },
+      template.id,
+    )
+    if (!template.imageUrl) return event
+
+    const eventWithImage = await updateEvent(event.id, { imageUrl: template.imageUrl })
+    await announceEvent(eventWithImage)
+    return eventWithImage
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505'
+    ) {
+      throw new AppError(409, 'EVENT_ALREADY_CREATED', 'Найближчу подію з цього шаблону вже створено')
+    }
+    throw error
   }
 }

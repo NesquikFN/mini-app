@@ -4,6 +4,8 @@ import * as eventsController from '../controllers/events.controller'
 export const eventsRouter = Router()
 
 eventsRouter.get('/', eventsController.listEvents)
+eventsRouter.get('/templates', eventsController.listEventTemplates)
+eventsRouter.post('/templates/:templateId/create-event', eventsController.createEventFromTemplate)
 eventsRouter.get('/:id', eventsController.getEvent)
 eventsRouter.post('/', eventsController.createEvent)
 eventsRouter.patch('/:id', eventsController.updateEvent)

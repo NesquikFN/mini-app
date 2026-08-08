@@ -65,3 +65,7 @@ export const eventsListQuerySchema = z.object({
 export const userIdParamSchema = z.object({
   userId: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
 })
+
+export const eventTemplateIdParamSchema = z.object({
+  templateId: z.uuid('Некоректний шаблон'),
+})

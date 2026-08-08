@@ -5,7 +5,6 @@ import * as eventsService from './events.service'
 import { AppError } from '../utils/AppError'
 import type { AdminUserView } from '../types/user'
 import { eventTemplatesRepository } from '../repositories/event-templates.repository'
-import { addDays, toISODate } from '../utils/date'
 import type { EventTemplate } from '../types/admin'
 import type { EventTemplateInput } from '../repositories/event-templates.repository'
 import type {
@@ -182,58 +181,8 @@ export async function deleteEventTemplate(id: string): Promise<void> {
   if (!removed) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
 }
 
-function nextTemplateDate(weekday: number, time: string): string {
-  const now = new Date()
-  let daysAhead = (weekday - now.getDay() + 7) % 7
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  if (daysAhead === 0 && time <= currentTime) daysAhead = 7
-  return toISODate(addDays(now, daysAhead))
-}
-
-export async function createEventFromTemplate(
-  templateId: string,
-  adminId: string,
-  adminDormitoryId?: string,
-): Promise<eventsService.EventResponse> {
-  const template = await eventTemplatesRepository.findById(templateId)
-  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
-
-  try {
-    const event = await eventsService.createEvent(
-      adminId,
-      template.dormitoryId ?? adminDormitoryId,
-      {
-        title: template.title,
-        description: template.description,
-        date: nextTemplateDate(template.weekday, template.time.slice(0, 5)),
-        time: template.time.slice(0, 5),
-        location: template.isOnline ? 'Онлайн' : template.location,
-        isOnline: template.isOnline,
-        maxParticipants: template.maxParticipants,
-        groupUrl: template.groupUrl,
-        deferNotification: Boolean(template.imageUrl),
-      },
-      template.id,
-    )
-    if (!template.imageUrl) return event
-
-    const eventWithImage = await eventsService.updateEvent(event.id, {
-      imageUrl: template.imageUrl,
-    })
-    await eventsService.announceEvent(eventWithImage)
-    return eventWithImage
-  } catch (error) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === '23505'
-    ) {
-      throw new AppError(409, 'EVENT_ALREADY_CREATED', 'Найближчу подію з цього шаблону вже створено')
-    }
-    throw error
-  }
-}
+/** Адмін не обмежений гуртожитком шаблону — див. events.service.ts. */
+export const createEventFromTemplate = eventsService.createEventFromTemplate
 
 export async function listEvents(
   page: number,
