@@ -23,6 +23,8 @@ interface TelegramChat {
 
 export interface TelegramWebhookMessage {
   chat: TelegramChat
+  text?: string
+  from?: { first_name: string }
   message_thread_id?: number
   forum_topic_created?: { name: string }
   forum_topic_edited?: { name?: string }
@@ -105,6 +107,39 @@ export async function handleTelegramWebhookUpdate(update: TelegramWebhookUpdate)
       ACTIVE_MEMBER_STATUSES.includes(new_chat_member.status),
     )
   }
+
+  // /start only makes sense as a DM to the bot (channel_post has no such
+  // command, and groups don't onboard this way) — greet and hand over
+  // the Mini App entry point right away instead of leaving a first-time
+  // user staring at an empty chat.
+  const privateMessage = update.message
+  if (privateMessage?.chat.type === 'private' && privateMessage.text?.trim().startsWith('/start')) {
+    await sendStartGreeting(String(privateMessage.chat.id), privateMessage.from?.first_name)
+  }
+}
+
+async function sendStartGreeting(chatId: string, firstName?: string): Promise<void> {
+  const greetingName = firstName ? `, ${firstName}` : ''
+  // Each line escaped once, *after* the name is interpolated in — doing
+  // it the other way round (pre-escaping firstName, then escaping the
+  // whole line again) would double-escape its backslashes.
+  const text = [
+    `👋 Привіт${greetingName}!`,
+    'DormHub — Mini App для мешканців гуртожитку: події, ігри та все важливе в одному місці.',
+    'Тисни кнопку нижче, щоб відкрити 👇',
+  ].map(escapeMarkdownV2).join('\n\n')
+
+  // web_app buttons (real Mini-App launch, not just a link) only work in
+  // private chats with the bot — see sendEventAnnouncement for why group
+  // messages use a t.me/?startapp= link instead.
+  await botApi('sendMessage', {
+    chat_id: chatId,
+    text,
+    parse_mode: 'MarkdownV2',
+    reply_markup: {
+      inline_keyboard: [[{ text: '🏠 Відкрити DormHub', web_app: { url: env.FRONTEND_URL } }]],
+    },
+  })
 }
 
 /**
