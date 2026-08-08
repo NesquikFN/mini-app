@@ -26,6 +26,17 @@ export function bootstrapTelegramWebApp(): void {
   webApp.ready()
   webApp.expand()
 
+  // На мобільних свайп вниз по контенту закривав Mini App — це і є
+  // "постійно зачиняю вкладку". disableVerticalSwipes прибирає жест
+  // повністю; enableClosingConfirmation — підстраховка для клієнтів,
+  // де цього методу ще нема (просить підтвердження перед закриттям).
+  try {
+    webApp.disableVerticalSwipes?.()
+    webApp.enableClosingConfirmation?.()
+  } catch {
+    // Старі клієнти Telegram — не критично.
+  }
+
   try {
     const bgColor = webApp.themeParams.bg_color
     if (bgColor) {

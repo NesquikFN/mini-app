@@ -50,6 +50,12 @@ interface TelegramWebApp {
   setHeaderColor(color: string): void
   setBackgroundColor(color: string): void
   openTelegramLink?(url: string): void
+  /** Bot API 7.7+. Stops an accidental swipe-down on page content from
+   * collapsing/closing the Mini App. Older clients don't have it. */
+  disableVerticalSwipes?(): void
+  /** Bot API 6.2+. Fallback for clients without disableVerticalSwipes —
+   * shows an "are you sure?" prompt before the app actually closes. */
+  enableClosingConfirmation?(): void
 }
 
 declare global {
