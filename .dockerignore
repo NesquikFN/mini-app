@@ -6,7 +6,6 @@ node_modules
 **/.env.*.local
 **/*.log
 .git
-frontend
 backend/src/**/*.test.ts
 backend/src/__tests__
 backend/src/test-utils
