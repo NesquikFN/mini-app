@@ -5,6 +5,9 @@ export const adminRouter = Router()
 
 adminRouter.get('/check', adminController.check)
 adminRouter.get('/stats', adminController.getStats)
+adminRouter.get('/notification-settings', adminController.getNotificationSettings)
+adminRouter.put('/notification-settings', adminController.updateNotificationSettings)
+adminRouter.get('/notification-chats', adminController.listNotificationChats)
 
 adminRouter.get('/users', adminController.listUsers)
 adminRouter.get('/banned-users', adminController.listBannedUsers)

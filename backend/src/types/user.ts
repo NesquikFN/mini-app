@@ -3,6 +3,7 @@ export interface AuthUser {
   telegramId: number
   firstName: string
   username?: string
+  photoUrl?: string
   /** FK на dormitories.id. Ще не обраний користувачем — undefined. */
   dormitoryId?: string
   bannedUntil?: string

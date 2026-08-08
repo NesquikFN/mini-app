@@ -211,12 +211,17 @@ export async function createEventFromTemplate(
         isOnline: template.isOnline,
         maxParticipants: template.maxParticipants,
         groupUrl: template.groupUrl,
+        deferNotification: Boolean(template.imageUrl),
       },
       template.id,
     )
-    return template.imageUrl
-      ? await eventsService.updateEvent(event.id, { imageUrl: template.imageUrl })
-      : event
+    if (!template.imageUrl) return event
+
+    const eventWithImage = await eventsService.updateEvent(event.id, {
+      imageUrl: template.imageUrl,
+    })
+    await eventsService.announceEvent(eventWithImage)
+    return eventWithImage
   } catch (error) {
     if (
       typeof error === 'object' &&

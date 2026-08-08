@@ -4,6 +4,7 @@ import { authRouter } from './auth.routes'
 import { eventsRouter } from './events.routes'
 import { meRouter } from './me.routes'
 import { dormitoriesRouter } from './dormitories.routes'
+import { usersRouter } from './users.routes'
 import { adminRouter } from './admin.routes'
 import { requireTelegramAuth } from '../middleware/requireTelegramAuth'
 import { requireAdmin } from '../middleware/requireAdmin'
@@ -15,4 +16,5 @@ apiRouter.use('/auth', authRouter)
 apiRouter.use('/events', requireTelegramAuth, eventsRouter)
 apiRouter.use('/me', requireTelegramAuth, meRouter)
 apiRouter.use('/dormitories', requireTelegramAuth, dormitoriesRouter)
+apiRouter.use('/users', requireTelegramAuth, usersRouter)
 apiRouter.use('/admin', requireTelegramAuth, requireAdmin, adminRouter)

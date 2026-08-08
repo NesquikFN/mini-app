@@ -234,6 +234,7 @@ export function EventForm({
         />
       </Field>
 
+
       <Field
         label="Максимальна кількість учасників"
         error={errors.maxParticipants}

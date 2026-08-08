@@ -81,6 +81,9 @@ export async function uploadEventImage(req: Request, res: Response): Promise<voi
 
   const { data } = supabase.storage.from('event-images').getPublicUrl(path)
   const updated = await eventsService.updateEvent(id, { imageUrl: data.publicUrl })
+  if (req.query.announce === 'true') {
+    await eventsService.announceEvent(updated)
+  }
   res.json({ event: updated })
 }
 

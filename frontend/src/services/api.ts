@@ -107,6 +107,33 @@ interface MeResponse {
   user: AuthUser
 }
 
+export interface TelegramChatOption {
+  id: string
+  title: string
+  type: 'group' | 'supergroup' | 'channel'
+}
+
+export async function fetchAdminNotificationChats(): Promise<TelegramChatOption[]> {
+  const data = await request<{ chats: TelegramChatOption[] }>('/admin/notification-chats')
+  return data.chats
+}
+
+export interface NotificationSettings {
+  chatId?: string
+  chatTitle?: string
+}
+
+export function fetchNotificationSettings(): Promise<NotificationSettings> {
+  return request<NotificationSettings>('/admin/notification-settings')
+}
+
+export function updateNotificationSettings(chat?: TelegramChatOption): Promise<NotificationSettings> {
+  return request<NotificationSettings>('/admin/notification-settings', {
+    method: 'PUT',
+    body: JSON.stringify({ chatId: chat?.id ?? null, chatTitle: chat?.title ?? null }),
+  })
+}
+
 export interface MyEventsResponse {
   created: DormEvent[]
   participating: DormEvent[]
@@ -141,11 +168,11 @@ export async function createEventRequest(
   const { imageFile, ...payload } = input
   const data = await request<EventResponseBody>('/events', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, deferNotification: Boolean(imageFile) }),
   })
   if (!imageFile) return data.event
 
-  const uploaded = await request<EventResponseBody>(`/events/${data.event.id}/image`, {
+  const uploaded = await request<EventResponseBody>(`/events/${data.event.id}/image?announce=true`, {
     method: 'PUT',
     headers: { 'Content-Type': imageFile.type },
     body: imageFile,
@@ -203,6 +230,16 @@ export async function leaveEventRequest(eventId: string): Promise<DormEvent> {
 export async function fetchCurrentUser(): Promise<AuthUser> {
   const data = await request<MeResponse>('/me')
   return data.user
+}
+
+export interface PublicProfileResponse {
+  user: PublicUser
+  isAdmin: boolean
+  createdEvents: DormEvent[]
+}
+
+export async function fetchPublicUser(id: string): Promise<PublicProfileResponse> {
+  return request<PublicProfileResponse>(`/users/${id}`)
 }
 
 export async function updateMyDormitory(dormitoryId: string): Promise<AuthUser> {

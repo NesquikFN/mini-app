@@ -77,7 +77,7 @@ export function ProfilePage() {
         {!isLoading && !hasError && user && myEvents && (
           <>
             <div className="flex items-center gap-4">
-              <Avatar name={user.firstName} size={56} />
+              <Avatar name={user.firstName} photoUrl={user.photoUrl} size={56} />
               <div>
                 <p className="text-lg font-semibold text-[var(--text-primary)]">
                   {user.firstName}

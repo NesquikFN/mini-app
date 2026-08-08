@@ -14,6 +14,7 @@ import { EventDetailPage } from './pages/EventDetailPage'
 import { CreateEventPage } from './pages/CreateEventPage'
 import { EditEventPage } from './pages/EditEventPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { UserProfilePage } from './pages/UserProfilePage'
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminUserDetailPage } from './pages/admin/AdminUserDetailPage'
@@ -22,6 +23,7 @@ import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminAdminsPage } from './pages/admin/AdminAdminsPage'
 import { AdminBannedUsersPage } from './pages/admin/AdminBannedUsersPage'
 import { AdminEventTemplatesPage } from './pages/admin/AdminEventTemplatesPage'
+import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 
 function App() {
   return (
@@ -40,6 +42,7 @@ function App() {
                       <Route path="/events/:id/edit" element={<EditEventPage />} />
                       <Route path="/create" element={<CreateEventPage />} />
                       <Route path="/profile" element={<ProfilePage />} />
+                      <Route path="/users/:id" element={<UserProfilePage />} />
                     </Route>
                   </Route>
 
@@ -53,6 +56,7 @@ function App() {
                       <Route path="/admin/admins" element={<AdminAdminsPage />} />
                       <Route path="/admin/banned" element={<AdminBannedUsersPage />} />
                       <Route path="/admin/templates" element={<AdminEventTemplatesPage />} />
+                      <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                     </Route>
                   </Route>
                 </Routes>

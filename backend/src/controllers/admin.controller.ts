@@ -12,7 +12,10 @@ import {
   banUserSchema,
   eventTemplateIdParamSchema,
   eventTemplateSchema,
+  notificationSettingsSchema,
 } from '../validation/admin.schemas'
+import { settingsRepository } from '../repositories/settings.repository'
+import * as telegramNotifications from '../services/telegram-notifications.service'
 
 /** Досяжний лише якщо requireTelegramAuth + requireAdmin уже пропустили
  * запит — сама наявність відповіді 200 тут і є перевіркою. */
@@ -22,6 +25,24 @@ export async function check(_req: Request, res: Response): Promise<void> {
 
 export async function getStats(_req: Request, res: Response): Promise<void> {
   res.json(await adminService.getStats())
+}
+
+export async function getNotificationSettings(_req: Request, res: Response): Promise<void> {
+  res.json(await settingsRepository.getNotificationSettings())
+}
+
+export async function listNotificationChats(req: Request, res: Response): Promise<void> {
+  res.json({ chats: await telegramNotifications.listAvailableChats(req.user.telegramId) })
+}
+
+export async function updateNotificationSettings(req: Request, res: Response): Promise<void> {
+  const { chatId, chatTitle } = notificationSettingsSchema.parse(req.body)
+  if (chatId) {
+    const allowed = (await telegramNotifications.listAvailableChats(req.user.telegramId))
+      .some((chat) => chat.id === chatId && chat.title === chatTitle)
+    if (!allowed) throw new AppError(403, 'TELEGRAM_CHAT_FORBIDDEN', 'Цей чат недоступний')
+  }
+  res.json(await settingsRepository.setNotificationChat(chatId ?? undefined, chatTitle ?? undefined))
 }
 
 export async function listUsers(req: Request, res: Response): Promise<void> {

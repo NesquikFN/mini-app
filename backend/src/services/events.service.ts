@@ -4,6 +4,8 @@ import { AppError } from '../utils/AppError'
 import type { Event } from '../types/event'
 import type { PublicUser } from '../types/user'
 import type { CreateEventInput, UpdateEventInput } from '../validation/event.schemas'
+import { settingsRepository } from '../repositories/settings.repository'
+import { sendEventAnnouncement } from './telegram-notifications.service'
 
 export interface EventResponse {
   id: string
@@ -139,7 +141,18 @@ export async function createEvent(
     dormitoryId: creatorDormitoryId,
     sourceTemplateId,
   })
-  return toEventResponse(event)
+  const response = toEventResponse(event)
+  if (!input.deferNotification) await announceEvent(response)
+  return response
+}
+
+export async function announceEvent(event: EventResponse): Promise<void> {
+  try {
+    const settings = await settingsRepository.getNotificationSettings()
+    if (settings.chatId) await sendEventAnnouncement(settings.chatId, event)
+  } catch (error) {
+    console.error('Не вдалося надіслати Telegram-анонс події:', error)
+  }
 }
 
 /** Лише адмін-панель — звичайний Mini App редагування подій не пропонує. */

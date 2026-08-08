@@ -33,6 +33,7 @@ export const createEventSchema = z.object({
   time: timeSchema,
   location: z.string().trim().min(1, 'Місце обовʼязкове'),
   groupUrl: telegramGroupUrlSchema.optional(),
+  deferNotification: z.boolean().optional(),
   isOnline: z.boolean().default(false),
   maxParticipants: z
     .number('Максимальна кількість учасників має бути числом')

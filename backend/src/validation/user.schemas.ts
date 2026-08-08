@@ -15,4 +15,8 @@ export const updateMeSchema = z.object({
     .regex(UUID_SHAPE, 'Некоректний ідентифікатор гуртожитку'),
 })
 
+export const publicUserIdParamSchema = z.object({
+  id: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
+})
+
 export type UpdateMeInput = z.infer<typeof updateMeSchema>

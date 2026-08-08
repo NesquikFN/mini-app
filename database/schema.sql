@@ -161,6 +161,16 @@ alter table event_participants enable row level security;
 alter table admin_users enable row level security;
 alter table dormitories enable row level security;
 
+-- Глобальні налаштування застосунку (один singleton-рядок).
+create table if not exists app_settings (
+  id boolean primary key default true check (id),
+  notification_chat_id text,
+  notification_chat_title text,
+  updated_at timestamptz not null default now()
+);
+insert into app_settings (id) values (true) on conflict (id) do nothing;
+alter table app_settings enable row level security;
+
 -- =========================================================
 -- Атомарна функція приєднання до події (захист від race condition)
 -- =========================================================

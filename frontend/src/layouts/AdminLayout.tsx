@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Ban, CalendarDays, Gamepad2, LayoutDashboard, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeft, Ban, Bell, CalendarDays, Gamepad2, LayoutDashboard, ShieldCheck, Users } from 'lucide-react'
 
 const TABS = [
   { to: '/admin', label: 'Огляд', icon: LayoutDashboard, end: true },
@@ -8,6 +8,7 @@ const TABS = [
   { to: '/admin/admins', label: 'Адміни', icon: ShieldCheck, end: false },
   { to: '/admin/banned', label: 'ЧС', icon: Ban, end: false },
   { to: '/admin/templates', label: 'Ігри', icon: Gamepad2, end: false },
+  { to: '/admin/notifications', label: 'Сповіщення', icon: Bell, end: false },
 ]
 
 export function AdminLayout() {

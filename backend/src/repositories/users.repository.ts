@@ -20,6 +20,7 @@ function toAuthUser(row: UserRow): AuthUser {
     telegramId: row.telegram_id,
     firstName: row.first_name,
     username: row.username ?? undefined,
+    photoUrl: row.photo_url ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
     bannedUntil: row.banned_until ?? undefined,
     bannedPermanently: row.banned_permanently,
@@ -184,6 +185,17 @@ export const usersRepository = {
 
     if (error) throw error
     return data.map(toPublicUser)
+  },
+
+  async getPublicUserById(id: string): Promise<PublicUser | null> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, first_name, username, photo_url, dormitory_id')
+      .eq('id', id)
+      .maybeSingle<PublicUserRow>()
+
+    if (error) throw error
+    return data ? toPublicUser(data) : null
   },
 
   async getAdminUserById(id: string): Promise<AdminUserView | null> {
