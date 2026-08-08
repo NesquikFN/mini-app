@@ -187,6 +187,9 @@ create table if not exists app_settings (
   notification_chat_title text,
   notification_thread_id text,
   notification_thread_title text,
+  -- Посилання на Discord/Telegram-спільноти для іконок на головному екрані.
+  discord_url text,
+  telegram_url text,
   updated_at timestamptz not null default now()
 );
 insert into app_settings (id) values (true) on conflict (id) do nothing;

@@ -1,14 +1,26 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarX, MonitorPlay } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { EventCard } from '../components/EventCard'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { DormitorySelector } from '../components/DormitorySelector'
+import { SocialLinks } from '../components/SocialLinks'
+import { fetchAppSettings, type SocialLinks as SocialLinksType } from '../services/api'
 import { isPastDate } from '../utils/date'
 
 export function HomePage() {
   const { events, status, errorMessage, reload } = useEvents()
+  const { user } = useCurrentUser()
+  const [socialLinks, setSocialLinks] = useState<SocialLinksType>()
+
+  useEffect(() => {
+    fetchAppSettings()
+      .then(setSocialLinks)
+      .catch(() => setSocialLinks(undefined))
+  }, [])
 
   // Backend повертає фізичні події свого гуртожитку плюс глобальні
   // онлайн-події. На головній розділяємо їх на окремі секції.
@@ -24,7 +36,12 @@ export function HomePage() {
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-8">
       <div className="flex flex-col gap-4">
-        <p className="text-xl font-semibold text-[var(--text-primary)]">👋 Привіт!</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-xl font-semibold text-[var(--text-primary)]">
+            👋 Привіт{user?.firstName ? `, ${user.firstName}` : ''}!
+          </p>
+          <SocialLinks links={socialLinks} />
+        </div>
         <DormitorySelector />
       </div>
 

@@ -38,7 +38,7 @@ export function EventCard({ event }: { event: DormEvent }) {
             >
               {event.isOnline ? 'Онлайн' : event.location}
             </CardMetaBadge>
-            {dormitoryNumber && (
+            {!event.isOnline && dormitoryNumber && (
               <CardMetaBadge icon={<Home size={13} />}>
                 №{dormitoryNumber}
               </CardMetaBadge>
@@ -69,7 +69,7 @@ export function EventCard({ event }: { event: DormEvent }) {
                   {event.isOnline ? <MonitorPlay size={14} /> : <MapPin size={14} />}
                   {event.isOnline ? 'Онлайн' : event.location}
                 </span>
-                {dormitoryName && (
+                {!event.isOnline && dormitoryName && (
                   <span className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)]">
                     <Home size={13} /> {dormitoryName}
                   </span>

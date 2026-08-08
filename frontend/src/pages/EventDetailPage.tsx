@@ -199,7 +199,7 @@ export function EventDetailPage() {
             <img
               src={event.imageUrl}
               alt={`Фотографія події «${event.title}»`}
-              className="h-72 w-full object-cover"
+              className="h-56 w-full object-cover"
             />
             <div className="absolute inset-x-0 top-0 flex flex-nowrap items-center gap-1 bg-gradient-to-b from-black/80 via-black/35 to-transparent px-2 pb-10 pt-2">
               <MetaBadge icon={<CalendarDays size={15} />}>
@@ -214,7 +214,7 @@ export function EventDetailPage() {
               >
                 {event.isOnline ? 'Онлайн' : event.location}
               </MetaBadge>
-              {dormitoryNumber && (
+              {!event.isOnline && dormitoryNumber && (
                 <MetaBadge icon={<Home size={15} />}>
                   №{dormitoryNumber}
                 </MetaBadge>
@@ -263,7 +263,7 @@ export function EventDetailPage() {
               )}
               {event.isOnline ? 'Онлайн' : event.location}
             </span>
-            {dormitoryName && (
+            {!event.isOnline && dormitoryName && (
               <span className="inline-flex items-center gap-2">
                 <Home size={16} className="text-[var(--text-secondary)]" />{' '}
                 {dormitoryName}
@@ -277,7 +277,7 @@ export function EventDetailPage() {
             <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
               Опис
             </h2>
-            <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+            <p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">
               {event.description}
             </p>
           </section>

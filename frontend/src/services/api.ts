@@ -192,6 +192,22 @@ export function updateNotificationSettings(
   })
 }
 
+export interface SocialLinks {
+  discordUrl?: string
+  telegramUrl?: string
+}
+
+export function fetchAppSettings(): Promise<SocialLinks> {
+  return request<SocialLinks>('/app-settings')
+}
+
+export function updateAppSettings(links: SocialLinks): Promise<SocialLinks> {
+  return request<SocialLinks>('/app-settings', {
+    method: 'PUT',
+    body: JSON.stringify(links),
+  })
+}
+
 export interface MyEventsResponse {
   created: DormEvent[]
   participating: DormEvent[]

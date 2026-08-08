@@ -11,6 +11,11 @@ export const notificationSettingsSchema = z.object({
   message: 'Гілка і її назва мають бути вказані разом',
 })
 
+export const socialLinksSchema = z.object({
+  discordUrl: z.union([z.literal(''), z.url('Некоректне посилання')]).optional(),
+  telegramUrl: z.union([z.literal(''), z.url('Некоректне посилання')]).optional(),
+})
+
 const paginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().catch(1),
   limit: z.coerce.number().int().positive().max(100).catch(20),

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Bell, RefreshCw } from 'lucide-react'
+import { Bell, Link2, RefreshCw } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { LoadingState } from '../../components/LoadingState'
 import {
   fetchAdminNotificationChats,
   fetchAdminNotificationTopics,
+  fetchAppSettings,
   fetchNotificationSettings,
   getErrorMessage,
+  updateAppSettings,
   updateNotificationSettings,
   type TelegramChatOption,
   type TelegramTopicOption,
@@ -183,6 +185,89 @@ export function AdminNotificationsPage() {
 
       {message && <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">{message}</p>}
       {error && <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</p>}
+
+      <SocialLinksSection />
     </div>
+  )
+}
+
+/** Посилання на Discord/Telegram-спільноти для іконок на головному
+ * екрані — окрема секція з власним станом, незалежна від чату
+ * сповіщень вище. */
+function SocialLinksSection() {
+  const [discordUrl, setDiscordUrl] = useState('')
+  const [telegramUrl, setTelegramUrl] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchAppSettings()
+      .then((links) => {
+        setDiscordUrl(links.discordUrl ?? '')
+        setTelegramUrl(links.telegramUrl ?? '')
+      })
+      .catch((loadError: unknown) => setError(getErrorMessage(loadError)))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+    setMessage(null)
+    try {
+      await updateAppSettings({
+        discordUrl: discordUrl.trim(),
+        telegramUrl: telegramUrl.trim(),
+      })
+      setMessage('Посилання оновлено.')
+    } catch (saveError) {
+      setError(getErrorMessage(saveError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <LoadingState label="Завантажуємо посилання…" />
+
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+      <div>
+        <h2 className="text-base font-semibold text-[var(--text-primary)]">Соціальні мережі</h2>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          Іконки-посилання в шапці головного екрана. Порожнє поле ховає іконку.
+        </p>
+      </div>
+
+      <label className="flex flex-col gap-2 text-sm font-medium">
+        Discord
+        <input
+          type="text"
+          value={discordUrl}
+          onChange={(event) => setDiscordUrl(event.target.value)}
+          placeholder="https://discord.gg/..."
+          className="h-12 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-disabled)] focus:border-[var(--accent)]"
+        />
+      </label>
+
+      <label className="flex flex-col gap-2 text-sm font-medium">
+        Telegram
+        <input
+          type="text"
+          value={telegramUrl}
+          onChange={(event) => setTelegramUrl(event.target.value)}
+          placeholder="https://t.me/..."
+          className="h-12 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-disabled)] focus:border-[var(--accent)]"
+        />
+      </label>
+
+      <Button onClick={save} loading={saving}>
+        <Link2 size={16} /> Зберегти посилання
+      </Button>
+
+      {message && <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">{message}</p>}
+      {error && <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</p>}
+    </section>
   )
 }
