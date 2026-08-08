@@ -18,6 +18,11 @@ export function AdminNotificationsPage() {
   const [topics, setTopics] = useState<TelegramTopicOption[]>([])
   const [topicsLoading, setTopicsLoading] = useState(false)
   const [selectedTopicId, setSelectedTopicId] = useState('')
+  // Telegram не дає API, щоб дізнатись справжню назву гілки заднім числом
+  // (лише подія створення/перейменування, побачена наживо) — тому назву
+  // для вже існуючих гілок (тоді ми бачимо лише message_thread_id) вписує
+  // сам адмін, а не бот вгадує.
+  const [topicTitle, setTopicTitle] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -27,6 +32,7 @@ export function AdminNotificationsPage() {
     if (!chatId) {
       setTopics([])
       setSelectedTopicId('')
+      setTopicTitle('')
       return
     }
     setTopicsLoading(true)
@@ -34,6 +40,9 @@ export function AdminNotificationsPage() {
       .then((availableTopics) => {
         setTopics(availableTopics)
         setSelectedTopicId(initialTopicId ?? '')
+        setTopicTitle(initialTopicId
+          ? (initialTopicTitle ?? availableTopics.find((topic) => topic.id === initialTopicId)?.title ?? '')
+          : '')
         if (initialTopicId && !availableTopics.some((topic) => topic.id === initialTopicId)) {
           setTopics((current) => [
             { id: initialTopicId, title: initialTopicTitle ?? initialTopicId },
@@ -78,13 +87,20 @@ export function AdminNotificationsPage() {
     loadTopics(chatId)
   }
 
+  function selectTopic(topicId: string) {
+    setSelectedTopicId(topicId)
+    setTopicTitle(topicId ? (topics.find((topic) => topic.id === topicId)?.title ?? '') : '')
+  }
+
   async function save() {
     setSaving(true)
     setError(null)
     setMessage(null)
     try {
       const chat = chats.find((item) => item.id === selectedId)
-      const topic = chat ? topics.find((item) => item.id === selectedTopicId) : undefined
+      const topic = chat && selectedTopicId
+        ? { id: selectedTopicId, title: topicTitle.trim() || selectedTopicId }
+        : undefined
       await updateNotificationSettings(chat, topic)
       setMessage(chat
         ? `Усі нові події надсилатимуться в «${chat.title}»${topic ? `, гілка «${topic.title}»` : ''}.`
@@ -125,13 +141,29 @@ export function AdminNotificationsPage() {
             Гілка (тема) у чаті
             <select
               value={selectedTopicId}
-              onChange={(event) => setSelectedTopicId(event.target.value)}
+              onChange={(event) => selectTopic(event.target.value)}
               disabled={topicsLoading}
               className="h-12 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 text-[var(--text-primary)] outline-none focus:border-[var(--accent)] disabled:opacity-50"
             >
               <option value="">Загальна тема чату</option>
               {topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.title}</option>)}
             </select>
+          </label>
+        )}
+
+        {selectedTopicId && (
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            Назва гілки
+            <input
+              type="text"
+              value={topicTitle}
+              onChange={(event) => setTopicTitle(event.target.value)}
+              placeholder="Наприклад: Анонси подій"
+              className="h-12 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-disabled)] focus:border-[var(--accent)]"
+            />
+            <span className="text-xs font-normal text-[var(--text-secondary)]">
+              Telegram не дає боту дізнатись справжню назву вже існуючої гілки — впишіть її самі, як вона показана у вашому чаті.
+            </span>
           </label>
         )}
 
