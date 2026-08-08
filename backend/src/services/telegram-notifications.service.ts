@@ -54,18 +54,40 @@ async function discoveredChats(): Promise<TelegramChatOption[]> {
   return [...chats.values()].sort((a, b) => a.title.localeCompare(b.title, 'uk'))
 }
 
+let botIdPromise: Promise<number> | undefined
+function getBotId(): Promise<number> {
+  botIdPromise ??= botApi<{ id: number }>('getMe').then((me) => me.id)
+  return botIdPromise
+}
+
+const ACTIVE_MEMBER_STATUSES = ['creator', 'administrator', 'member']
+
+async function isActiveMember(chatId: string, userId: number): Promise<boolean> {
+  try {
+    const member = await botApi<{ status: string }>('getChatMember', {
+      chat_id: chatId,
+      user_id: userId,
+    })
+    return ACTIVE_MEMBER_STATUSES.includes(member.status)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * getUpdates() replays Telegram's update history (no offset is ever
+ * acknowledged — see discoveredChats), so it still lists chats the bot
+ * was later removed from. Re-checking both the bot's own membership and
+ * the admin's drops those stale entries instead of showing dead chats.
+ */
 export async function listAvailableChats(telegramUserId: number): Promise<TelegramChatOption[]> {
-  const chats = await discoveredChats()
+  const [chats, botId] = await Promise.all([discoveredChats(), getBotId()])
   const checked = await Promise.all(chats.map(async (chat) => {
-    try {
-      const member = await botApi<{ status: string }>('getChatMember', {
-        chat_id: chat.id,
-        user_id: telegramUserId,
-      })
-      return ['creator', 'administrator', 'member'].includes(member.status) ? chat : null
-    } catch {
-      return null
-    }
+    const [botIsMember, userIsMember] = await Promise.all([
+      isActiveMember(chat.id, botId),
+      isActiveMember(chat.id, telegramUserId),
+    ])
+    return botIsMember && userIsMember ? chat : null
   }))
   return checked.filter((chat): chat is TelegramChatOption => chat !== null)
 }
