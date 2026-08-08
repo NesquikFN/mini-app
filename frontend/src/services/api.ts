@@ -15,7 +15,8 @@ import type {
   EventTemplateInput,
   HostListItem,
 } from '../types/admin'
-import { getSessionToken } from './session'
+import { getSessionToken, setSessionToken } from './session'
+import { getTelegramInitData } from './telegram'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -63,7 +64,30 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
   return typeof code === 'string' && typeof message === 'string'
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// Telegram's WebView can wipe sessionStorage mid-session (backgrounding,
+// OS memory pressure) while the page itself stays alive — the user is
+// still looking at an already-rendered screen with a live
+// window.Telegram.WebApp.initData, but the next API call has no Bearer
+// token. Re-authenticating once with that still-valid initData and
+// retrying, instead of dead-ending the user with a "потрібна
+// автентифікація" error mid-action (e.g. while picking a dormitory).
+let reauthPromise: Promise<string> | null = null
+
+function reauthenticateWithTelegram(): Promise<string> {
+  if (!reauthPromise) {
+    reauthPromise = authenticateWithTelegram(getTelegramInitData())
+      .then(({ token }) => {
+        setSessionToken(token)
+        return token
+      })
+      .finally(() => {
+        reauthPromise = null
+      })
+  }
+  return reauthPromise
+}
+
+async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
   let response: Response
 
   const token = getSessionToken()
@@ -82,6 +106,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && !isRetry && path !== '/auth/telegram') {
+      try {
+        await reauthenticateWithTelegram()
+        return await request<T>(path, init, true)
+      } catch {
+        // Re-auth itself failed (e.g. not actually running in Telegram
+        // anymore) — fall through and surface the original 401 below.
+      }
+    }
+
     const body: unknown = await response.json().catch(() => null)
     if (isApiErrorBody(body)) {
       throw new ApiError(response.status, body.error.code, body.error.message)

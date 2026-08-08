@@ -69,12 +69,6 @@ export interface NewUser {
   photoUrl?: string
 }
 
-export interface ProfileUpdate {
-  firstName: string
-  username?: string
-  photoUrl?: string
-}
-
 const PUBLIC_USER_COLUMNS = 'id, first_name, username, photo_url, dormitory_id'
 
 export const usersRepository = {
@@ -88,25 +82,26 @@ export const usersRepository = {
     return rows[0] ? toAuthUser(rows[0]) : null
   },
 
-  async createUser(input: NewUser): Promise<AuthUser> {
+  /** Атомарний create-or-update по telegram_id — використовується при
+   * кожному Telegram-логіні. Одним запитом (не окремі select+insert),
+   * бо два паралельні логіни того самого нового користувача (напр.
+   * Telegram WebView двічі змонтував сторінку) інакше обидва бачать
+   * "юзера ще нема" і обидва намагаються INSERT — другий падає з
+   * duplicate key на users_telegram_id_key. Telegram щоразу надсилає
+   * поточні first_name/username/photo_url в initData, і вони можуть
+   * відрізнятись від того, що збережено (людина змінила ім'я чи
+   * аватар) — тому апдейт цих полів при кожному вході, не лише при
+   * створенні. */
+  async upsertByTelegramId(input: NewUser): Promise<AuthUser> {
     const { rows } = await query<UserRow>(
       `insert into users (telegram_id, first_name, username, photo_url)
        values ($1, $2, $3, $4)
+       on conflict (telegram_id) do update set
+         first_name = excluded.first_name,
+         username = excluded.username,
+         photo_url = excluded.photo_url
        returning *`,
       [input.telegramId, input.firstName, input.username ?? null, input.photoUrl ?? null],
-    )
-    return toAuthUser(rows[0])
-  },
-
-  /** Викликається при повторному Telegram-логіні — Telegram щоразу надсилає
-   * поточні first_name/username/photo_url в initData, і вони можуть
-   * відрізнятись від того, що збережено (людина змінила ім'я чи аватар). */
-  async updateProfile(id: string, input: ProfileUpdate): Promise<AuthUser> {
-    const { rows } = await query<UserRow>(
-      `update users set first_name = $2, username = $3, photo_url = $4
-       where id = $1
-       returning *`,
-      [id, input.firstName, input.username ?? null, input.photoUrl ?? null],
     )
     return toAuthUser(rows[0])
   },

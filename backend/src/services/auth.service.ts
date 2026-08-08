@@ -27,23 +27,12 @@ export interface TelegramAuthResult {
 export async function authenticateTelegramUser(initData: unknown): Promise<TelegramAuthResult> {
   const telegramUser = resolveTelegramUser(initData)
 
-  const existing = await usersRepository.getUserByTelegramId(telegramUser.id)
-  // Telegram надсилає поточні first_name/username/photo_url при кожному
-  // вході — синхронізуємо збережений профіль, а не лише створюємо його
-  // один раз, інакше зміна імені чи аватара в Telegram ніколи б не
-  // відобразилась у DormHub.
-  const user = existing
-    ? await usersRepository.updateProfile(existing.id, {
-        firstName: telegramUser.first_name,
-        username: telegramUser.username,
-        photoUrl: telegramUser.photo_url,
-      })
-    : await usersRepository.createUser({
-        telegramId: telegramUser.id,
-        firstName: telegramUser.first_name,
-        username: telegramUser.username,
-        photoUrl: telegramUser.photo_url,
-      })
+  const user = await usersRepository.upsertByTelegramId({
+    telegramId: telegramUser.id,
+    firstName: telegramUser.first_name,
+    username: telegramUser.username,
+    photoUrl: telegramUser.photo_url,
+  })
 
   if (isUserBanned(user)) {
     throw new AppError(403, 'USER_BANNED', bannedMessage(user))
