@@ -182,6 +182,13 @@ export async function sendEventAnnouncement(
   ].filter(Boolean).join('\n')
 
   const threadParam = threadId ? { message_thread_id: Number(threadId) } : {}
+  // A URL button pointing at the Mini App's own domain opens inside
+  // Telegram as the Mini App itself (not an external browser) — so this
+  // takes the tap straight to the event's detail page, where the actual
+  // join action already lives.
+  const replyMarkup = {
+    inline_keyboard: [[{ text: '🎉 Приєднатися', url: `${env.FRONTEND_URL}/events/${event.id}` }]],
+  }
 
   if (event.imageUrl) {
     await botApi('sendPhoto', {
@@ -189,6 +196,7 @@ export async function sendEventAnnouncement(
       photo: event.imageUrl,
       caption: text.slice(0, 1024),
       parse_mode: 'MarkdownV2',
+      reply_markup: replyMarkup,
       ...threadParam,
     })
     return
@@ -198,6 +206,7 @@ export async function sendEventAnnouncement(
     chat_id: chatId,
     text: text.slice(0, 4096),
     parse_mode: 'MarkdownV2',
+    reply_markup: replyMarkup,
     ...threadParam,
   })
 }
