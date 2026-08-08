@@ -4,6 +4,7 @@ import { CalendarDays, Clock, Home, MapPin, MonitorPlay, PartyPopper, Users } fr
 import type { DormEvent } from '../types/event'
 import { formatEventDate, formatEventTime } from '../utils/date'
 import { useDormitories } from '../hooks/useDormitories'
+import { ParticipantAvatarStack } from './ParticipantAvatarStack'
 
 export function EventCard({ event }: { event: DormEvent }) {
   const { getDormitoryName } = useDormitories()
@@ -79,17 +80,23 @@ export function EventCard({ event }: { event: DormEvent }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1 text-sm text-[var(--text-secondary)]">
-          <Users size={14} />
-          {event.participants.length} / {event.maxParticipants} учасників
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex min-w-0 items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <ParticipantAvatarStack
+            participants={event.participantPreview ?? []}
+            totalCount={event.participantCount ?? event.participants.length}
+          />
+          <span className="inline-flex shrink-0 items-center gap-1">
+            <Users size={14} />
+            {event.participants.length} / {event.maxParticipants} учасників
+          </span>
         </span>
         {isFull ? (
-          <span className="rounded-full bg-[var(--surface-card-alt)] px-3 py-1 text-xs font-medium text-[var(--text-disabled)]">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--surface-card-alt)] px-3 py-1 text-xs font-medium text-[var(--text-disabled)]">
             Місць немає
           </span>
         ) : (
-          <span className="rounded-full bg-[var(--accent-soft-bg)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--accent-soft-bg)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
             Є місця
           </span>
         )}

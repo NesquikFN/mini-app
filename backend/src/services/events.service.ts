@@ -22,7 +22,16 @@ export interface EventResponse {
   time: string
   location: string
   maxParticipants: number
+  /** Повний список id — незмінна форма, на яку вже покладається frontend
+   * (isFull-перевірка тощо). Не видаляти й не міняти тип. */
   participants: string[]
+  /** === participants.length, тут лише щоб клієнту не рахувати самому. */
+  participantCount: number
+  /** Перші (за часом приєднання) щонайбільше 3 учасники з публічними
+   * профілями — для avatar-стека на картці події. Завжди заповнений (не
+   * lazy): усі функції нижче, що повертають EventResponse, проганяють
+   * результат через attachParticipantPreview(s) одним batch-запитом. */
+  participantPreview: PublicUser[]
   createdAt: string
   dormitoryId: string
 }
@@ -46,9 +55,29 @@ function toEventResponse(event: Event): EventResponse {
     location: event.location,
     maxParticipants: event.maxParticipants,
     participants: event.participantIds,
+    participantCount: event.participantIds.length,
+    participantPreview: [],
     createdAt: event.createdAt,
     dormitoryId: event.dormitoryId,
   }
+}
+
+/**
+ * Fills in `participantPreview` for a batch of events with exactly one
+ * extra SQL query (events.repository.findParticipantPreviews), no matter
+ * how many events are passed — the batch query every EventResponse-
+ * returning function below funnels through, so the API never does N+1
+ * (one query per event) to build avatar previews.
+ */
+async function attachParticipantPreviews(events: EventResponse[]): Promise<EventResponse[]> {
+  if (events.length === 0) return events
+  const previews = await eventsRepository.findParticipantPreviews(events.map((event) => event.id))
+  return events.map((event) => ({ ...event, participantPreview: previews.get(event.id) ?? [] }))
+}
+
+async function attachParticipantPreview(event: EventResponse): Promise<EventResponse> {
+  const [withPreview] = await attachParticipantPreviews([event])
+  return withPreview
 }
 
 async function getEventOrThrow(id: string): Promise<Event> {
@@ -75,15 +104,15 @@ export async function listEvents(
   if (scope === 'mine') {
     if (!userDormitoryId) return []
     const events = await eventsRepository.findAll(userDormitoryId)
-    return events.map(toEventResponse)
+    return attachParticipantPreviews(events.map(toEventResponse))
   }
 
   const events = await eventsRepository.findAll()
-  return events.map(toEventResponse)
+  return attachParticipantPreviews(events.map(toEventResponse))
 }
 
 export async function getEvent(id: string): Promise<EventResponse> {
-  return toEventResponse(await getEventOrThrow(id))
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(id)))
 }
 
 export interface EventMembers {
@@ -144,7 +173,10 @@ export async function createEvent(
     dormitoryId: creatorDormitoryId,
     sourceTemplateId,
   })
-  const response = toEventResponse(event)
+  // Творець щойно автоприєднався (repository.insert), тож preview тут
+  // ніколи не буде порожнім — саме цього й очікує EventCard одразу
+  // після створення, без окремого рефетчу.
+  const response = await attachParticipantPreview(toEventResponse(event))
   if (!input.deferNotification) await announceEvent(response)
   return response
 }
@@ -171,7 +203,7 @@ export async function updateEvent(
   input: UpdateEventInput,
 ): Promise<EventResponse> {
   await getEventOrThrow(id)
-  return toEventResponse(await eventsRepository.update(id, input))
+  return attachParticipantPreview(toEventResponse(await eventsRepository.update(id, input)))
 }
 
 export async function updateOwnEvent(
@@ -193,7 +225,7 @@ export async function updateOwnEvent(
       'Ліміт не може бути меншим за поточну кількість учасників',
     )
   }
-  return toEventResponse(await eventsRepository.update(id, input))
+  return attachParticipantPreview(toEventResponse(await eventsRepository.update(id, input)))
 }
 
 /** Лише адмін-панель. event_participants видаляються каскадом (FK ON
@@ -229,7 +261,7 @@ export async function removeOwnEventParticipant(
   if (!removed) {
     throw new AppError(404, 'PARTICIPANT_NOT_FOUND', 'Учасника не знайдено')
   }
-  return toEventResponse(await getEventOrThrow(eventId))
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
 }
 
 export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {
@@ -237,7 +269,10 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
   // атомарно всередині PostgreSQL-функції join_event (repository),
   // тому тут немає окремого "прочитати → перевірити → вставити".
   await eventsRepository.addParticipant(eventId, userId)
-  return toEventResponse(await getEventOrThrow(eventId))
+  // participantPreview у відповіді дозволяє EventsProvider оновити
+  // avatar-стек на картці, підмінивши лише цю подію в списку — без
+  // повторного GET /api/events для всіх подій одразу.
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
 }
 
 export async function leaveEvent(eventId: string, userId: string): Promise<EventResponse> {
@@ -248,18 +283,30 @@ export async function leaveEvent(eventId: string, userId: string): Promise<Event
     throw new AppError(409, 'NOT_PARTICIPATING', 'Ви не берете участі у цій події')
   }
 
-  return toEventResponse(await getEventOrThrow(eventId))
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
 }
 
+/** Один batch-запит прев'ю на ОБИДВА списки разом (а не по одному на
+ * кожен) — id подій об'єднуються перед єдиним викликом repository. */
 export async function listEventsForUser(userId: string): Promise<UserEvents> {
   const [created, participating] = await Promise.all([
     eventsRepository.getUserCreatedEvents(userId),
     eventsRepository.getUserParticipatingEvents(userId),
   ])
 
+  const createdResponses = created.map(toEventResponse)
+  const participatingResponses = participating.map(toEventResponse)
+  const previews = await eventsRepository.findParticipantPreviews([
+    ...new Set([...createdResponses, ...participatingResponses].map((event) => event.id)),
+  ])
+  const withPreview = (event: EventResponse): EventResponse => ({
+    ...event,
+    participantPreview: previews.get(event.id) ?? [],
+  })
+
   return {
-    created: created.map(toEventResponse),
-    participating: participating.map(toEventResponse),
+    created: createdResponses.map(withPreview),
+    participating: participatingResponses.map(withPreview),
   }
 }
 

@@ -2,6 +2,7 @@ import { query } from '../config/db'
 import { AppError } from '../utils/AppError'
 import { addDays, todayISODate, toISODate } from '../utils/date'
 import type { Event } from '../types/event'
+import type { PublicUser } from '../types/user'
 
 export type EventDateFilter = 'today' | 'week' | 'all'
 
@@ -244,6 +245,60 @@ export const eventsRepository = {
       [eventId],
     )
     return rows.map((row) => row.user_id)
+  },
+
+  /**
+   * Batch fetch of the first `limit` participants per event, keyed by
+   * event id — used to show avatar-stack previews on event cards without
+   * an N+1 (one query total, regardless of how many event ids are
+   * passed). `row_number() over (partition by event_id ...)` ranks each
+   * event's own participants by join order (ep.created_at, same column
+   * join_event() stamps), and the outer filter keeps only the first
+   * `limit` per partition — the Postgres-native way to do a per-group
+   * "top N" in a single query instead of N separate limited queries.
+   */
+  async findParticipantPreviews(
+    eventIds: string[],
+    limit = 3,
+  ): Promise<Map<string, PublicUser[]>> {
+    const byEvent = new Map<string, PublicUser[]>()
+    if (eventIds.length === 0) return byEvent
+
+    const { rows } = await query<{
+      event_id: string
+      id: string
+      first_name: string
+      username: string | null
+      photo_url: string | null
+    }>(
+      `select event_id, id, first_name, username, photo_url
+       from (
+         select
+           ep.event_id,
+           u.id,
+           u.first_name,
+           u.username,
+           u.photo_url,
+           row_number() over (partition by ep.event_id order by ep.created_at asc) as rn
+         from event_participants ep
+         join users u on u.id = ep.user_id
+         where ep.event_id = any($1)
+       ) ranked
+       where rn <= $2`,
+      [eventIds, limit],
+    )
+
+    for (const row of rows) {
+      const preview = byEvent.get(row.event_id) ?? []
+      preview.push({
+        id: row.id,
+        firstName: row.first_name,
+        username: row.username ?? undefined,
+        photoUrl: row.photo_url ?? undefined,
+      })
+      byEvent.set(row.event_id, preview)
+    }
+    return byEvent
   },
 
   async isParticipant(eventId: string, userId: string): Promise<boolean> {
