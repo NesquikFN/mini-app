@@ -58,6 +58,12 @@ function chatTitle(chat: TelegramChat): string {
   return chat.title ?? (chat.username ? `@${chat.username}` : String(chat.id))
 }
 
+let botUsernamePromise: Promise<string> | undefined
+function getBotUsername(): Promise<string> {
+  botUsernamePromise ??= botApi<{ username: string }>('getMe').then((me) => me.username)
+  return botUsernamePromise
+}
+
 async function isActiveMember(chatId: string, userId: number): Promise<boolean> {
   try {
     const member = await botApi<{ status: string }>('getChatMember', {
@@ -175,12 +181,20 @@ export async function sendEventAnnouncement(
   ].filter(Boolean).join('\n')
 
   const threadParam = threadId ? { message_thread_id: Number(threadId) } : {}
-  // A URL button pointing at the Mini App's own domain opens inside
-  // Telegram as the Mini App itself (not an external browser) — so this
-  // takes the tap straight to the event's detail page, where the actual
-  // join action already lives.
+  // Group-chat messages can't use an inline `web_app` button — Telegram
+  // only allows that in private chats with the bot, and a plain `url`
+  // button (even same-domain) just opens as a normal link with no
+  // initData at all. The documented way to deep-link into the Mini App
+  // from a group message is a t.me/<bot>?startapp=... link: Telegram
+  // recognizes it and launches the Mini App itself, passing the value
+  // through as initDataUnsafe.start_param (read on the frontend to jump
+  // straight to this event).
+  const botUsername = await getBotUsername()
   const replyMarkup = {
-    inline_keyboard: [[{ text: '🎉 Приєднатися', url: `${env.FRONTEND_URL}/events/${event.id}` }]],
+    inline_keyboard: [[{
+      text: '🎉 Приєднатися',
+      url: `https://t.me/${botUsername}?startapp=event_${event.id}`,
+    }]],
   }
 
   if (event.imageUrl) {

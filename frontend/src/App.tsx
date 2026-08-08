@@ -1,4 +1,5 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthProvider'
 import { EventsProvider } from './context/EventsProvider'
 import { UserProvider } from './context/UserProvider'
@@ -24,6 +25,21 @@ import { AdminAdminsPage } from './pages/admin/AdminAdminsPage'
 import { AdminBannedUsersPage } from './pages/admin/AdminBannedUsersPage'
 import { AdminEventTemplatesPage } from './pages/admin/AdminEventTemplatesPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
+import { getTelegramStartParam } from './services/telegram'
+
+/** Jumps straight to an event when the Mini App was opened via the
+ * "🎉 Приєднатися" button on a group announcement (a t.me/<bot>?startapp=
+ * deep link) — see sendEventAnnouncement in the backend. */
+function StartAppRedirect() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const match = getTelegramStartParam()?.match(/^event_([0-9a-fA-F-]{36})$/)
+    if (match) navigate(`/events/${match[1]}`, { replace: true })
+  }, [navigate])
+
+  return null
+}
 
 function App() {
   return (
@@ -33,6 +49,7 @@ function App() {
           <DormitoriesProvider>
             <EventsProvider>
               <BrowserRouter>
+                <StartAppRedirect />
                 <Routes>
                   <Route element={<DormitoryGate />}>
                     <Route element={<MainLayout />}>

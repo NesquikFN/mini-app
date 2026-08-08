@@ -36,6 +36,9 @@ interface TelegramWebAppInitDataUnsafe {
   user?: TelegramWebAppUser
   auth_date?: number
   hash?: string
+  /** Passed through from a t.me/<bot>?startapp=<value> deep link — see
+   * sendEventAnnouncement's "🎉 Приєднатися" button in the backend. */
+  start_param?: string
   [key: string]: unknown
 }
 

@@ -17,6 +17,14 @@ export function getTelegramInitData(): string | undefined {
   return webApp?.initData ? webApp.initData : undefined
 }
 
+/** The `?startapp=` value from the t.me deep link that opened this Mini
+ * App session, if any — e.g. "event_<uuid>" from a group announcement's
+ * "🎉 Приєднатися" button. Not signed, so only ever used for navigation,
+ * never trusted as auth or data. */
+export function getTelegramStartParam(): string | undefined {
+  return getTelegramWebApp()?.initDataUnsafe.start_param
+}
+
 /** Mini App bootstrap: signal readiness and expand to full height. Safe
  * no-op outside Telegram (plain browser during local development). */
 export function bootstrapTelegramWebApp(): void {
