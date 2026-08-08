@@ -8,16 +8,28 @@ export interface TelegramChatOption {
   type: 'group' | 'supergroup' | 'channel'
 }
 
+export interface TelegramTopicOption {
+  id: string
+  title: string
+}
+
 interface TelegramChat {
   id: number
   title?: string
   username?: string
   type: string
+  is_forum?: boolean
+}
+
+interface TelegramMessage {
+  chat: TelegramChat
+  message_thread_id?: number
+  forum_topic_created?: { name: string }
 }
 
 interface TelegramUpdate {
-  message?: { chat: TelegramChat }
-  channel_post?: { chat: TelegramChat }
+  message?: TelegramMessage
+  channel_post?: TelegramMessage
   my_chat_member?: { chat: TelegramChat }
   chat_member?: { chat: TelegramChat }
 }
@@ -92,6 +104,32 @@ export async function listAvailableChats(telegramUserId: number): Promise<Telegr
   return checked.filter((chat): chat is TelegramChatOption => chat !== null)
 }
 
+/**
+ * The Bot API has no "list topics" endpoint, so — like discoveredChats —
+ * this reads topic names out of update history (forum_topic_created
+ * service messages) and only returns anything for chats with Topics
+ * enabled at all.
+ */
+export async function listAvailableTopics(chatId: string): Promise<TelegramTopicOption[]> {
+  const chat = await botApi<TelegramChat>('getChat', { chat_id: chatId })
+  if (!chat.is_forum) return []
+
+  const updates = await botApi<TelegramUpdate[]>('getUpdates')
+  const topics = new Map<string, TelegramTopicOption>()
+  for (const update of updates) {
+    const message = update.message ?? update.channel_post
+    if (!message || String(message.chat.id) !== chatId || !message.message_thread_id) continue
+    const threadId = String(message.message_thread_id)
+    const title = message.forum_topic_created?.name
+    if (title) {
+      topics.set(threadId, { id: threadId, title })
+    } else if (!topics.has(threadId)) {
+      topics.set(threadId, { id: threadId, title: `Гілка #${threadId}` })
+    }
+  }
+  return [...topics.values()].sort((a, b) => a.title.localeCompare(b.title, 'uk'))
+}
+
 // Telegram MarkdownV2 special characters that must be escaped outside of
 // an intentional entity, or the API rejects the message with a 400
 // ("can't find end of the entity").
@@ -127,6 +165,7 @@ export async function sendEventAnnouncement(
   chatId: string,
   event: EventResponse,
   creator?: AnnouncementCreator,
+  threadId?: string,
 ): Promise<void> {
   const location = event.isOnline ? 'Онлайн' : event.location
   const creatorName = creator
@@ -142,12 +181,15 @@ export async function sendEventAnnouncement(
     event.description ? `\n${toTelegramMarkdown(event.description)}` : '',
   ].filter(Boolean).join('\n')
 
+  const threadParam = threadId ? { message_thread_id: Number(threadId) } : {}
+
   if (event.imageUrl) {
     await botApi('sendPhoto', {
       chat_id: chatId,
       photo: event.imageUrl,
       caption: text.slice(0, 1024),
       parse_mode: 'MarkdownV2',
+      ...threadParam,
     })
     return
   }
@@ -156,5 +198,6 @@ export async function sendEventAnnouncement(
     chat_id: chatId,
     text: text.slice(0, 4096),
     parse_mode: 'MarkdownV2',
+    ...threadParam,
   })
 }

@@ -3,8 +3,12 @@ import { z } from 'zod'
 export const notificationSettingsSchema = z.object({
   chatId: z.string().regex(/^-?\d+$/, 'Некоректний Telegram chat_id').nullable(),
   chatTitle: z.string().trim().min(1).nullable(),
+  threadId: z.string().regex(/^\d+$/, 'Некоректний ID гілки').nullable().optional(),
+  threadTitle: z.string().trim().min(1).nullable().optional(),
 }).refine((value) => (value.chatId === null) === (value.chatTitle === null), {
   message: 'Чат і його назва мають бути вказані разом',
+}).refine((value) => ((value.threadId ?? null) === null) === ((value.threadTitle ?? null) === null), {
+  message: 'Гілка і її назва мають бути вказані разом',
 })
 
 const paginationQuerySchema = z.object({

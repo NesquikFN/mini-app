@@ -35,14 +35,31 @@ export async function listNotificationChats(req: Request, res: Response): Promis
   res.json({ chats: await telegramNotifications.listAvailableChats(req.user.telegramId) })
 }
 
+export async function listNotificationTopics(req: Request, res: Response): Promise<void> {
+  const chatId = typeof req.query.chatId === 'string' ? req.query.chatId : ''
+  if (!/^-?\d+$/.test(chatId)) throw new AppError(400, 'VALIDATION_ERROR', 'Некоректний chat_id')
+  res.json({ topics: await telegramNotifications.listAvailableTopics(chatId) })
+}
+
 export async function updateNotificationSettings(req: Request, res: Response): Promise<void> {
-  const { chatId, chatTitle } = notificationSettingsSchema.parse(req.body)
+  const { chatId, chatTitle, threadId, threadTitle } = notificationSettingsSchema.parse(req.body)
   if (chatId) {
     const allowed = (await telegramNotifications.listAvailableChats(req.user.telegramId))
       .some((chat) => chat.id === chatId && chat.title === chatTitle)
     if (!allowed) throw new AppError(403, 'TELEGRAM_CHAT_FORBIDDEN', 'Цей чат недоступний')
+
+    if (threadId) {
+      const allowedThread = (await telegramNotifications.listAvailableTopics(chatId))
+        .some((topic) => topic.id === threadId && topic.title === threadTitle)
+      if (!allowedThread) throw new AppError(403, 'TELEGRAM_THREAD_FORBIDDEN', 'Ця гілка недоступна')
+    }
   }
-  res.json(await settingsRepository.setNotificationChat(chatId ?? undefined, chatTitle ?? undefined))
+  res.json(await settingsRepository.setNotificationChat(
+    chatId ?? undefined,
+    chatTitle ?? undefined,
+    threadId ?? undefined,
+    threadTitle ?? undefined,
+  ))
 }
 
 export async function listUsers(req: Request, res: Response): Promise<void> {

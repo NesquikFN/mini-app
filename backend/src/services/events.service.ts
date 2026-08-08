@@ -155,6 +155,7 @@ export async function announceEvent(event: EventResponse): Promise<void> {
       settings.chatId,
       event,
       creator ? { firstName: creator.firstName, username: creator.username } : undefined,
+      settings.threadId,
     )
   } catch (error) {
     console.error('Не вдалося надіслати Telegram-анонс події:', error)

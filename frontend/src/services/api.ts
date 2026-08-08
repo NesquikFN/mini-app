@@ -118,19 +118,42 @@ export async function fetchAdminNotificationChats(): Promise<TelegramChatOption[
   return data.chats
 }
 
+export interface TelegramTopicOption {
+  id: string
+  title: string
+}
+
+/** Порожній список означає, що в чаті не увімкнені гілки (Topics). */
+export async function fetchAdminNotificationTopics(chatId: string): Promise<TelegramTopicOption[]> {
+  const data = await request<{ topics: TelegramTopicOption[] }>(
+    `/admin/notification-topics?chatId=${encodeURIComponent(chatId)}`,
+  )
+  return data.topics
+}
+
 export interface NotificationSettings {
   chatId?: string
   chatTitle?: string
+  threadId?: string
+  threadTitle?: string
 }
 
 export function fetchNotificationSettings(): Promise<NotificationSettings> {
   return request<NotificationSettings>('/admin/notification-settings')
 }
 
-export function updateNotificationSettings(chat?: TelegramChatOption): Promise<NotificationSettings> {
+export function updateNotificationSettings(
+  chat?: TelegramChatOption,
+  topic?: TelegramTopicOption,
+): Promise<NotificationSettings> {
   return request<NotificationSettings>('/admin/notification-settings', {
     method: 'PUT',
-    body: JSON.stringify({ chatId: chat?.id ?? null, chatTitle: chat?.title ?? null }),
+    body: JSON.stringify({
+      chatId: chat?.id ?? null,
+      chatTitle: chat?.title ?? null,
+      threadId: topic?.id ?? null,
+      threadTitle: topic?.title ?? null,
+    }),
   })
 }
 
