@@ -30,6 +30,8 @@ export const eventsQuerySchema = paginationQuerySchema.extend({
   date: z.enum(['today', 'week', 'all']).catch('all'),
 })
 
+export const notificationLogQuerySchema = paginationQuerySchema
+
 export const userIdParamSchema = z.object({
   id: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
 })

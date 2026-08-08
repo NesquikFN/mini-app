@@ -9,6 +9,7 @@ adminRouter.get('/notification-settings', adminController.getNotificationSetting
 adminRouter.put('/notification-settings', adminController.updateNotificationSettings)
 adminRouter.get('/notification-chats', adminController.listNotificationChats)
 adminRouter.get('/notification-topics', adminController.listNotificationTopics)
+adminRouter.get('/notification-log', adminController.listNotificationLog)
 
 adminRouter.get('/users', adminController.listUsers)
 adminRouter.get('/banned-users', adminController.listBannedUsers)

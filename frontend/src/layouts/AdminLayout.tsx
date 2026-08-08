@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Ban, Bell, CalendarDays, LayoutDashboard, ShieldCheck, Sparkles, Users } from 'lucide-react'
+import { ArrowLeft, Ban, Bell, CalendarDays, History, LayoutDashboard, ShieldCheck, Sparkles, Users } from 'lucide-react'
 
 // "Ігри" (шаблони подій) переїхали в головну навігацію (BottomNavigation)
 // — доступні всім юзерам, не лише адмінам.
@@ -11,6 +11,7 @@ const TABS = [
   { to: '/admin/hosts', label: 'Хости', icon: Sparkles, end: false },
   { to: '/admin/banned', label: 'ЧС', icon: Ban, end: false },
   { to: '/admin/notifications', label: 'Сповіщення', icon: Bell, end: false },
+  { to: '/admin/notification-log', label: 'Журнал', icon: History, end: false },
 ]
 
 export function AdminLayout() {

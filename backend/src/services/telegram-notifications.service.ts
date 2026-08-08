@@ -2,6 +2,10 @@ import { env } from '../config/env'
 import { AppError } from '../utils/AppError'
 import { telegramRegistryRepository } from '../repositories/telegram-registry.repository'
 import { usersRepository } from '../repositories/users.repository'
+import {
+  notificationLogRepository,
+  type NotificationKind,
+} from '../repositories/notification-log.repository'
 import type { EventResponse } from './events.service'
 import type { Event } from '../types/event'
 
@@ -53,6 +57,39 @@ async function botApi<T>(method: string, body?: Record<string, unknown>): Promis
     throw new AppError(502, 'TELEGRAM_API_ERROR', payload.description ?? 'Помилка Telegram API')
   }
   return payload.result
+}
+
+/**
+ * Every actual message dispatch (as opposed to getMe/getChatMember/etc.)
+ * goes through here so it lands in notification_log — that's what backs
+ * the admin "Журнал сповіщень" page. Logging failure itself never masks
+ * or replaces the original send outcome: it's fire-and-forget on success,
+ * and on failure the original error still propagates after being logged.
+ */
+async function sendAndLog(
+  kind: NotificationKind,
+  chatId: string,
+  send: () => Promise<void>,
+  event?: { id: string; title: string },
+): Promise<void> {
+  try {
+    await send()
+    await notificationLogRepository
+      .log({ chatId, kind, eventId: event?.id, eventTitle: event?.title, success: true })
+      .catch((error: unknown) => console.error('Не вдалося записати журнал сповіщень:', error))
+  } catch (error) {
+    await notificationLogRepository
+      .log({
+        chatId,
+        kind,
+        eventId: event?.id,
+        eventTitle: event?.title,
+        success: false,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+      .catch((logError: unknown) => console.error('Не вдалося записати журнал сповіщень:', logError))
+    throw error
+  }
 }
 
 const ACTIVE_MEMBER_STATUSES = ['creator', 'administrator', 'member']
@@ -139,11 +176,12 @@ async function handleNotificationsOffCommand(chatId: string): Promise<void> {
   if (user) {
     await usersRepository.setNotifyNewEvents(user.id, false)
   }
-  await botApi('sendMessage', {
-    chat_id: chatId,
-    text: escapeMarkdownV2('🔕 Сповіщення про нові події вимкнено. Увімкнути знову можна перемикачем у розділі «Ігри».'),
-    parse_mode: 'MarkdownV2',
-  })
+  await sendAndLog('notifications_off_confirmation', chatId, () =>
+    botApi('sendMessage', {
+      chat_id: chatId,
+      text: escapeMarkdownV2('🔕 Сповіщення про нові події вимкнено. Увімкнути знову можна перемикачем у розділі «Ігри».'),
+      parse_mode: 'MarkdownV2',
+    }))
 }
 
 async function sendStartGreeting(chatId: string, firstName?: string): Promise<void> {
@@ -160,14 +198,15 @@ async function sendStartGreeting(chatId: string, firstName?: string): Promise<vo
   // web_app buttons (real Mini-App launch, not just a link) only work in
   // private chats with the bot — see sendEventAnnouncement for why group
   // messages use a t.me/?startapp= link instead.
-  await botApi('sendMessage', {
-    chat_id: chatId,
-    text,
-    parse_mode: 'MarkdownV2',
-    reply_markup: {
-      inline_keyboard: [[{ text: '🏠 Відкрити DormHub', web_app: { url: env.FRONTEND_URL } }]],
-    },
-  })
+  await sendAndLog('start_greeting', chatId, () =>
+    botApi('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'MarkdownV2',
+      reply_markup: {
+        inline_keyboard: [[{ text: '🏠 Відкрити DormHub', web_app: { url: env.FRONTEND_URL } }]],
+      },
+    }))
 }
 
 /**
@@ -252,41 +291,51 @@ export async function sendEventAnnouncement(
   ].filter(Boolean).join('\n')
 
   const threadParam = threadId ? { message_thread_id: Number(threadId) } : {}
-  // Group-chat messages can't use an inline `web_app` button — Telegram
-  // only allows that in private chats with the bot, and a plain `url`
-  // button (even same-domain) just opens as a normal link with no
-  // initData at all. The documented way to deep-link into the Mini App
-  // from a group message is a t.me/<bot>?startapp=... link: Telegram
-  // recognizes it and launches the Mini App itself, passing the value
-  // through as initDataUnsafe.start_param (read on the frontend to jump
-  // straight to this event).
-  const botUsername = await getBotUsername()
-  const replyMarkup = {
-    inline_keyboard: [[{
-      text: '🎉 Приєднатися',
-      url: `https://t.me/${botUsername}?startapp=event_${event.id}`,
-    }]],
-  }
+  const kind: NotificationKind = isPersonalNotification ? 'personal_announcement' : 'group_announcement'
+  await sendAndLog(
+    kind,
+    chatId,
+    async () => {
+      // Group-chat messages can't use an inline `web_app` button — Telegram
+      // only allows that in private chats with the bot, and a plain `url`
+      // button (even same-domain) just opens as a normal link with no
+      // initData at all. The documented way to deep-link into the Mini App
+      // from a group message is a t.me/<bot>?startapp=... link: Telegram
+      // recognizes it and launches the Mini App itself, passing the value
+      // through as initDataUnsafe.start_param (read on the frontend to jump
+      // straight to this event). Resolved *inside* this callback (not
+      // above, before sendAndLog) so a getMe failure is itself logged as
+      // a failed send, instead of throwing past sendAndLog unnoticed.
+      const botUsername = await getBotUsername()
+      const replyMarkup = {
+        inline_keyboard: [[{
+          text: '🎉 Приєднатися',
+          url: `https://t.me/${botUsername}?startapp=event_${event.id}`,
+        }]],
+      }
 
-  if (event.imageUrl) {
-    await botApi('sendPhoto', {
-      chat_id: chatId,
-      photo: event.imageUrl,
-      caption: text.slice(0, 1024),
-      parse_mode: 'MarkdownV2',
-      reply_markup: replyMarkup,
-      ...threadParam,
-    })
-    return
-  }
+      if (event.imageUrl) {
+        await botApi('sendPhoto', {
+          chat_id: chatId,
+          photo: event.imageUrl,
+          caption: text.slice(0, 1024),
+          parse_mode: 'MarkdownV2',
+          reply_markup: replyMarkup,
+          ...threadParam,
+        })
+        return
+      }
 
-  await botApi('sendMessage', {
-    chat_id: chatId,
-    text: text.slice(0, 4096),
-    parse_mode: 'MarkdownV2',
-    reply_markup: replyMarkup,
-    ...threadParam,
-  })
+      await botApi('sendMessage', {
+        chat_id: chatId,
+        text: text.slice(0, 4096),
+        parse_mode: 'MarkdownV2',
+        reply_markup: replyMarkup,
+        ...threadParam,
+      })
+    },
+    { id: event.id, title: event.title },
+  )
 }
 
 /** DM-нагадування учасникам за ~30 хв до старту (event-reminders.service.ts).
@@ -294,7 +343,7 @@ export async function sendEventAnnouncement(
  * учасники) і без опису, лише найважливіше для того, хто вже поспішає. */
 export async function sendEventReminder(
   chatId: string,
-  event: Pick<Event, 'title' | 'time' | 'location' | 'isOnline'>,
+  event: Pick<Event, 'id' | 'title' | 'time' | 'location' | 'isOnline'>,
 ): Promise<void> {
   const location = event.isOnline ? 'Онлайн' : event.location
   const text = [
@@ -302,5 +351,10 @@ export async function sendEventReminder(
     `🕐 ${event.time.slice(0, 5)} 📍 ${location}`,
   ].map(escapeMarkdownV2).join('\n')
 
-  await botApi('sendMessage', { chat_id: chatId, text, parse_mode: 'MarkdownV2' })
+  await sendAndLog(
+    'event_reminder',
+    chatId,
+    () => botApi('sendMessage', { chat_id: chatId, text, parse_mode: 'MarkdownV2' }),
+    { id: event.id, title: event.title },
+  )
 }

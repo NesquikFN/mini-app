@@ -10,8 +10,10 @@ import {
   adminUserIdParamSchema,
   banUserSchema,
   notificationSettingsSchema,
+  notificationLogQuerySchema,
 } from '../validation/admin.schemas'
 import { settingsRepository } from '../repositories/settings.repository'
+import { notificationLogRepository } from '../repositories/notification-log.repository'
 import * as telegramNotifications from '../services/telegram-notifications.service'
 
 /** Досяжний лише якщо requireTelegramAuth + requireAdmin уже пропустили
@@ -154,4 +156,13 @@ export async function removeHost(req: Request, res: Response): Promise<void> {
   const { userId } = adminUserIdParamSchema.parse(req.params)
   await adminService.removeHost(userId)
   res.json({ success: true })
+}
+
+export async function listNotificationLog(req: Request, res: Response): Promise<void> {
+  const { page, limit } = notificationLogQuerySchema.parse(req.query)
+  const { entries, total } = await notificationLogRepository.listPaginated(page, limit)
+  res.json({
+    entries,
+    pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+  })
 }

@@ -14,6 +14,7 @@ import type {
   EventTemplate,
   EventTemplateInput,
   HostListItem,
+  NotificationLogResponse,
 } from '../types/admin'
 import { getSessionToken, setSessionToken } from './session'
 import { getTelegramInitData } from './telegram'
@@ -380,6 +381,14 @@ export async function fetchAdminUsers(
 
 export async function fetchAdminUserDetail(id: string): Promise<AdminUserDetail> {
   return request<AdminUserDetail>(`/admin/users/${id}`)
+}
+
+export async function fetchAdminNotificationLog(
+  page: number,
+  limit: number,
+): Promise<NotificationLogResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  return request<NotificationLogResponse>(`/admin/notification-log?${params.toString()}`)
 }
 
 export async function deleteAdminUser(id: string): Promise<void> {

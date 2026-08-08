@@ -25,6 +25,7 @@ import { AdminAdminsPage } from './pages/admin/AdminAdminsPage'
 import { AdminHostsPage } from './pages/admin/AdminHostsPage'
 import { AdminBannedUsersPage } from './pages/admin/AdminBannedUsersPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
+import { AdminNotificationLogPage } from './pages/admin/AdminNotificationLogPage'
 import { EventTemplatesPage } from './pages/EventTemplatesPage'
 import { getTelegramStartParam } from './services/telegram'
 
@@ -76,6 +77,7 @@ function App() {
                       <Route path="/admin/hosts" element={<AdminHostsPage />} />
                       <Route path="/admin/banned" element={<AdminBannedUsersPage />} />
                       <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+                      <Route path="/admin/notification-log" element={<AdminNotificationLogPage />} />
                     </Route>
                   </Route>
                 </Routes>

@@ -200,6 +200,21 @@ create table if not exists app_settings (
 insert into app_settings (id) values (true) on conflict (id) do nothing;
 alter table app_settings enable row level security;
 
+-- Журнал усіх повідомлень, надісланих ботом — для адмін-панелі "Журнал
+-- сповіщень" (кому й коли бот щось надіслав).
+create table if not exists notification_log (
+  id uuid primary key default gen_random_uuid(),
+  chat_id text not null,
+  kind text not null,
+  event_id uuid references events (id) on delete set null,
+  event_title text,
+  success boolean not null,
+  error_message text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_notification_log_created_at on notification_log (created_at desc);
+create index if not exists idx_notification_log_chat_id on notification_log (chat_id);
+
 -- =========================================================
 -- Атомарна функція приєднання до події (захист від race condition)
 -- =========================================================

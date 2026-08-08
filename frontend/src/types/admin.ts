@@ -15,6 +15,30 @@ export interface Pagination {
   pages: number
 }
 
+export type NotificationKind =
+  | 'group_announcement'
+  | 'personal_announcement'
+  | 'event_reminder'
+  | 'start_greeting'
+  | 'notifications_off_confirmation'
+
+export interface NotificationLogEntry {
+  id: string
+  chatId: string
+  recipientName?: string
+  kind: NotificationKind
+  eventId?: string
+  eventTitle?: string
+  success: boolean
+  errorMessage?: string
+  createdAt: string
+}
+
+export interface NotificationLogResponse {
+  entries: NotificationLogEntry[]
+  pagination: Pagination
+}
+
 /** Ширший профіль для адмінки — на відміну від PublicUser включає
  * telegram_id і дату реєстрації, бо це вже адміністративний інтерфейс. */
 export interface AdminUserView {
