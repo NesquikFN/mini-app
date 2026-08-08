@@ -139,3 +139,19 @@ export async function removeAdmin(req: Request, res: Response): Promise<void> {
   await adminService.removeAdmin(userId)
   res.json({ success: true })
 }
+
+export async function listHosts(_req: Request, res: Response): Promise<void> {
+  res.json({ hosts: await adminService.listHosts() })
+}
+
+export async function addHost(req: Request, res: Response): Promise<void> {
+  const { telegramId } = addAdminSchema.parse(req.body)
+  const host = await adminService.addHostByTelegramId(telegramId)
+  res.status(201).json({ host })
+}
+
+export async function removeHost(req: Request, res: Response): Promise<void> {
+  const { userId } = adminUserIdParamSchema.parse(req.params)
+  await adminService.removeHost(userId)
+  res.json({ success: true })
+}

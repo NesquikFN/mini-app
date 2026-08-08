@@ -51,6 +51,9 @@ create table if not exists users (
   -- тихо лишати людей без гуртожитку.
   dormitory_id uuid references dormitories (id),
   created_at timestamptz not null default now(),
+  -- Особиста підписка на DM-сповіщення про нові події від бота, окремо
+  -- від групового чату (app_settings.notification_chat_id).
+  notify_new_events boolean not null default false,
   constraint users_telegram_id_key unique (telegram_id)
 );
 
@@ -146,6 +149,21 @@ create table if not exists admin_users (
 create index if not exists idx_admin_users_user_id on admin_users (user_id);
 
 -- =========================================================
+-- Таблиця hosts (див. migrations/0014_hosts_and_notifications.sql)
+-- =========================================================
+-- "Хост" — право редагувати/видаляти/створювати шаблони ігор, окремо
+-- від admin_users (адміни й так мають повний доступ). Той самий шаблон
+-- таблиці, що й admin_users.
+create table if not exists hosts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint hosts_user_id_key unique (user_id)
+);
+
+create index if not exists idx_hosts_user_id on hosts (user_id);
+
+-- =========================================================
 -- Row Level Security
 -- =========================================================
 -- Успадковано від часів Supabase (де backend ходив через SERVICE_ROLE_KEY,
@@ -159,6 +177,7 @@ alter table users enable row level security;
 alter table events enable row level security;
 alter table event_participants enable row level security;
 alter table admin_users enable row level security;
+alter table hosts enable row level security;
 alter table dormitories enable row level security;
 
 -- Глобальні налаштування застосунку (один singleton-рядок).

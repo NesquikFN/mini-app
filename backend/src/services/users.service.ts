@@ -36,3 +36,7 @@ export async function updateDormitory(userId: string, dormitoryId: string): Prom
 
   return usersRepository.setDormitory(userId, dormitoryId)
 }
+
+export async function updateNotifyNewEvents(userId: string, notify: boolean): Promise<AuthUser> {
+  return usersRepository.setNotifyNewEvents(userId, notify)
+}

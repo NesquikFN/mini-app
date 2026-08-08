@@ -9,11 +9,14 @@ import { z } from 'zod'
 // users.service.ts, not in this format validation.
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export const updateMeSchema = z.object({
-  dormitoryId: z
-    .string('Гуртожиток обовʼязковий')
-    .regex(UUID_SHAPE, 'Некоректний ідентифікатор гуртожитку'),
-})
+export const updateMeSchema = z
+  .object({
+    dormitoryId: z.string().regex(UUID_SHAPE, 'Некоректний ідентифікатор гуртожитку').optional(),
+    notifyNewEvents: z.boolean().optional(),
+  })
+  .refine((value) => value.dormitoryId !== undefined || value.notifyNewEvents !== undefined, {
+    message: 'Немає що оновлювати',
+  })
 
 export const publicUserIdParamSchema = z.object({
   id: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),

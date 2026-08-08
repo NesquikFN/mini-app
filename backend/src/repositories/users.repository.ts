@@ -12,6 +12,7 @@ interface UserRow {
   banned_until: string | null
   banned_permanently: boolean
   created_at: string
+  notify_new_events: boolean
 }
 
 function toAuthUser(row: UserRow): AuthUser {
@@ -24,6 +25,7 @@ function toAuthUser(row: UserRow): AuthUser {
     dormitoryId: row.dormitory_id ?? undefined,
     bannedUntil: row.banned_until ?? undefined,
     bannedPermanently: row.banned_permanently,
+    notifyNewEvents: row.notify_new_events,
   }
 }
 
@@ -119,6 +121,23 @@ export const usersRepository = {
       [id, dormitoryId],
     )
     return toAuthUser(rows[0])
+  },
+
+  async setNotifyNewEvents(id: string, notify: boolean): Promise<AuthUser> {
+    const { rows } = await query<UserRow>(
+      'update users set notify_new_events = $2 where id = $1 returning *',
+      [id, notify],
+    )
+    return toAuthUser(rows[0])
+  },
+
+  /** telegram_id тих, хто підписався на особисті DM-сповіщення про нові
+   * події (окремо від групового чату) — для announceEvent у events.service.ts. */
+  async getSubscribedTelegramIds(): Promise<number[]> {
+    const { rows } = await query<{ telegram_id: string }>(
+      'select telegram_id from users where notify_new_events = true',
+    )
+    return rows.map((row) => Number(row.telegram_id))
   },
 
   async getAllUsers(): Promise<AdminUserView[]> {

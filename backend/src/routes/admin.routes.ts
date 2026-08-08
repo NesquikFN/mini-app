@@ -26,3 +26,7 @@ adminRouter.delete('/events/:id/participants/:userId', adminController.removePar
 adminRouter.get('/admins', adminController.listAdmins)
 adminRouter.post('/admins', adminController.addAdmin)
 adminRouter.delete('/admins/:userId', adminController.removeAdmin)
+
+adminRouter.get('/hosts', adminController.listHosts)
+adminRouter.post('/hosts', adminController.addHost)
+adminRouter.delete('/hosts/:userId', adminController.removeHost)

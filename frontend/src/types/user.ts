@@ -6,6 +6,8 @@ export interface AuthUser {
   photoUrl?: string
   /** FK на dormitories.id, ще не обраний користувачем — undefined. */
   dormitoryId?: string
+  /** Особиста підписка на DM-сповіщення про нові події від бота. */
+  notifyNewEvents: boolean
 }
 
 /** Публічний профіль організатора чи учасника події — те, що API

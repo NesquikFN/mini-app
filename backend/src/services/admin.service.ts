@@ -1,4 +1,5 @@
 import { adminRepository } from '../repositories/admin.repository'
+import { hostsRepository } from '../repositories/hosts.repository'
 import { usersRepository } from '../repositories/users.repository'
 import { eventsRepository, type EventDateFilter } from '../repositories/events.repository'
 import * as eventsService from './events.service'
@@ -13,6 +14,7 @@ import type {
   AdminEventsResponse,
   AdminEventDetail,
   AdminListItem,
+  HostListItem,
   Pagination,
 } from '../types/admin'
 
@@ -292,4 +294,50 @@ export async function removeAdmin(userId: string): Promise<void> {
   }
 
   await adminRepository.removeAdmin(userId)
+}
+
+/** Той самий патерн, що й для listAdmins/addAdminByTelegramId/removeAdmin
+ * вище — "хост" не потребує захисту "останнього" (адміни завжди можуть
+ * керувати hosts незалежно від їх кількості, на відміну від admin_users,
+ * де порожній список означає втрату доступу до самої адмінки). */
+export async function listHosts(): Promise<HostListItem[]> {
+  const hostRows = await hostsRepository.listHosts()
+  if (hostRows.length === 0) return []
+
+  const users = await usersRepository.getUsersByIds(hostRows.map((row) => row.userId))
+  const userById = new Map(users.map((user) => [user.id, user]))
+
+  return hostRows
+    .map((row) => {
+      const user = userById.get(row.userId)
+      if (!user) return null
+      return { ...user, hostSince: row.hostSince }
+    })
+    .filter((item): item is HostListItem => item !== null)
+}
+
+export async function addHostByTelegramId(telegramId: number): Promise<HostListItem> {
+  const user = await usersRepository.getUserByTelegramId(telegramId)
+  if (!user) {
+    throw new AppError(
+      404,
+      'USER_NOT_FOUND',
+      'Користувача з таким Telegram ID ще немає в системі — попросіть спочатку відкрити застосунок',
+    )
+  }
+
+  const hostRow = await hostsRepository.addHost(user.id)
+  const hostView = await usersRepository.getAdminUserById(user.id)
+  if (!hostView) {
+    throw new Error('Не вдалося прочитати щойно доданого хоста')
+  }
+
+  return { ...hostView, hostSince: hostRow.hostSince }
+}
+
+export async function removeHost(userId: string): Promise<void> {
+  const removed = await hostsRepository.removeHost(userId)
+  if (!removed) {
+    throw new AppError(404, 'HOST_NOT_FOUND', 'Цей користувач не є хостом')
+  }
 }

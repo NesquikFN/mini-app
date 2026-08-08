@@ -13,6 +13,7 @@ import type {
   AdminUserView,
   EventTemplate,
   EventTemplateInput,
+  HostListItem,
 } from '../types/admin'
 import { getSessionToken } from './session'
 
@@ -273,6 +274,14 @@ export async function updateMyDormitory(dormitoryId: string): Promise<AuthUser> 
   return data.user
 }
 
+export async function updateMyNotifyNewEvents(notifyNewEvents: boolean): Promise<AuthUser> {
+  const data = await request<MeResponse>('/me', {
+    method: 'PATCH',
+    body: JSON.stringify({ notifyNewEvents }),
+  })
+  return data.user
+}
+
 export async function fetchDormitories(): Promise<Dormitory[]> {
   const data = await request<{ dormitories: Dormitory[] }>('/dormitories')
   return data.dormitories
@@ -392,9 +401,31 @@ export async function removeAdmin(userId: string): Promise<void> {
   await request<{ success: boolean }>(`/admin/admins/${userId}`, { method: 'DELETE' })
 }
 
+export async function fetchAdminHosts(): Promise<HostListItem[]> {
+  const data = await request<{ hosts: HostListItem[] }>('/admin/hosts')
+  return data.hosts
+}
+
+export async function addHostByTelegramId(telegramId: number): Promise<HostListItem> {
+  const data = await request<{ host: HostListItem }>('/admin/hosts', {
+    method: 'POST',
+    body: JSON.stringify({ telegramId }),
+  })
+  return data.host
+}
+
+export async function removeHost(userId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/hosts/${userId}`, { method: 'DELETE' })
+}
+
 export async function fetchEventTemplates(): Promise<EventTemplate[]> {
   const data = await request<{ templates: EventTemplate[] }>('/event-templates')
   return data.templates
+}
+
+export async function fetchTemplateManagerStatus(): Promise<boolean> {
+  const data = await request<{ canManage: boolean }>('/event-templates/manager-status')
+  return data.canManage
 }
 
 export async function createEventTemplate(input: EventTemplateInput): Promise<EventTemplate> {

@@ -8,6 +8,8 @@ export interface AuthUser {
   dormitoryId?: string
   bannedUntil?: string
   bannedPermanently: boolean
+  /** Особиста підписка на DM-сповіщення про нові події від бота. */
+  notifyNewEvents: boolean
 }
 
 /** Ширший погляд на users-рядок для адмін-панелі — включає поля, які

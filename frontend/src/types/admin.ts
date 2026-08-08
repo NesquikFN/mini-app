@@ -34,6 +34,10 @@ export interface AdminListItem extends AdminUserView {
   adminSince: string
 }
 
+export interface HostListItem extends AdminUserView {
+  hostSince: string
+}
+
 export interface AdminUserListItem extends AdminUserView {
   eventsCreatedCount: number
 }

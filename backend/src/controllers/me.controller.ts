@@ -9,7 +9,13 @@ export async function getMe(req: Request, res: Response): Promise<void> {
 
 export async function updateMe(req: Request, res: Response): Promise<void> {
   const input = updateMeSchema.parse(req.body)
-  const user = await usersService.updateDormitory(req.user.id, input.dormitoryId)
+  let user = req.user
+  if (input.dormitoryId !== undefined) {
+    user = await usersService.updateDormitory(user.id, input.dormitoryId)
+  }
+  if (input.notifyNewEvents !== undefined) {
+    user = await usersService.updateNotifyNewEvents(user.id, input.notifyNewEvents)
+  }
   res.json({ user })
 }
 

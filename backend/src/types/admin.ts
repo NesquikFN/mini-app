@@ -66,6 +66,11 @@ export interface AdminListItem extends AdminUserView {
   adminSince: string
 }
 
+export interface HostListItem extends AdminUserView {
+  /** hosts.created_at — відколи цей users.id має права хоста. */
+  hostSince: string
+}
+
 export interface EventTemplate {
   id: string
   title: string

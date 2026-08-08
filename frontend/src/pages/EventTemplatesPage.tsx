@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { CalendarPlus, Clock, Gamepad2, ImagePlus, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Bell, BellOff, CalendarPlus, Clock, Gamepad2, ImagePlus, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/PageHeader'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
 import { useEvents } from '../hooks/useEvents'
 import {
@@ -12,8 +13,10 @@ import {
   createEventTemplate,
   deleteEventTemplate,
   fetchEventTemplates,
+  fetchTemplateManagerStatus,
   getErrorMessage,
   updateEventTemplate,
+  updateMyNotifyNewEvents,
 } from '../services/api'
 import { formatEventDate } from '../utils/date'
 import type { EventTemplate, EventTemplateInput } from '../types/admin'
@@ -30,12 +33,14 @@ const WEEKDAYS = [
 
 type Status = 'loading' | 'success' | 'error'
 
-/** "Ігри" — доступна будь-якому автентифікованому юзеру (не лише
- * адмінам): дивитись, створювати, редагувати, видаляти й запускати
- * шаблони може кожен, backend гейтить лише requireTelegramAuth. */
+/** "Ігри" — доступна будь-якому автентифікованому юзеру: переглядати й
+ * запускати шаблони може кожен, а редагувати/створювати/видаляти —
+ * лише адміни та хости (backend гейтить requireTemplateManager,
+ * canManage тут визначає, чи показувати відповідні кнопки). */
 export function EventTemplatesPage() {
   const { getDormitoryName } = useDormitories()
   const { reload: reloadEvents } = useEvents()
+  const { user, reload: reloadUser } = useCurrentUser()
   const [templates, setTemplates] = useState<EventTemplate[]>([])
   const [status, setStatus] = useState<Status>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -45,6 +50,8 @@ export function EventTemplatesPage() {
   const [pendingDelete, setPendingDelete] = useState<EventTemplate | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [canManage, setCanManage] = useState(false)
+  const [notifyToggling, setNotifyToggling] = useState(false)
 
   const load = useCallback(() => {
     fetchEventTemplates()
@@ -59,6 +66,25 @@ export function EventTemplatesPage() {
   }, [])
 
   useEffect(() => load(), [load])
+
+  useEffect(() => {
+    fetchTemplateManagerStatus()
+      .then(setCanManage)
+      .catch(() => setCanManage(false))
+  }, [])
+
+  async function handleToggleNotify() {
+    if (!user) return
+    setNotifyToggling(true)
+    try {
+      await updateMyNotifyNewEvents(!user.notifyNewEvents)
+      reloadUser()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setNotifyToggling(false)
+    }
+  }
 
   async function handleSave(input: EventTemplateInput) {
     setSaving(true)
@@ -115,10 +141,37 @@ export function EventTemplatesPage() {
       <div className="flex flex-col gap-4 px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">Регулярні події в один клік — доступно всім.</p>
-          <Button onClick={() => setEditing('new')}>
-            <Plus size={17} /> Новий шаблон
-          </Button>
+          {canManage && (
+            <Button onClick={() => setEditing('new')}>
+              <Plus size={17} /> Новий шаблон
+            </Button>
+          )}
         </div>
+
+        {user && (
+          <button
+            type="button"
+            onClick={handleToggleNotify}
+            disabled={notifyToggling}
+            className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] px-4 py-3 text-left disabled:opacity-60"
+          >
+            <span className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
+              {user.notifyNewEvents ? <Bell size={17} className="text-[var(--accent)]" /> : <BellOff size={17} className="text-[var(--text-secondary)]" />}
+              Сповіщення про нові події від бота
+            </span>
+            <span
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                user.notifyNewEvents ? 'bg-[var(--accent)]' : 'bg-[var(--surface-card-alt)]'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                  user.notifyNewEvents ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
+          </button>
+        )}
 
         {successMessage && (
           <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
@@ -131,7 +184,7 @@ export function EventTemplatesPage() {
           </p>
         )}
 
-        {editing && (
+        {editing && canManage && (
           <TemplateForm
             key={editing === 'new' ? 'new' : editing.id}
             template={editing === 'new' ? undefined : editing}
@@ -177,7 +230,7 @@ export function EventTemplatesPage() {
                   </p>
                 </div>
               </div>
-              <div className="m-4 grid grid-cols-[1fr_auto_auto] gap-2">
+              <div className={`m-4 grid gap-2 ${canManage ? 'grid-cols-[1fr_auto_auto]' : 'grid-cols-1'}`}>
                 <Button
                   loading={publishingId === template.id}
                   disabled={publishingId !== null}
@@ -185,12 +238,16 @@ export function EventTemplatesPage() {
                 >
                   <CalendarPlus size={17} /> Створити найближчу
                 </Button>
-                <Button variant="outline" aria-label="Редагувати шаблон" onClick={() => setEditing(template)}>
-                  <Pencil size={16} />
-                </Button>
-                <Button variant="danger" aria-label="Видалити шаблон" onClick={() => setPendingDelete(template)}>
-                  <Trash2 size={16} />
-                </Button>
+                {canManage && (
+                  <>
+                    <Button variant="outline" aria-label="Редагувати шаблон" onClick={() => setEditing(template)}>
+                      <Pencil size={16} />
+                    </Button>
+                    <Button variant="danger" aria-label="Видалити шаблон" onClick={() => setPendingDelete(template)}>
+                      <Trash2 size={16} />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ))}

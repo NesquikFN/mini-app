@@ -185,19 +185,28 @@ export async function createEvent(
 }
 
 export async function announceEvent(event: EventResponse): Promise<void> {
+  const creator = await usersRepository.getPublicUserById(event.creatorId)
+  const creatorInfo = creator ? { firstName: creator.firstName, username: creator.username } : undefined
+
   try {
     const settings = await settingsRepository.getNotificationSettings()
-    if (!settings.chatId) return
-    const creator = await usersRepository.getPublicUserById(event.creatorId)
-    await sendEventAnnouncement(
-      settings.chatId,
-      event,
-      creator ? { firstName: creator.firstName, username: creator.username } : undefined,
-      settings.threadId,
-    )
+    if (settings.chatId) {
+      await sendEventAnnouncement(settings.chatId, event, creatorInfo, settings.threadId)
+    }
   } catch (error) {
     console.error('Не вдалося надіслати Telegram-анонс події:', error)
   }
+
+  const subscriberIds = await usersRepository.getSubscribedTelegramIds()
+  await Promise.all(
+    subscriberIds.map(async (telegramId) => {
+      try {
+        await sendEventAnnouncement(String(telegramId), event, creatorInfo)
+      } catch (error) {
+        console.error(`Не вдалося надіслати особисте сповіщення про подію користувачу ${telegramId}:`, error)
+      }
+    }),
+  )
 }
 
 /** Лише адмін-панель — звичайний Mini App редагування подій не пропонує. */
