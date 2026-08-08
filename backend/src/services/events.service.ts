@@ -1,6 +1,9 @@
 import { eventsRepository } from '../repositories/events.repository'
 import { usersRepository } from '../repositories/users.repository'
-import { eventTemplatesRepository } from '../repositories/event-templates.repository'
+import {
+  eventTemplatesRepository,
+  type EventTemplateInput,
+} from '../repositories/event-templates.repository'
 import { AppError } from '../utils/AppError'
 import { addDays, toISODate } from '../utils/date'
 import type { Event } from '../types/event'
@@ -310,10 +313,35 @@ export async function listEventsForUser(userId: string): Promise<UserEvents> {
   }
 }
 
-/** Шаблони без dormitoryId доступні всім гуртожиткам; решта — лише своєму. */
-export async function listAvailableEventTemplates(dormitoryId?: string): Promise<EventTemplate[]> {
-  const templates = await eventTemplatesRepository.findAll()
-  return templates.filter((template) => !template.dormitoryId || template.dormitoryId === dormitoryId)
+/**
+ * Шаблони ігор — спільна вкладка "Ігри", доступна будь-якому
+ * автентифікованому юзеру (не лише адмінам): читати, створювати,
+ * редагувати, видаляти й запускати може кожен. Без обмеження гуртожитком
+ * на запуск — той самий рівень доступу, що раніше мали лише адміни.
+ */
+export async function listEventTemplates(): Promise<EventTemplate[]> {
+  return eventTemplatesRepository.findAll()
+}
+
+export async function createEventTemplate(input: EventTemplateInput): Promise<EventTemplate> {
+  return eventTemplatesRepository.insert(input)
+}
+
+export async function updateEventTemplate(id: string, input: EventTemplateInput): Promise<EventTemplate> {
+  const template = await eventTemplatesRepository.update(id, input)
+  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+  return template
+}
+
+export async function updateEventTemplateImage(id: string, imageUrl: string): Promise<EventTemplate> {
+  const template = await eventTemplatesRepository.updateImage(id, imageUrl)
+  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+  return template
+}
+
+export async function deleteEventTemplate(id: string): Promise<void> {
+  const removed = await eventTemplatesRepository.remove(id)
+  if (!removed) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
 }
 
 function nextTemplateDate(weekday: number, time: string): string {
@@ -328,20 +356,9 @@ export async function createEventFromTemplate(
   templateId: string,
   creatorId: string,
   creatorDormitoryId?: string,
-  // Адмін керує всіма гуртожитками й може використати будь-який шаблон;
-  // для звичайного юзера — лише глобальні шаблони або шаблони свого
-  // гуртожитку, інакше подія створиться не в тому гуртожитку.
-  options?: { restrictToOwnDormitory?: boolean },
 ): Promise<EventResponse> {
   const template = await eventTemplatesRepository.findById(templateId)
   if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
-  if (
-    options?.restrictToOwnDormitory &&
-    template.dormitoryId &&
-    template.dormitoryId !== creatorDormitoryId
-  ) {
-    throw new AppError(403, 'TEMPLATE_FORBIDDEN', 'Цей шаблон недоступний для вашого гуртожитку')
-  }
 
   try {
     const event = await createEvent(

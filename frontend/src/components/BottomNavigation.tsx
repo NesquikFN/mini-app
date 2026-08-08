@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { Home, CalendarDays, PlusCircle, User } from 'lucide-react'
+import { Home, CalendarDays, Gamepad2, PlusCircle, User } from 'lucide-react'
 
 const items = [
   { to: '/', label: 'Головна', icon: Home, end: true },
   { to: '/events', label: 'Події', icon: CalendarDays, end: false },
   { to: '/create', label: 'Створити', icon: PlusCircle, end: false },
+  { to: '/templates', label: 'Ігри', icon: Gamepad2, end: false },
   { to: '/profile', label: 'Профіль', icon: User, end: false },
 ]
 

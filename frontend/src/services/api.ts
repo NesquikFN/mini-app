@@ -250,19 +250,6 @@ export async function leaveEventRequest(eventId: string): Promise<DormEvent> {
   return data.event
 }
 
-/** Тільки шаблони, доступні гуртожитку поточного юзера (глобальні + свого). */
-export async function fetchAvailableEventTemplates(): Promise<EventTemplate[]> {
-  const data = await request<{ templates: EventTemplate[] }>('/events/templates')
-  return data.templates
-}
-
-export async function createEventFromAvailableTemplate(id: string): Promise<DormEvent> {
-  const data = await request<{ event: DormEvent }>(`/events/templates/${id}/create-event`, {
-    method: 'POST',
-  })
-  return data.event
-}
-
 export async function fetchCurrentUser(): Promise<AuthUser> {
   const data = await request<MeResponse>('/me')
   return data.user
@@ -406,13 +393,13 @@ export async function removeAdmin(userId: string): Promise<void> {
 }
 
 export async function fetchEventTemplates(): Promise<EventTemplate[]> {
-  const data = await request<{ templates: EventTemplate[] }>('/admin/event-templates')
+  const data = await request<{ templates: EventTemplate[] }>('/event-templates')
   return data.templates
 }
 
 export async function createEventTemplate(input: EventTemplateInput): Promise<EventTemplate> {
   const { imageFile, ...payload } = input
-  const data = await request<{ template: EventTemplate }>('/admin/event-templates', {
+  const data = await request<{ template: EventTemplate }>('/event-templates', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -424,7 +411,7 @@ export async function updateEventTemplate(
   input: EventTemplateInput,
 ): Promise<EventTemplate> {
   const { imageFile, ...payload } = input
-  const data = await request<{ template: EventTemplate }>(`/admin/event-templates/${id}`, {
+  const data = await request<{ template: EventTemplate }>(`/event-templates/${id}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
   })
@@ -432,7 +419,7 @@ export async function updateEventTemplate(
 }
 
 async function uploadEventTemplateImage(id: string, imageFile: File): Promise<EventTemplate> {
-  const data = await request<{ template: EventTemplate }>(`/admin/event-templates/${id}/image`, {
+  const data = await request<{ template: EventTemplate }>(`/event-templates/${id}/image`, {
     method: 'PUT',
     headers: { 'Content-Type': imageFile.type },
     body: imageFile,
@@ -441,12 +428,12 @@ async function uploadEventTemplateImage(id: string, imageFile: File): Promise<Ev
 }
 
 export async function deleteEventTemplate(id: string): Promise<void> {
-  await request<{ success: boolean }>(`/admin/event-templates/${id}`, { method: 'DELETE' })
+  await request<{ success: boolean }>(`/event-templates/${id}`, { method: 'DELETE' })
 }
 
 export async function createEventFromTemplate(id: string): Promise<DormEvent> {
   const data = await request<{ event: DormEvent }>(
-    `/admin/event-templates/${id}/create-event`,
+    `/event-templates/${id}/create-event`,
     { method: 'POST' },
   )
   return data.event

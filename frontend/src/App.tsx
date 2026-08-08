@@ -23,8 +23,8 @@ import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminAdminsPage } from './pages/admin/AdminAdminsPage'
 import { AdminBannedUsersPage } from './pages/admin/AdminBannedUsersPage'
-import { AdminEventTemplatesPage } from './pages/admin/AdminEventTemplatesPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
+import { EventTemplatesPage } from './pages/EventTemplatesPage'
 import { getTelegramStartParam } from './services/telegram'
 
 /** Jumps straight to an event when the Mini App was opened via the
@@ -58,6 +58,7 @@ function App() {
                       <Route path="/events/:id" element={<EventDetailPage />} />
                       <Route path="/events/:id/edit" element={<EditEventPage />} />
                       <Route path="/create" element={<CreateEventPage />} />
+                      <Route path="/templates" element={<EventTemplatesPage />} />
                       <Route path="/profile" element={<ProfilePage />} />
                       <Route path="/users/:id" element={<UserProfilePage />} />
                     </Route>
@@ -72,7 +73,6 @@ function App() {
                       <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
                       <Route path="/admin/admins" element={<AdminAdminsPage />} />
                       <Route path="/admin/banned" element={<AdminBannedUsersPage />} />
-                      <Route path="/admin/templates" element={<AdminEventTemplatesPage />} />
                       <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                     </Route>
                   </Route>

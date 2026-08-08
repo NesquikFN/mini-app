@@ -3,7 +3,6 @@ import * as eventsService from '../services/events.service'
 import {
   createEventSchema,
   eventIdParamSchema,
-  eventTemplateIdParamSchema,
   eventsListQuerySchema,
   updateEventSchema,
   userIdParamSchema,
@@ -86,20 +85,4 @@ export async function leaveEvent(req: Request, res: Response): Promise<void> {
   const { id } = eventIdParamSchema.parse(req.params)
   const event = await eventsService.leaveEvent(id, req.user.id)
   res.json({ event })
-}
-
-export async function listEventTemplates(req: Request, res: Response): Promise<void> {
-  const templates = await eventsService.listAvailableEventTemplates(req.user.dormitoryId)
-  res.json({ templates })
-}
-
-export async function createEventFromTemplate(req: Request, res: Response): Promise<void> {
-  const { templateId } = eventTemplateIdParamSchema.parse(req.params)
-  const event = await eventsService.createEventFromTemplate(
-    templateId,
-    req.user.id,
-    req.user.dormitoryId,
-    { restrictToOwnDormitory: true },
-  )
-  res.status(201).json({ event })
 }

@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express'
 import * as adminService from '../services/admin.service'
-import { IMAGE_EXTENSIONS_BY_CONTENT_TYPE, saveUpload } from '../utils/uploads'
 import { AppError } from '../utils/AppError'
 import { eventIdParamSchema, userIdParamSchema as participantIdParamSchema } from '../validation/event.schemas'
 import {
@@ -10,8 +9,6 @@ import {
   addAdminSchema,
   adminUserIdParamSchema,
   banUserSchema,
-  eventTemplateIdParamSchema,
-  eventTemplateSchema,
   notificationSettingsSchema,
 } from '../validation/admin.schemas'
 import { settingsRepository } from '../repositories/settings.repository'
@@ -96,54 +93,6 @@ export async function unbanUser(req: Request, res: Response): Promise<void> {
   const { id } = userIdParamSchema.parse(req.params)
   await adminService.unbanUser(id)
   res.json({ success: true })
-}
-
-export async function listEventTemplates(_req: Request, res: Response): Promise<void> {
-  res.json({ templates: await adminService.listEventTemplates() })
-}
-
-export async function createEventTemplate(req: Request, res: Response): Promise<void> {
-  const input = eventTemplateSchema.parse(req.body)
-  res.status(201).json({ template: await adminService.createEventTemplate(input) })
-}
-
-export async function updateEventTemplate(req: Request, res: Response): Promise<void> {
-  const { templateId } = eventTemplateIdParamSchema.parse(req.params)
-  const input = eventTemplateSchema.parse(req.body)
-  res.json({ template: await adminService.updateEventTemplate(templateId, input) })
-}
-
-export async function uploadEventTemplateImage(req: Request, res: Response): Promise<void> {
-  const { templateId } = eventTemplateIdParamSchema.parse(req.params)
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-    throw new AppError(400, 'IMAGE_REQUIRED', 'Оберіть фотографію')
-  }
-
-  const contentType = req.headers['content-type'] ?? ''
-  const extension = IMAGE_EXTENSIONS_BY_CONTENT_TYPE[contentType]
-  if (!extension) {
-    throw new AppError(415, 'IMAGE_TYPE_UNSUPPORTED', 'Підтримуються JPG, PNG або WebP')
-  }
-
-  const imageUrl = await saveUpload(`templates/${templateId}/cover.${extension}`, req.body)
-  const template = await adminService.updateEventTemplateImage(templateId, imageUrl)
-  res.json({ template })
-}
-
-export async function deleteEventTemplate(req: Request, res: Response): Promise<void> {
-  const { templateId } = eventTemplateIdParamSchema.parse(req.params)
-  await adminService.deleteEventTemplate(templateId)
-  res.json({ success: true })
-}
-
-export async function createFromEventTemplate(req: Request, res: Response): Promise<void> {
-  const { templateId } = eventTemplateIdParamSchema.parse(req.params)
-  const event = await adminService.createEventFromTemplate(
-    templateId,
-    req.user.id,
-    req.user.dormitoryId,
-  )
-  res.status(201).json({ event })
 }
 
 export async function listEvents(req: Request, res: Response): Promise<void> {

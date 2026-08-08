@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { CalendarPlus, Clock, Gamepad2, ImagePlus, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Button } from '../../components/Button'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { EmptyState } from '../../components/EmptyState'
-import { LoadingState } from '../../components/LoadingState'
-import { useDormitories } from '../../hooks/useDormitories'
-import { useEvents } from '../../hooks/useEvents'
+import { Button } from '../components/Button'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { EmptyState } from '../components/EmptyState'
+import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/PageHeader'
+import { useDormitories } from '../hooks/useDormitories'
+import { useEvents } from '../hooks/useEvents'
 import {
   createEventFromTemplate,
   createEventTemplate,
@@ -13,9 +14,9 @@ import {
   fetchEventTemplates,
   getErrorMessage,
   updateEventTemplate,
-} from '../../services/api'
-import { formatEventDate } from '../../utils/date'
-import type { EventTemplate, EventTemplateInput } from '../../types/admin'
+} from '../services/api'
+import { formatEventDate } from '../utils/date'
+import type { EventTemplate, EventTemplateInput } from '../types/admin'
 
 const WEEKDAYS = [
   { value: 1, label: 'Понеділок' },
@@ -29,7 +30,10 @@ const WEEKDAYS = [
 
 type Status = 'loading' | 'success' | 'error'
 
-export function AdminEventTemplatesPage() {
+/** "Ігри" — доступна будь-якому автентифікованому юзеру (не лише
+ * адмінам): дивитись, створювати, редагувати, видаляти й запускати
+ * шаблони може кожен, backend гейтить лише requireTelegramAuth. */
+export function EventTemplatesPage() {
   const { getDormitoryName } = useDormitories()
   const { reload: reloadEvents } = useEvents()
   const [templates, setTemplates] = useState<EventTemplate[]>([])
@@ -106,103 +110,103 @@ export function AdminEventTemplatesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Шаблони ігор</h1>
-          <p className="text-sm text-[var(--text-secondary)]">Регулярні події в один клік</p>
+    <div className="flex flex-col">
+      <PageHeader title="Ігри" />
+      <div className="flex flex-col gap-4 px-4 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-[var(--text-secondary)]">Регулярні події в один клік — доступно всім.</p>
+          <Button onClick={() => setEditing('new')}>
+            <Plus size={17} /> Новий шаблон
+          </Button>
         </div>
-        <Button onClick={() => setEditing('new')}>
-          <Plus size={17} /> Новий шаблон
-        </Button>
-      </div>
 
-      {successMessage && (
-        <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-          {successMessage}
-        </p>
-      )}
-      {errorMessage && (
-        <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          {errorMessage}
-        </p>
-      )}
+        {successMessage && (
+          <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            {successMessage}
+          </p>
+        )}
+        {errorMessage && (
+          <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {errorMessage}
+          </p>
+        )}
 
-      {editing && (
-        <TemplateForm
-          key={editing === 'new' ? 'new' : editing.id}
-          template={editing === 'new' ? undefined : editing}
-          saving={saving}
-          onSubmit={handleSave}
-          onCancel={() => setEditing(null)}
-        />
-      )}
+        {editing && (
+          <TemplateForm
+            key={editing === 'new' ? 'new' : editing.id}
+            template={editing === 'new' ? undefined : editing}
+            saving={saving}
+            onSubmit={handleSave}
+            onCancel={() => setEditing(null)}
+          />
+        )}
 
-      {status === 'loading' && <LoadingState label="Завантажуємо шаблони…" />}
-      {status === 'error' && (
-        <EmptyState title="Не вдалося завантажити шаблони" actionLabel="Повторити" onAction={load} />
-      )}
-      {status === 'success' && templates.length === 0 && !editing && (
-        <EmptyState
-          icon={<Gamepad2 size={34} />}
-          title="Шаблонів ще немає"
-          description="Створіть першу регулярну гру."
-        />
-      )}
+        {status === 'loading' && <LoadingState label="Завантажуємо шаблони…" />}
+        {status === 'error' && (
+          <EmptyState title="Не вдалося завантажити шаблони" actionLabel="Повторити" onAction={load} />
+        )}
+        {status === 'success' && templates.length === 0 && !editing && (
+          <EmptyState
+            icon={<Gamepad2 size={34} />}
+            title="Шаблонів ще немає"
+            description="Створіть першу регулярну гру."
+          />
+        )}
 
-      <div className="flex flex-col gap-3">
-        {templates.map((template) => (
-          <div
-            key={template.id}
-            className="overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)]"
-          >
-            {template.imageUrl && (
-              <img src={template.imageUrl} alt={template.title} className="h-36 w-full object-cover" />
-            )}
-            <div className="flex items-start gap-3 p-4 pb-0">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
-                <Gamepad2 size={21} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="truncate font-semibold text-[var(--text-primary)]">{template.title}</h2>
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
-                  <span className="inline-flex items-center gap-1"><Clock size={13} /> {weekdayLabel(template.weekday)}, {template.time.slice(0, 5)}</span>
-                  <span className="inline-flex items-center gap-1"><MapPin size={13} /> {template.isOnline ? 'Онлайн' : template.location}</span>
+        <div className="flex flex-col gap-3">
+          {templates.map((template) => (
+            <div
+              key={template.id}
+              className="overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)]"
+            >
+              {template.imageUrl && (
+                <img src={template.imageUrl} alt={template.title} className="h-36 w-full object-cover" />
+              )}
+              <div className="flex items-start gap-3 p-4 pb-0">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
+                  <Gamepad2 size={21} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate font-semibold text-[var(--text-primary)]">{template.title}</h2>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
+                    <span className="inline-flex items-center gap-1"><Clock size={13} /> {weekdayLabel(template.weekday)}, {template.time.slice(0, 5)}</span>
+                    <span className="inline-flex items-center gap-1"><MapPin size={13} /> {template.isOnline ? 'Онлайн' : template.location}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-disabled)]">
+                    {template.isOnline ? 'Доступно всім гуртожиткам' : getDormitoryName(template.dormitoryId)}
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-[var(--text-disabled)]">
-                  {template.isOnline ? 'Доступно всім гуртожиткам' : getDormitoryName(template.dormitoryId)}
-                </p>
+              </div>
+              <div className="m-4 grid grid-cols-[1fr_auto_auto] gap-2">
+                <Button
+                  loading={publishingId === template.id}
+                  disabled={publishingId !== null}
+                  onClick={() => handlePublish(template)}
+                >
+                  <CalendarPlus size={17} /> Створити найближчу
+                </Button>
+                <Button variant="outline" aria-label="Редагувати шаблон" onClick={() => setEditing(template)}>
+                  <Pencil size={16} />
+                </Button>
+                <Button variant="danger" aria-label="Видалити шаблон" onClick={() => setPendingDelete(template)}>
+                  <Trash2 size={16} />
+                </Button>
               </div>
             </div>
-            <div className="m-4 grid grid-cols-[1fr_auto_auto] gap-2">
-              <Button
-                loading={publishingId === template.id}
-                disabled={publishingId !== null}
-                onClick={() => handlePublish(template)}
-              >
-                <CalendarPlus size={17} /> Створити найближчу
-              </Button>
-              <Button variant="outline" aria-label="Редагувати шаблон" onClick={() => setEditing(template)}>
-                <Pencil size={16} />
-              </Button>
-              <Button variant="danger" aria-label="Видалити шаблон" onClick={() => setPendingDelete(template)}>
-                <Trash2 size={16} />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {pendingDelete && (
-        <ConfirmDialog
-          title="Видалити шаблон?"
-          description={`«${pendingDelete.title}» більше не буде доступний для швидкого створення.`}
-          confirmLabel="Видалити"
-          loading={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setPendingDelete(null)}
-        />
-      )}
+        {pendingDelete && (
+          <ConfirmDialog
+            title="Видалити шаблон?"
+            description={`«${pendingDelete.title}» більше не буде доступний для швидкого створення.`}
+            confirmLabel="Видалити"
+            loading={deleting}
+            onConfirm={handleDelete}
+            onCancel={() => setPendingDelete(null)}
+          />
+        )}
+      </div>
     </div>
   )
 }

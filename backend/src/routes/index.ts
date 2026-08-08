@@ -3,6 +3,7 @@ import { healthRouter } from './health.routes'
 import { authRouter } from './auth.routes'
 import * as telegramWebhookController from '../controllers/telegram-webhook.controller'
 import { eventsRouter } from './events.routes'
+import { eventTemplatesRouter } from './event-templates.routes'
 import { meRouter } from './me.routes'
 import { dormitoriesRouter } from './dormitories.routes'
 import { usersRouter } from './users.routes'
@@ -16,6 +17,7 @@ apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.post('/telegram/webhook', telegramWebhookController.receiveUpdate)
 apiRouter.use('/events', requireTelegramAuth, eventsRouter)
+apiRouter.use('/event-templates', requireTelegramAuth, eventTemplatesRouter)
 apiRouter.use('/me', requireTelegramAuth, meRouter)
 apiRouter.use('/dormitories', requireTelegramAuth, dormitoriesRouter)
 apiRouter.use('/users', requireTelegramAuth, usersRouter)

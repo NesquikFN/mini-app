@@ -4,9 +4,6 @@ import { eventsRepository, type EventDateFilter } from '../repositories/events.r
 import * as eventsService from './events.service'
 import { AppError } from '../utils/AppError'
 import type { AdminUserView } from '../types/user'
-import { eventTemplatesRepository } from '../repositories/event-templates.repository'
-import type { EventTemplate } from '../types/admin'
-import type { EventTemplateInput } from '../repositories/event-templates.repository'
 import type {
   AdminStats,
   AdminUserListItem,
@@ -152,37 +149,6 @@ export async function unbanUser(userId: string): Promise<void> {
   if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
   await usersRepository.unban(userId)
 }
-
-export async function listEventTemplates(): Promise<EventTemplate[]> {
-  return eventTemplatesRepository.findAll()
-}
-
-export async function createEventTemplate(input: EventTemplateInput): Promise<EventTemplate> {
-  return eventTemplatesRepository.insert(input)
-}
-
-export async function updateEventTemplate(
-  id: string,
-  input: EventTemplateInput,
-): Promise<EventTemplate> {
-  const template = await eventTemplatesRepository.update(id, input)
-  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
-  return template
-}
-
-export async function updateEventTemplateImage(id: string, imageUrl: string): Promise<EventTemplate> {
-  const template = await eventTemplatesRepository.updateImage(id, imageUrl)
-  if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
-  return template
-}
-
-export async function deleteEventTemplate(id: string): Promise<void> {
-  const removed = await eventTemplatesRepository.remove(id)
-  if (!removed) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
-}
-
-/** Адмін не обмежений гуртожитком шаблону — див. events.service.ts. */
-export const createEventFromTemplate = eventsService.createEventFromTemplate
 
 export async function listEvents(
   page: number,
