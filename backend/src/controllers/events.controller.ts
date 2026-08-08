@@ -8,7 +8,7 @@ import {
   updateEventSchema,
   userIdParamSchema,
 } from '../validation/event.schemas'
-import { supabase } from '../config/supabase'
+import { IMAGE_EXTENSIONS_BY_CONTENT_TYPE, saveUpload } from '../utils/uploads'
 import { AppError } from '../utils/AppError'
 
 export async function listEvents(req: Request, res: Response): Promise<void> {
@@ -63,25 +63,13 @@ export async function uploadEventImage(req: Request, res: Response): Promise<voi
   }
 
   const contentType = req.headers['content-type'] ?? ''
-  const extensions: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-  }
-  const extension = extensions[contentType]
+  const extension = IMAGE_EXTENSIONS_BY_CONTENT_TYPE[contentType]
   if (!extension) {
     throw new AppError(415, 'IMAGE_TYPE_UNSUPPORTED', 'Підтримуються JPG, PNG або WebP')
   }
 
-  const path = `${id}/cover.${extension}`
-  const { error } = await supabase.storage.from('event-images').upload(path, req.body, {
-    contentType,
-    upsert: true,
-  })
-  if (error) throw error
-
-  const { data } = supabase.storage.from('event-images').getPublicUrl(path)
-  const updated = await eventsService.updateEvent(id, { imageUrl: data.publicUrl })
+  const imageUrl = await saveUpload(`${id}/cover.${extension}`, req.body)
+  const updated = await eventsService.updateEvent(id, { imageUrl })
   if (req.query.announce === 'true') {
     await eventsService.announceEvent(updated)
   }

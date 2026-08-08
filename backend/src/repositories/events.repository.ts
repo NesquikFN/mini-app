@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import { AppError } from '../utils/AppError'
 import { addDays, todayISODate, toISODate } from '../utils/date'
 import type { Event } from '../types/event'
@@ -20,7 +20,7 @@ interface EventRow {
   created_at: string
   dormitory_id: string
   source_template_id: string | null
-  event_participants: { user_id: string }[]
+  participant_ids: string[]
 }
 
 export interface NewEvent {
@@ -40,10 +40,14 @@ export interface NewEvent {
   sourceTemplateId?: string
 }
 
-// event_participants(user_id) — вкладена вибірка: PostgREST підтягує
-// пов'язані рядки з event_participants в одному запиті, замість окремого
-// SELECT на кожну подію.
-const EVENT_SELECT = '*, event_participants(user_id)'
+// participant_ids — агрегований масив через LEFT JOIN + array_agg, той
+// самий "один запит замість N+1", що раніше давав вкладений PostgREST-select.
+const EVENTS_BASE_SELECT = `
+  select e.*,
+    coalesce(array_agg(ep.user_id) filter (where ep.user_id is not null), '{}') as participant_ids
+  from events e
+  left join event_participants ep on ep.event_id = e.id
+`
 
 function toEvent(row: EventRow): Event {
   return {
@@ -58,22 +62,23 @@ function toEvent(row: EventRow): Event {
     time: row.time,
     location: row.location,
     maxParticipants: row.max_participants,
-    participantIds: row.event_participants.map((participant) => participant.user_id),
+    participantIds: row.participant_ids,
     createdAt: row.created_at,
     dormitoryId: row.dormitory_id,
     sourceTemplateId: row.source_template_id ?? undefined,
   }
 }
 
-/** Перекладає відомі помилки RPC join_event у доменні AppError. */
-function translateJoinError(error: { message: string }): never {
-  if (error.message === 'EVENT_NOT_FOUND') {
+/** Перекладає відомі помилки функції join_event у доменні AppError. */
+function translateJoinError(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('EVENT_NOT_FOUND')) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
-  if (error.message === 'ALREADY_JOINED') {
+  if (message.includes('ALREADY_JOINED')) {
     throw new AppError(409, 'ALREADY_JOINED', 'Ви вже берете участь у цій події')
   }
-  if (error.message === 'EVENT_FULL') {
+  if (message.includes('EVENT_FULL')) {
     throw new AppError(409, 'EVENT_FULL', 'Місць більше немає')
   }
   throw error
@@ -84,95 +89,94 @@ export const eventsRepository = {
    * узятий і чи довіряти йому, вирішує events.service, не тут). Без
    * нього — усі гуртожитки. */
   async findAll(dormitoryId?: string): Promise<Event[]> {
-    let query = supabase.from('events').select(EVENT_SELECT)
-    if (dormitoryId) {
-      // Physical events stay scoped to the selected dormitory, while
-      // online events are global and must be visible to everyone.
-      query = query.or(`dormitory_id.eq.${dormitoryId},is_online.eq.true`)
-    }
-
-    const { data, error } = await query
-      .order('date', { ascending: true })
-      .returns<EventRow[]>()
-
-    if (error) throw error
-    return data.map(toEvent)
+    // Physical events stay scoped to the selected dormitory, while
+    // online events are global and must be visible to everyone.
+    const where = dormitoryId ? 'where e.dormitory_id = $1 or e.is_online = true' : ''
+    const { rows } = await query<EventRow>(
+      `${EVENTS_BASE_SELECT} ${where} group by e.id order by e.date asc`,
+      dormitoryId ? [dormitoryId] : [],
+    )
+    return rows.map(toEvent)
   },
 
   /** Адмінський список подій — сторінками, з пошуком по назві та
-   * фільтром по даті. Той самий EVENT_SELECT, що й скрізь, тож
-   * participantIds доступні одразу без окремого запиту на лічильник. */
+   * фільтром по даті. */
   async findPaginated(
     page: number,
     limit: number,
     search?: string,
     dateFilter: EventDateFilter = 'all',
   ): Promise<{ events: Event[]; total: number }> {
-    let query = supabase.from('events').select(EVENT_SELECT, { count: 'exact' })
+    const conditions: string[] = []
+    const params: unknown[] = []
 
     const trimmedSearch = search?.trim()
     if (trimmedSearch) {
-      const escaped = trimmedSearch.replace(/[%_]/g, (char) => `\\${char}`)
-      query = query.ilike('title', `%${escaped}%`)
+      params.push(`%${trimmedSearch}%`)
+      conditions.push(`e.title ilike $${params.length}`)
     }
-
     if (dateFilter === 'today') {
-      query = query.eq('date', todayISODate())
+      params.push(todayISODate())
+      conditions.push(`e.date = $${params.length}`)
     } else if (dateFilter === 'week') {
-      query = query.gte('date', todayISODate()).lte('date', toISODate(addDays(new Date(), 7)))
+      params.push(todayISODate())
+      conditions.push(`e.date >= $${params.length}`)
+      params.push(toISODate(addDays(new Date(), 7)))
+      conditions.push(`e.date <= $${params.length}`)
     }
 
-    const from = (page - 1) * limit
-    const to = from + limit - 1
+    const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : ''
+    const offset = (page - 1) * limit
 
-    const { data, error, count } = await query
-      .order('date', { ascending: true })
-      .range(from, to)
-      .returns<EventRow[]>()
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query<EventRow>(
+        `${EVENTS_BASE_SELECT} ${where} group by e.id order by e.date asc
+         limit $${params.length + 1} offset $${params.length + 2}`,
+        [...params, limit, offset],
+      ),
+      query<{ count: string }>(`select count(*) from events e ${where}`, params),
+    ])
 
-    if (error) throw error
-    return { events: data.map(toEvent), total: count ?? 0 }
+    return { events: rows.map(toEvent), total: Number(countRows[0].count) }
   },
 
   async findById(id: string): Promise<Event | null> {
-    const { data, error } = await supabase
-      .from('events')
-      .select(EVENT_SELECT)
-      .eq('id', id)
-      .maybeSingle<EventRow>()
-
-    if (error) throw error
-    return data ? toEvent(data) : null
+    const { rows } = await query<EventRow>(
+      `${EVENTS_BASE_SELECT} where e.id = $1 group by e.id`,
+      [id],
+    )
+    return rows[0] ? toEvent(rows[0]) : null
   },
 
   async insert(newEvent: NewEvent): Promise<Event> {
-    const { data, error } = await supabase
-      .from('events')
-      .insert({
-        creator_id: newEvent.creatorId,
-        title: newEvent.title,
-        description: newEvent.description || null,
-        image_url: newEvent.imageUrl || null,
-        group_url: newEvent.groupUrl || null,
-        is_online: newEvent.isOnline,
-        date: newEvent.date,
-        time: newEvent.time,
-        location: newEvent.location,
-        max_participants: newEvent.maxParticipants,
-        dormitory_id: newEvent.dormitoryId,
-        source_template_id: newEvent.sourceTemplateId ?? null,
-      })
-      .select('id')
-      .single<{ id: string }>()
-
-    if (error) throw error
+    const { rows } = await query<{ id: string }>(
+      `insert into events
+         (creator_id, title, description, image_url, group_url, is_online,
+          date, time, location, max_participants, dormitory_id, source_template_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       returning id`,
+      [
+        newEvent.creatorId,
+        newEvent.title,
+        newEvent.description || null,
+        newEvent.imageUrl || null,
+        newEvent.groupUrl || null,
+        newEvent.isOnline,
+        newEvent.date,
+        newEvent.time,
+        newEvent.location,
+        newEvent.maxParticipants,
+        newEvent.dormitoryId,
+        newEvent.sourceTemplateId ?? null,
+      ],
+    )
 
     // Творець автоматично стає учасником власної події. Той самий
     // атомарний шлях (join_event), що й для звичайного приєднання —
     // подія щойно створена з 0 учасників, тож EVENT_FULL тут неможливий.
-    await eventsRepository.addParticipant(data.id, newEvent.creatorId)
+    await eventsRepository.addParticipant(rows[0].id, newEvent.creatorId)
 
-    const created = await eventsRepository.findById(data.id)
+    const created = await eventsRepository.findById(rows[0].id)
     if (!created) {
       throw new Error('Не вдалося прочитати щойно створену подію')
     }
@@ -182,19 +186,22 @@ export const eventsRepository = {
   /** Часткове оновлення — лише адмін-панель, звичайний Mini App редагування
    * подій не пропонує. */
   async update(id: string, patch: Partial<Omit<NewEvent, 'creatorId'>>): Promise<Event> {
-    const updatePayload: Record<string, unknown> = {}
-    if (patch.title !== undefined) updatePayload.title = patch.title
-    if (patch.description !== undefined) updatePayload.description = patch.description || null
-    if (patch.imageUrl !== undefined) updatePayload.image_url = patch.imageUrl || null
-    if (patch.groupUrl !== undefined) updatePayload.group_url = patch.groupUrl || null
-    if (patch.isOnline !== undefined) updatePayload.is_online = patch.isOnline
-    if (patch.date !== undefined) updatePayload.date = patch.date
-    if (patch.time !== undefined) updatePayload.time = patch.time
-    if (patch.location !== undefined) updatePayload.location = patch.location
-    if (patch.maxParticipants !== undefined) updatePayload.max_participants = patch.maxParticipants
+    const columns: Record<string, unknown> = {}
+    if (patch.title !== undefined) columns.title = patch.title
+    if (patch.description !== undefined) columns.description = patch.description || null
+    if (patch.imageUrl !== undefined) columns.image_url = patch.imageUrl || null
+    if (patch.groupUrl !== undefined) columns.group_url = patch.groupUrl || null
+    if (patch.isOnline !== undefined) columns.is_online = patch.isOnline
+    if (patch.date !== undefined) columns.date = patch.date
+    if (patch.time !== undefined) columns.time = patch.time
+    if (patch.location !== undefined) columns.location = patch.location
+    if (patch.maxParticipants !== undefined) columns.max_participants = patch.maxParticipants
 
-    const { error } = await supabase.from('events').update(updatePayload).eq('id', id)
-    if (error) throw error
+    const keys = Object.keys(columns)
+    if (keys.length > 0) {
+      const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ')
+      await query(`update events set ${setClause} where id = $1`, [id, ...keys.map((key) => columns[key])])
+    }
 
     const updated = await eventsRepository.findById(id)
     if (!updated) {
@@ -204,93 +211,69 @@ export const eventsRepository = {
   },
 
   async remove(id: string): Promise<boolean> {
-    const { data, error } = await supabase.from('events').delete().eq('id', id).select('id')
-    if (error) throw error
-    return (data?.length ?? 0) > 0
+    const { rows } = await query('delete from events where id = $1 returning id', [id])
+    return rows.length > 0
   },
 
   async removeByCreatorId(creatorId: string): Promise<void> {
-    const { error } = await supabase.from('events').delete().eq('creator_id', creatorId)
-    if (error) throw error
+    await query('delete from events where creator_id = $1', [creatorId])
   },
 
-  /** Атомарне приєднання через PostgreSQL-функцію join_event (RPC) —
-   * захищає від race condition при одночасних спробах зайняти останнє
-   * місце (див. database/schema.sql). */
+  /** Атомарне приєднання через PostgreSQL-функцію join_event — захищає
+   * від race condition при одночасних спробах зайняти останнє місце
+   * (див. database/schema.sql). */
   async addParticipant(eventId: string, userId: string): Promise<void> {
-    const { error } = await supabase.rpc('join_event', {
-      p_event_id: eventId,
-      p_user_id: userId,
-    })
-
-    if (error) translateJoinError(error)
+    try {
+      await query('select join_event($1, $2)', [eventId, userId])
+    } catch (error) {
+      translateJoinError(error)
+    }
   },
 
   async removeParticipant(eventId: string, userId: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('event_participants')
-      .delete()
-      .eq('event_id', eventId)
-      .eq('user_id', userId)
-      .select('id')
-
-    if (error) throw error
-    return (data?.length ?? 0) > 0
+    const { rows } = await query(
+      'delete from event_participants where event_id = $1 and user_id = $2 returning id',
+      [eventId, userId],
+    )
+    return rows.length > 0
   },
 
   async getParticipants(eventId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from('event_participants')
-      .select('user_id')
-      .eq('event_id', eventId)
-
-    if (error) throw error
-    return (data ?? []).map((row) => row.user_id)
+    const { rows } = await query<{ user_id: string }>(
+      'select user_id from event_participants where event_id = $1',
+      [eventId],
+    )
+    return rows.map((row) => row.user_id)
   },
 
   async isParticipant(eventId: string, userId: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('event_participants')
-      .select('id')
-      .eq('event_id', eventId)
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (error) throw error
-    return data !== null
+    const { rows } = await query(
+      'select id from event_participants where event_id = $1 and user_id = $2',
+      [eventId, userId],
+    )
+    return rows.length > 0
   },
 
   async getUserCreatedEvents(userId: string): Promise<Event[]> {
-    const { data, error } = await supabase
-      .from('events')
-      .select(EVENT_SELECT)
-      .eq('creator_id', userId)
-      .order('date', { ascending: true })
-      .returns<EventRow[]>()
-
-    if (error) throw error
-    return data.map(toEvent)
+    const { rows } = await query<EventRow>(
+      `${EVENTS_BASE_SELECT} where e.creator_id = $1 group by e.id order by e.date asc`,
+      [userId],
+    )
+    return rows.map(toEvent)
   },
 
   async getUserParticipatingEvents(userId: string): Promise<Event[]> {
-    const { data: participantRows, error: participantError } = await supabase
-      .from('event_participants')
-      .select('event_id')
-      .eq('user_id', userId)
-
-    if (participantError) throw participantError
-
-    const eventIds = (participantRows ?? []).map((row) => row.event_id)
+    const { rows: participantRows } = await query<{ event_id: string }>(
+      'select event_id from event_participants where user_id = $1',
+      [userId],
+    )
+    const eventIds = participantRows.map((row) => row.event_id)
     if (eventIds.length === 0) return []
 
-    const { data, error } = await supabase
-      .from('events')
-      .select(EVENT_SELECT)
-      .in('id', eventIds)
-      .order('date', { ascending: true })
-      .returns<EventRow[]>()
-
-    if (error) throw error
-    return data.map(toEvent)
+    const { rows } = await query<EventRow>(
+      `${EVENTS_BASE_SELECT} where e.id = any($1) group by e.id order by e.date asc`,
+      [eventIds],
+    )
+    return rows.map(toEvent)
   },
 }

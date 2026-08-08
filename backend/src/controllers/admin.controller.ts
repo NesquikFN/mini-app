@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import * as adminService from '../services/admin.service'
-import { supabase } from '../config/supabase'
+import { IMAGE_EXTENSIONS_BY_CONTENT_TYPE, saveUpload } from '../utils/uploads'
 import { AppError } from '../utils/AppError'
 import { eventIdParamSchema, userIdParamSchema as participantIdParamSchema } from '../validation/event.schemas'
 import {
@@ -117,25 +117,13 @@ export async function uploadEventTemplateImage(req: Request, res: Response): Pro
   }
 
   const contentType = req.headers['content-type'] ?? ''
-  const extensions: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-  }
-  const extension = extensions[contentType]
+  const extension = IMAGE_EXTENSIONS_BY_CONTENT_TYPE[contentType]
   if (!extension) {
     throw new AppError(415, 'IMAGE_TYPE_UNSUPPORTED', 'Підтримуються JPG, PNG або WebP')
   }
 
-  const path = `templates/${templateId}/cover.${extension}`
-  const { error } = await supabase.storage.from('event-images').upload(path, req.body, {
-    contentType,
-    upsert: true,
-  })
-  if (error) throw error
-
-  const { data } = supabase.storage.from('event-images').getPublicUrl(path)
-  const template = await adminService.updateEventTemplateImage(templateId, data.publicUrl)
+  const imageUrl = await saveUpload(`templates/${templateId}/cover.${extension}`, req.body)
+  const template = await adminService.updateEventTemplateImage(templateId, imageUrl)
   res.json({ template })
 }
 

@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 
 export interface NotificationSettings {
   chatId?: string
@@ -28,13 +28,10 @@ const SETTINGS_COLUMNS =
 
 export const settingsRepository = {
   async getNotificationSettings(): Promise<NotificationSettings> {
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select(SETTINGS_COLUMNS)
-      .eq('id', true)
-      .single<NotificationSettingsRow>()
-    if (error) throw error
-    return toSettings(data)
+    const { rows } = await query<NotificationSettingsRow>(
+      `select ${SETTINGS_COLUMNS} from app_settings where id = true`,
+    )
+    return toSettings(rows[0])
   },
 
   async setNotificationChat(
@@ -43,21 +40,26 @@ export const settingsRepository = {
     threadId?: string,
     threadTitle?: string,
   ): Promise<NotificationSettings> {
-    const { data, error } = await supabase
-      .from('app_settings')
-      .upsert({
-        id: true,
-        notification_chat_id: chatId ?? null,
-        notification_chat_title: chatTitle ?? null,
+    const { rows } = await query<NotificationSettingsRow>(
+      `insert into app_settings (id, notification_chat_id, notification_chat_title,
+         notification_thread_id, notification_thread_title, updated_at)
+       values (true, $1, $2, $3, $4, now())
+       on conflict (id) do update set
+         notification_chat_id = excluded.notification_chat_id,
+         notification_chat_title = excluded.notification_chat_title,
+         notification_thread_id = excluded.notification_thread_id,
+         notification_thread_title = excluded.notification_thread_title,
+         updated_at = excluded.updated_at
+       returning ${SETTINGS_COLUMNS}`,
+      [
+        chatId ?? null,
+        chatTitle ?? null,
         // Гілка прив'язана до чату — зміна чату завжди скидає її,
         // а не лишає "гілку" від попереднього чату висіти в налаштуваннях.
-        notification_thread_id: chatId ? (threadId ?? null) : null,
-        notification_thread_title: chatId ? (threadTitle ?? null) : null,
-        updated_at: new Date().toISOString(),
-      })
-      .select(SETTINGS_COLUMNS)
-      .single<NotificationSettingsRow>()
-    if (error) throw error
-    return toSettings(data)
+        chatId ? (threadId ?? null) : null,
+        chatId ? (threadTitle ?? null) : null,
+      ],
+    )
+    return toSettings(rows[0])
   },
 }

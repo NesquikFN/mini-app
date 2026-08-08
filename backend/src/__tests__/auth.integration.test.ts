@@ -16,7 +16,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import { app } from '../app'
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import { buildValidInitData, nowSeconds, telegramUserField } from '../test-utils/telegramInitData'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
@@ -117,7 +117,7 @@ describe('authenticated API access', () => {
   // cleaned up directly here rather than left for a human to find.
   after(async () => {
     if (createdEventId) {
-      await supabase.from('events').delete().eq('id', createdEventId)
+      await query('delete from events where id = $1', [createdEventId])
     }
   })
 
@@ -222,7 +222,7 @@ describe('authenticated API access', () => {
         assert.ok(!serialized.includes(forbidden), `response leaked "${forbidden}"`)
       }
     } finally {
-      await supabase.from('events').delete().eq('id', eventId)
+      await query('delete from events where id = $1', [eventId])
     }
   })
 

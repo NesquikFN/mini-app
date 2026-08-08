@@ -13,7 +13,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import { app } from '../app'
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import { buildValidInitData, nowSeconds, telegramUserField } from '../test-utils/telegramInitData'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
@@ -53,7 +53,7 @@ describe('GET /api/dormitories', () => {
   let userId: string | undefined
 
   after(async () => {
-    if (userId) await supabase.from('users').delete().eq('id', userId)
+    if (userId) await query('delete from users where id = $1', [userId])
   })
 
   it('returns a non-empty list of dormitories with id + name', async () => {
@@ -82,7 +82,7 @@ describe('dormitory: user onboarding', () => {
   let dormitoryIds: string[] = []
 
   after(async () => {
-    if (userId) await supabase.from('users').delete().eq('id', userId)
+    if (userId) await query('delete from users where id = $1', [userId])
   })
 
   it('a brand-new user has no dormitory until they choose one', async () => {
@@ -153,8 +153,8 @@ describe('dormitory: event creation is server-controlled', () => {
   let dormitoryIds: string[] = []
 
   after(async () => {
-    if (createdEventId) await supabase.from('events').delete().eq('id', createdEventId)
-    if (userId) await supabase.from('users').delete().eq('id', userId)
+    if (createdEventId) await query('delete from events where id = $1', [createdEventId])
+    if (userId) await query('delete from users where id = $1', [userId])
   })
 
   it('blocks event creation before a dormitory is chosen', async () => {
@@ -222,10 +222,10 @@ describe('dormitory: events list filtering (scope)', () => {
   let eventIdB: string | undefined
 
   after(async () => {
-    if (eventIdA) await supabase.from('events').delete().eq('id', eventIdA)
-    if (eventIdB) await supabase.from('events').delete().eq('id', eventIdB)
-    if (userIdA) await supabase.from('users').delete().eq('id', userIdA)
-    if (userIdB) await supabase.from('users').delete().eq('id', userIdB)
+    if (eventIdA) await query('delete from events where id = $1', [eventIdA])
+    if (eventIdB) await query('delete from events where id = $1', [eventIdB])
+    if (userIdA) await query('delete from users where id = $1', [userIdA])
+    if (userIdB) await query('delete from users where id = $1', [userIdB])
   })
 
   it('scope=mine only returns the caller dormitory events; scope=all returns both', async () => {

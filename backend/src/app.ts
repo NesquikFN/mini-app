@@ -23,6 +23,7 @@ if (env.NODE_ENV === 'development') {
   app.use(requestLogger)
 }
 
+app.use('/uploads', express.static(env.UPLOADS_DIR))
 app.use('/api', apiRouter)
 
 app.use(notFoundHandler)

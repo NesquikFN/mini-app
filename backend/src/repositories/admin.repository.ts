@@ -1,10 +1,9 @@
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import { todayISODate } from '../utils/date'
 
 async function countRows(table: 'users' | 'events' | 'event_participants'): Promise<number> {
-  const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true })
-  if (error) throw error
-  return count ?? 0
+  const { rows } = await query<{ count: string }>(`select count(*) from ${table}`)
+  return Number(rows[0].count)
 }
 
 export interface AdminUserRow {
@@ -18,23 +17,13 @@ export const adminRepository = {
    * перевірки. Порожній admin_users означає "адмінів ще нема" (403 для
    * всіх), а не "усім можна". */
   async isAdmin(userId: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (error) throw error
-    return data !== null
+    const { rows } = await query('select id from admin_users where user_id = $1', [userId])
+    return rows.length > 0
   },
 
   async countAdmins(): Promise<number> {
-    const { count, error } = await supabase
-      .from('admin_users')
-      .select('*', { count: 'exact', head: true })
-
-    if (error) throw error
-    return count ?? 0
+    const { rows } = await query<{ count: string }>('select count(*) from admin_users')
+    return Number(rows[0].count)
   },
 
   /** Список рядків admin_users (лише user_id + відколи адмін) — деталі
@@ -42,39 +31,28 @@ export const adminRepository = {
    * usersRepository.getUsersByIds, той самий патерн, що й для creators
    * у listEvents. */
   async listAdmins(): Promise<AdminUserRow[]> {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('user_id, created_at')
-      .order('created_at', { ascending: true })
-      .returns<{ user_id: string; created_at: string }[]>()
-
-    if (error) throw error
-    return data.map((row) => ({ userId: row.user_id, adminSince: row.created_at }))
+    const { rows } = await query<{ user_id: string; created_at: string }>(
+      'select user_id, created_at from admin_users order by created_at asc',
+    )
+    return rows.map((row) => ({ userId: row.user_id, adminSince: row.created_at }))
   },
 
   /** Upsert замість insert — повторне додавання того самого user_id не
    * створює дубліката й не кидає помилку unique-порушення. Повертає рядок
    * (з незмінним created_at, якщо адмін уже існував). */
   async addAdmin(userId: string): Promise<AdminUserRow> {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .upsert({ user_id: userId }, { onConflict: 'user_id' })
-      .select('user_id, created_at')
-      .single<{ user_id: string; created_at: string }>()
-
-    if (error) throw error
-    return { userId: data.user_id, adminSince: data.created_at }
+    const { rows } = await query<{ user_id: string; created_at: string }>(
+      `insert into admin_users (user_id) values ($1)
+       on conflict (user_id) do update set user_id = excluded.user_id
+       returning user_id, created_at`,
+      [userId],
+    )
+    return { userId: rows[0].user_id, adminSince: rows[0].created_at }
   },
 
   async removeAdmin(userId: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .delete()
-      .eq('user_id', userId)
-      .select('id')
-
-    if (error) throw error
-    return (data?.length ?? 0) > 0
+    const { rows } = await query('delete from admin_users where user_id = $1 returning id', [userId])
+    return rows.length > 0
   },
 
   countUsers: () => countRows('users'),
@@ -82,25 +60,18 @@ export const adminRepository = {
   countParticipations: () => countRows('event_participants'),
 
   async countEventsOnDate(date: string): Promise<number> {
-    const { count, error } = await supabase
-      .from('events')
-      .select('*', { count: 'exact', head: true })
-      .eq('date', date)
-
-    if (error) throw error
-    return count ?? 0
+    const { rows } = await query<{ count: string }>('select count(*) from events where date = $1', [date])
+    return Number(rows[0].count)
   },
 
   /** "Активні" події для дашборду адмінки — дата ще не минула (сьогодні
    * або пізніше). Не плутати з countEventsOnDate (рівно сьогодні). */
   async countUpcomingEvents(): Promise<number> {
-    const { count, error } = await supabase
-      .from('events')
-      .select('*', { count: 'exact', head: true })
-      .gte('date', todayISODate())
-
-    if (error) throw error
-    return count ?? 0
+    const { rows } = await query<{ count: string }>(
+      'select count(*) from events where date >= $1',
+      [todayISODate()],
+    )
+    return Number(rows[0].count)
   },
 
   /** Скільки подій створив кожен із переданих users.id — один запит на
@@ -109,14 +80,11 @@ export const adminRepository = {
     const counts = new Map<string, number>()
     if (ids.length === 0) return counts
 
-    const { data, error } = await supabase
-      .from('events')
-      .select('creator_id')
-      .in('creator_id', ids)
-
-    if (error) throw error
-
-    for (const row of data as { creator_id: string }[]) {
+    const { rows } = await query<{ creator_id: string }>(
+      'select creator_id from events where creator_id = any($1)',
+      [ids],
+    )
+    for (const row of rows) {
       counts.set(row.creator_id, (counts.get(row.creator_id) ?? 0) + 1)
     }
     return counts
@@ -127,21 +95,11 @@ export const adminRepository = {
    * об'єднання двох множин id — простіше й прозоріше, ніж заводити SQL
    * функцію для метрики, що ще може змінитись. */
   async countActiveUsers(): Promise<number> {
-    const [creators, participants] = await Promise.all([
-      supabase.from('events').select('creator_id'),
-      supabase.from('event_participants').select('user_id'),
-    ])
-
-    if (creators.error) throw creators.error
-    if (participants.error) throw participants.error
-
-    const activeIds = new Set<string>()
-    for (const row of creators.data as { creator_id: string }[]) {
-      activeIds.add(row.creator_id)
-    }
-    for (const row of participants.data as { user_id: string }[]) {
-      activeIds.add(row.user_id)
-    }
-    return activeIds.size
+    const { rows } = await query<{ id: string }>(`
+      select creator_id as id from events
+      union
+      select user_id as id from event_participants
+    `)
+    return rows.length
   },
 }

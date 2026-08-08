@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import type { Dormitory } from '../types/dormitory'
 
 interface DormitoryRow {
@@ -19,26 +19,14 @@ function toDormitory(row: DormitoryRow): Dormitory {
 
 export const dormitoriesRepository = {
   async findAll(): Promise<Dormitory[]> {
-    const { data, error } = await supabase
-      .from('dormitories')
-      .select('*')
-      .order('name', { ascending: true })
-      .returns<DormitoryRow[]>()
-
-    if (error) throw error
-    return data.map(toDormitory)
+    const { rows } = await query<DormitoryRow>('select * from dormitories order by name asc')
+    return rows.map(toDormitory)
   },
 
   /** Для валідації dormitoryId, що приходить у PATCH /me — щоб дати
    * зрозумілу 400-помилку замість сирої помилки FK-порушення з Postgres. */
   async exists(id: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('dormitories')
-      .select('id')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (error) throw error
-    return data !== null
+    const { rows } = await query('select id from dormitories where id = $1', [id])
+    return rows.length > 0
   },
 }

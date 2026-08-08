@@ -5,10 +5,15 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   FRONTEND_URL: z.url().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  SUPABASE_URL: z.url('SUPABASE_URL має бути коректним URL проєкту Supabase'),
-  SUPABASE_SERVICE_ROLE_KEY: z
+  DATABASE_URL: z
     .string()
-    .min(1, 'SUPABASE_SERVICE_ROLE_KEY обовʼязковий (Supabase → Settings → API)'),
+    .min(1, 'DATABASE_URL обовʼязковий (Postgres connection string)'),
+  // Диск, куди зберігаються завантажені зображення (подій/шаблонів) —
+  // на Railway це шлях монтування Volume, локально звичайна папка.
+  UPLOADS_DIR: z.string().default('uploads'),
+  // Публічний origin цього ж backend-сервісу, потрібен лише щоб
+  // побудувати повний URL для збережених зображень (${PUBLIC_URL}/uploads/...).
+  PUBLIC_URL: z.url().default('http://localhost:3000'),
   // Порожній за замовчуванням: бот можна створити пізніше (BotFather), а до
   // того локальна розробка йде через DEV_AUTH. Реальний Telegram-логін без
   // токена коректно впаде з зрозумілою помилкою (див. auth.service.ts).

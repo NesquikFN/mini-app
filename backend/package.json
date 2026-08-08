@@ -14,10 +14,10 @@
     "test:integration": "BOT_TOKEN=integration-test-bot-token-do-not-use-in-prod tsx --test \"src/__tests__/**/*.test.ts\""
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "pg": "^8.22.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -25,6 +25,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.2",
+    "@types/pg": "^8.21.0",
     "@types/supertest": "^7.2.1",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",

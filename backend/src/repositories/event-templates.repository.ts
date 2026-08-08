@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import type { EventTemplate } from '../types/admin'
 
 interface EventTemplateRow {
@@ -47,82 +47,75 @@ function toTemplate(row: EventTemplateRow): EventTemplate {
   }
 }
 
-function toRow(input: EventTemplateInput): Record<string, unknown> {
-  return {
-    title: input.title,
-    description: input.description || null,
-    weekday: input.weekday,
-    time: input.time,
-    location: input.location,
-    is_online: input.isOnline,
-    max_participants: input.maxParticipants,
-    group_url: input.groupUrl || null,
-    dormitory_id: input.dormitoryId ?? null,
-    updated_at: new Date().toISOString(),
-  }
-}
-
 export const eventTemplatesRepository = {
   async findAll(): Promise<EventTemplate[]> {
-    const { data, error } = await supabase
-      .from('event_templates')
-      .select('*')
-      .order('weekday', { ascending: true })
-      .order('time', { ascending: true })
-      .returns<EventTemplateRow[]>()
-    if (error) throw error
-    return data.map(toTemplate)
+    const { rows } = await query<EventTemplateRow>(
+      'select * from event_templates order by weekday asc, time asc',
+    )
+    return rows.map(toTemplate)
   },
 
   async findById(id: string): Promise<EventTemplate | null> {
-    const { data, error } = await supabase
-      .from('event_templates')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle<EventTemplateRow>()
-    if (error) throw error
-    return data ? toTemplate(data) : null
+    const { rows } = await query<EventTemplateRow>('select * from event_templates where id = $1', [id])
+    return rows[0] ? toTemplate(rows[0]) : null
   },
 
   async insert(input: EventTemplateInput): Promise<EventTemplate> {
-    const { data, error } = await supabase
-      .from('event_templates')
-      .insert(toRow(input))
-      .select('*')
-      .single<EventTemplateRow>()
-    if (error) throw error
-    return toTemplate(data)
+    const { rows } = await query<EventTemplateRow>(
+      `insert into event_templates
+         (title, description, weekday, time, location, is_online,
+          max_participants, group_url, dormitory_id, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+       returning *`,
+      [
+        input.title,
+        input.description || null,
+        input.weekday,
+        input.time,
+        input.location,
+        input.isOnline,
+        input.maxParticipants,
+        input.groupUrl || null,
+        input.dormitoryId ?? null,
+      ],
+    )
+    return toTemplate(rows[0])
   },
 
   async update(id: string, input: EventTemplateInput): Promise<EventTemplate | null> {
-    const { data, error } = await supabase
-      .from('event_templates')
-      .update(toRow(input))
-      .eq('id', id)
-      .select('*')
-      .maybeSingle<EventTemplateRow>()
-    if (error) throw error
-    return data ? toTemplate(data) : null
+    const { rows } = await query<EventTemplateRow>(
+      `update event_templates set
+         title = $2, description = $3, weekday = $4, time = $5, location = $6,
+         is_online = $7, max_participants = $8, group_url = $9, dormitory_id = $10,
+         updated_at = now()
+       where id = $1
+       returning *`,
+      [
+        id,
+        input.title,
+        input.description || null,
+        input.weekday,
+        input.time,
+        input.location,
+        input.isOnline,
+        input.maxParticipants,
+        input.groupUrl || null,
+        input.dormitoryId ?? null,
+      ],
+    )
+    return rows[0] ? toTemplate(rows[0]) : null
   },
 
   async updateImage(id: string, imageUrl: string): Promise<EventTemplate | null> {
-    const { data, error } = await supabase
-      .from('event_templates')
-      .update({ image_url: imageUrl, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select('*')
-      .maybeSingle<EventTemplateRow>()
-    if (error) throw error
-    return data ? toTemplate(data) : null
+    const { rows } = await query<EventTemplateRow>(
+      'update event_templates set image_url = $2, updated_at = now() where id = $1 returning *',
+      [id, imageUrl],
+    )
+    return rows[0] ? toTemplate(rows[0]) : null
   },
 
   async remove(id: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('event_templates')
-      .delete()
-      .eq('id', id)
-      .select('id')
-    if (error) throw error
-    return (data?.length ?? 0) > 0
+    const { rows } = await query('delete from event_templates where id = $1 returning id', [id])
+    return rows.length > 0
   },
 }

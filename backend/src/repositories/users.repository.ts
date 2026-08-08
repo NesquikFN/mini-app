@@ -1,9 +1,9 @@
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import type { AdminUserView, AuthUser, PublicUser } from '../types/user'
 
 interface UserRow {
   id: string
-  telegram_id: number
+  telegram_id: string
   username: string | null
   first_name: string
   last_name: string | null
@@ -17,7 +17,7 @@ interface UserRow {
 function toAuthUser(row: UserRow): AuthUser {
   return {
     id: row.id,
-    telegramId: row.telegram_id,
+    telegramId: Number(row.telegram_id),
     firstName: row.first_name,
     username: row.username ?? undefined,
     photoUrl: row.photo_url ?? undefined,
@@ -30,7 +30,7 @@ function toAuthUser(row: UserRow): AuthUser {
 function toAdminUserView(row: UserRow): AdminUserView {
   return {
     id: row.id,
-    telegramId: row.telegram_id,
+    telegramId: Number(row.telegram_id),
     firstName: row.first_name,
     lastName: row.last_name ?? undefined,
     username: row.username ?? undefined,
@@ -73,62 +73,40 @@ export interface ProfileUpdate {
   photoUrl?: string
 }
 
+const PUBLIC_USER_COLUMNS = 'id, first_name, username, photo_url, dormitory_id'
+
 export const usersRepository = {
   async getUserByTelegramId(telegramId: number): Promise<AuthUser | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('telegram_id', telegramId)
-      .maybeSingle<UserRow>()
-
-    if (error) throw error
-    return data ? toAuthUser(data) : null
+    const { rows } = await query<UserRow>('select * from users where telegram_id = $1', [telegramId])
+    return rows[0] ? toAuthUser(rows[0]) : null
   },
 
   async getUserById(id: string): Promise<AuthUser | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle<UserRow>()
-
-    if (error) throw error
-    return data ? toAuthUser(data) : null
+    const { rows } = await query<UserRow>('select * from users where id = $1', [id])
+    return rows[0] ? toAuthUser(rows[0]) : null
   },
 
   async createUser(input: NewUser): Promise<AuthUser> {
-    const { data, error } = await supabase
-      .from('users')
-      .insert({
-        telegram_id: input.telegramId,
-        first_name: input.firstName,
-        username: input.username ?? null,
-        photo_url: input.photoUrl ?? null,
-      })
-      .select('*')
-      .single<UserRow>()
-
-    if (error) throw error
-    return toAuthUser(data)
+    const { rows } = await query<UserRow>(
+      `insert into users (telegram_id, first_name, username, photo_url)
+       values ($1, $2, $3, $4)
+       returning *`,
+      [input.telegramId, input.firstName, input.username ?? null, input.photoUrl ?? null],
+    )
+    return toAuthUser(rows[0])
   },
 
   /** Викликається при повторному Telegram-логіні — Telegram щоразу надсилає
    * поточні first_name/username/photo_url в initData, і вони можуть
    * відрізнятись від того, що збережено (людина змінила ім'я чи аватар). */
   async updateProfile(id: string, input: ProfileUpdate): Promise<AuthUser> {
-    const { data, error } = await supabase
-      .from('users')
-      .update({
-        first_name: input.firstName,
-        username: input.username ?? null,
-        photo_url: input.photoUrl ?? null,
-      })
-      .eq('id', id)
-      .select('*')
-      .single<UserRow>()
-
-    if (error) throw error
-    return toAuthUser(data)
+    const { rows } = await query<UserRow>(
+      `update users set first_name = $2, username = $3, photo_url = $4
+       where id = $1
+       returning *`,
+      [id, input.firstName, input.username ?? null, input.photoUrl ?? null],
+    )
+    return toAuthUser(rows[0])
   },
 
   /** Онбординг та подальша зміна гуртожитку через профіль. Окремий
@@ -136,39 +114,22 @@ export const usersRepository = {
    * автоматично при кожному Telegram-логіні й не повинен ненавмисно
    * зачіпати dormitory_id. */
   async setDormitory(id: string, dormitoryId: string): Promise<AuthUser> {
-    const { data, error } = await supabase
-      .from('users')
-      .update({ dormitory_id: dormitoryId })
-      .eq('id', id)
-      .select('*')
-      .single<UserRow>()
-
-    if (error) throw error
-    return toAuthUser(data)
+    const { rows } = await query<UserRow>(
+      'update users set dormitory_id = $2 where id = $1 returning *',
+      [id, dormitoryId],
+    )
+    return toAuthUser(rows[0])
   },
 
   async getAllUsers(): Promise<AdminUserView[]> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .returns<UserRow[]>()
-
-    if (error) throw error
-    return data.map(toAdminUserView)
+    const { rows } = await query<UserRow>('select * from users order by created_at desc')
+    return rows.map(toAdminUserView)
   },
 
   async getUsersByIds(ids: string[]): Promise<AdminUserView[]> {
     if (ids.length === 0) return []
-
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .in('id', ids)
-      .returns<UserRow[]>()
-
-    if (error) throw error
-    return data.map(toAdminUserView)
+    const { rows } = await query<UserRow>('select * from users where id = any($1)', [ids])
+    return rows.map(toAdminUserView)
   },
 
   /** Для показу організатора/учасників звичайним користувачам DormHub —
@@ -176,37 +137,24 @@ export const usersRepository = {
    * не протягнути щось приватне повз toPublicUser. */
   async getPublicUsersByIds(ids: string[]): Promise<PublicUser[]> {
     if (ids.length === 0) return []
-
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, first_name, username, photo_url, dormitory_id')
-      .in('id', ids)
-      .returns<PublicUserRow[]>()
-
-    if (error) throw error
-    return data.map(toPublicUser)
+    const { rows } = await query<PublicUserRow>(
+      `select ${PUBLIC_USER_COLUMNS} from users where id = any($1)`,
+      [ids],
+    )
+    return rows.map(toPublicUser)
   },
 
   async getPublicUserById(id: string): Promise<PublicUser | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, first_name, username, photo_url, dormitory_id')
-      .eq('id', id)
-      .maybeSingle<PublicUserRow>()
-
-    if (error) throw error
-    return data ? toPublicUser(data) : null
+    const { rows } = await query<PublicUserRow>(
+      `select ${PUBLIC_USER_COLUMNS} from users where id = $1`,
+      [id],
+    )
+    return rows[0] ? toPublicUser(rows[0]) : null
   },
 
   async getAdminUserById(id: string): Promise<AdminUserView | null> {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle<UserRow>()
-
-    if (error) throw error
-    return data ? toAdminUserView(data) : null
+    const { rows } = await query<UserRow>('select * from users where id = $1', [id])
+    return rows[0] ? toAdminUserView(rows[0]) : null
   },
 
   /** Адмінський список користувачів — сторінками, з пошуком по імені,
@@ -219,63 +167,58 @@ export const usersRepository = {
     limit: number,
     search?: string,
   ): Promise<{ users: AdminUserView[]; total: number }> {
-    let query = supabase.from('users').select('*', { count: 'exact' })
-
     const trimmedSearch = search?.trim()
+    const conditions: string[] = []
+    const params: unknown[] = []
+
     if (trimmedSearch) {
-      const escaped = trimmedSearch.replace(/[%_]/g, (char) => `\\${char}`)
-      const orFilters = [`first_name.ilike.%${escaped}%`, `username.ilike.%${escaped}%`]
+      params.push(`%${trimmedSearch}%`)
+      const nameMatch = `(first_name ilike $${params.length} or username ilike $${params.length})`
       if (/^\d+$/.test(trimmedSearch)) {
-        orFilters.push(`telegram_id.eq.${trimmedSearch}`)
+        params.push(trimmedSearch)
+        conditions.push(`(${nameMatch} or telegram_id = $${params.length})`)
+      } else {
+        conditions.push(nameMatch)
       }
-      query = query.or(orFilters.join(','))
     }
 
-    const from = (page - 1) * limit
-    const to = from + limit - 1
+    const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : ''
+    const offset = (page - 1) * limit
 
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to)
-      .returns<UserRow[]>()
+    const [{ rows }, { rows: countRows }] = await Promise.all([
+      query<UserRow>(
+        `select * from users ${where} order by created_at desc limit $${params.length + 1} offset $${params.length + 2}`,
+        [...params, limit, offset],
+      ),
+      query<{ count: string }>(`select count(*) from users ${where}`, params),
+    ])
 
-    if (error) throw error
-    return { users: data.map(toAdminUserView), total: count ?? 0 }
+    return { users: rows.map(toAdminUserView), total: Number(countRows[0].count) }
   },
 
   async remove(id: string): Promise<boolean> {
-    const { data, error } = await supabase.from('users').delete().eq('id', id).select('id')
-    if (error) throw error
-    return (data?.length ?? 0) > 0
+    const { rows } = await query('delete from users where id = $1 returning id', [id])
+    return rows.length > 0
   },
 
   async ban(id: string, bannedUntil: string | null, bannedPermanently: boolean): Promise<void> {
-    const { error } = await supabase
-      .from('users')
-      .update({ banned_until: bannedUntil, banned_permanently: bannedPermanently })
-      .eq('id', id)
-    if (error) throw error
+    await query('update users set banned_until = $2, banned_permanently = $3 where id = $1', [
+      id,
+      bannedUntil,
+      bannedPermanently,
+    ])
   },
 
   async unban(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('users')
-      .update({ banned_until: null, banned_permanently: false })
-      .eq('id', id)
-    if (error) throw error
+    await query('update users set banned_until = null, banned_permanently = false where id = $1', [id])
   },
 
   async getBannedUsers(): Promise<AdminUserView[]> {
-    const now = new Date().toISOString()
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .or(`banned_permanently.eq.true,banned_until.gt.${now}`)
-      .order('banned_permanently', { ascending: false })
-      .order('banned_until', { ascending: true })
-      .returns<UserRow[]>()
-
-    if (error) throw error
-    return data.map(toAdminUserView)
+    const { rows } = await query<UserRow>(
+      `select * from users
+       where banned_permanently = true or banned_until > now()
+       order by banned_permanently desc, banned_until asc`,
+    )
+    return rows.map(toAdminUserView)
   },
 }

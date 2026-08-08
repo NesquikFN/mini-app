@@ -21,7 +21,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import { app } from '../app'
-import { supabase } from '../config/supabase'
+import { query } from '../config/db'
 import { buildValidInitData, nowSeconds, telegramUserField } from '../test-utils/telegramInitData'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
@@ -82,22 +82,20 @@ describe('admin API', () => {
 
     // Grant admin rights — the same effect as the README's manual SQL
     // Editor insert, done programmatically so this test is self-contained.
-    const { error } = await supabase
-      .from('admin_users')
-      .upsert({ user_id: adminUserId }, { onConflict: 'user_id' })
-    assert.equal(
-      error,
-      null,
-      `could not seed admin_users — has migration 0002_admin_users.sql been applied? ${error?.message}`,
+    await query(
+      'insert into admin_users (user_id) values ($1) on conflict (user_id) do nothing',
+      [adminUserId],
     )
   })
 
   after(async () => {
     for (const id of createdEventIds) {
-      await supabase.from('events').delete().eq('id', id)
+      await query('delete from events where id = $1', [id])
     }
-    await supabase.from('admin_users').delete().eq('user_id', adminUserId)
-    await supabase.from('users').delete().in('telegram_id', [REGULAR_TELEGRAM_ID, ADMIN_TELEGRAM_ID])
+    await query('delete from admin_users where user_id = $1', [adminUserId])
+    await query('delete from users where telegram_id = any($1)', [
+      [REGULAR_TELEGRAM_ID, ADMIN_TELEGRAM_ID],
+    ])
   })
 
   it('rejects unauthenticated requests with 401', async () => {
@@ -297,8 +295,8 @@ describe('admin API', () => {
     })
 
     after(async () => {
-      await supabase.from('admin_users').delete().eq('user_id', targetUserId)
-      await supabase.from('users').delete().eq('telegram_id', TARGET_TELEGRAM_ID)
+      await query('delete from admin_users where user_id = $1', [targetUserId])
+      await query('delete from users where telegram_id = $1', [TARGET_TELEGRAM_ID])
     })
 
     it('rejects a non-admin from admins endpoints with 403', async () => {
