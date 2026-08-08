@@ -1,7 +1,9 @@
 import { env } from '../config/env'
 import { AppError } from '../utils/AppError'
 import { telegramRegistryRepository } from '../repositories/telegram-registry.repository'
+import { usersRepository } from '../repositories/users.repository'
 import type { EventResponse } from './events.service'
+import type { Event } from '../types/event'
 
 export interface TelegramChatOption {
   id: string
@@ -93,8 +95,13 @@ export async function handleTelegramWebhookUpdate(update: TelegramWebhookUpdate)
     await telegramRegistryRepository.upsertChat(chatId, chatTitle(message.chat), message.chat.type, true)
 
     const topicName = message.forum_topic_created?.name ?? message.forum_topic_edited?.name
-    if (message.message_thread_id && topicName) {
-      await telegramRegistryRepository.upsertTopic(chatId, String(message.message_thread_id), topicName)
+    if (message.message_thread_id) {
+      const threadId = String(message.message_thread_id)
+      if (topicName) {
+        await telegramRegistryRepository.upsertTopic(chatId, threadId, topicName)
+      } else {
+        await telegramRegistryRepository.ensureTopicKnown(chatId, threadId, `Гілка #${threadId}`)
+      }
     }
   }
 
@@ -113,9 +120,30 @@ export async function handleTelegramWebhookUpdate(update: TelegramWebhookUpdate)
   // the Mini App entry point right away instead of leaving a first-time
   // user staring at an empty chat.
   const privateMessage = update.message
-  if (privateMessage?.chat.type === 'private' && privateMessage.text?.trim().startsWith('/start')) {
-    await sendStartGreeting(String(privateMessage.chat.id), privateMessage.from?.first_name)
+  if (privateMessage?.chat.type === 'private') {
+    const text = privateMessage.text?.trim()
+    if (text?.startsWith('/start')) {
+      await sendStartGreeting(String(privateMessage.chat.id), privateMessage.from?.first_name)
+    } else if (text?.startsWith('/notifications_off')) {
+      await handleNotificationsOffCommand(String(privateMessage.chat.id))
+    }
   }
+}
+
+/** Той самий "особисто DM тобі щось прийшло → маєш легкий шлях це
+ * вимкнути" принцип, що й перемикач на сторінці "Ігри" — команда прямо
+ * в чаті з ботом для тих, хто не хоче йти в застосунок заради цього. */
+async function handleNotificationsOffCommand(chatId: string): Promise<void> {
+  const telegramId = Number(chatId)
+  const user = await usersRepository.getUserByTelegramId(telegramId)
+  if (user) {
+    await usersRepository.setNotifyNewEvents(user.id, false)
+  }
+  await botApi('sendMessage', {
+    chat_id: chatId,
+    text: escapeMarkdownV2('🔕 Сповіщення про нові події вимкнено. Увімкнути знову можна перемикачем у розділі «Ігри».'),
+    parse_mode: 'MarkdownV2',
+  })
 }
 
 async function sendStartGreeting(chatId: string, firstName?: string): Promise<void> {
@@ -200,6 +228,11 @@ export async function sendEventAnnouncement(
   event: EventResponse,
   creator?: AnnouncementCreator,
   threadId?: string,
+  /** DM-версія цього ж анонсу (announceEvent → notify_new_events
+   * підписники) додає підказку, як його вимкнути — у групових чатах
+   * (isPersonalNotification=false) цього нема, бо там нема кого
+   * "відписувати". */
+  isPersonalNotification = false,
 ): Promise<void> {
   const location = event.isOnline ? 'Онлайн' : event.location
   const creatorName = creator
@@ -213,6 +246,9 @@ export async function sendEventAnnouncement(
     `📍 ${escapeMarkdownV2(location)}`,
     creatorName ? `👤 Створив: ${creatorName}` : '',
     event.description ? `\n${toTelegramMarkdown(event.description)}` : '',
+    isPersonalNotification
+      ? escapeMarkdownV2('\n🔕 Вимкнути ці сповіщення: команда /notifications_off боту або перемикач у розділі «Ігри».')
+      : '',
   ].filter(Boolean).join('\n')
 
   const threadParam = threadId ? { message_thread_id: Number(threadId) } : {}
@@ -251,4 +287,20 @@ export async function sendEventAnnouncement(
     reply_markup: replyMarkup,
     ...threadParam,
   })
+}
+
+/** DM-нагадування учасникам за ~30 хв до старту (event-reminders.service.ts).
+ * На відміну від sendEventAnnouncement — без кнопки приєднання (вони вже
+ * учасники) і без опису, лише найважливіше для того, хто вже поспішає. */
+export async function sendEventReminder(
+  chatId: string,
+  event: Pick<Event, 'title' | 'time' | 'location' | 'isOnline'>,
+): Promise<void> {
+  const location = event.isOnline ? 'Онлайн' : event.location
+  const text = [
+    `⏰ Нагадування: «${event.title}» починається за 30 хвилин!`,
+    `🕐 ${event.time.slice(0, 5)} 📍 ${location}`,
+  ].map(escapeMarkdownV2).join('\n')
+
+  await botApi('sendMessage', { chat_id: chatId, text, parse_mode: 'MarkdownV2' })
 }

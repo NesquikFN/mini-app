@@ -7,7 +7,7 @@ const dateSchema = z
   .refine(isValidCalendarDate, 'Некоректна дата')
   .refine((value) => !isPastDate(value), 'Дата не може бути в минулому')
 
-const timeSchema = z
+export const timeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Час має бути у форматі ГГ:ХХ')
 
@@ -68,6 +68,12 @@ export const userIdParamSchema = z.object({
 
 export const eventTemplateIdParamSchema = z.object({
   templateId: z.uuid('Некоректний шаблон'),
+})
+
+// Час запуску гри тепер обирає той, хто натискає "Створити" — шаблон
+// лишає лише день тижня та час-за-замовчуванням для відображення.
+export const createEventFromTemplateSchema = z.object({
+  time: timeSchema.optional(),
 })
 
 export const eventTemplateSchema = z

@@ -46,12 +46,14 @@ export function EventTemplatesPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [editing, setEditing] = useState<EventTemplate | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
-  const [publishingId, setPublishingId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<EventTemplate | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [canManage, setCanManage] = useState(false)
   const [notifyToggling, setNotifyToggling] = useState(false)
+  const [publishing, setPublishing] = useState<EventTemplate | null>(null)
+  const [publishTime, setPublishTime] = useState('')
+  const [publishSaving, setPublishSaving] = useState(false)
 
   const load = useCallback(() => {
     fetchEventTemplates()
@@ -107,17 +109,25 @@ export function EventTemplatesPage() {
     }
   }
 
-  async function handlePublish(template: EventTemplate) {
-    setPublishingId(template.id)
+  function openPublishDialog(template: EventTemplate) {
+    setPublishing(template)
+    setPublishTime(template.time.slice(0, 5))
+    setErrorMessage(null)
+  }
+
+  async function handleConfirmPublish() {
+    if (!publishing) return
+    setPublishSaving(true)
     setErrorMessage(null)
     try {
-      const event = await createEventFromTemplate(template.id)
+      const event = await createEventFromTemplate(publishing.id, publishTime)
       reloadEvents()
-      setSuccessMessage(`Подію «${event.title}» створено на ${formatEventDate(event.date)}.`)
+      setSuccessMessage(`Подію «${event.title}» створено на ${formatEventDate(event.date)} о ${publishTime}.`)
+      setPublishing(null)
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
     } finally {
-      setPublishingId(null)
+      setPublishSaving(false)
     }
   }
 
@@ -231,11 +241,7 @@ export function EventTemplatesPage() {
                 </div>
               </div>
               <div className={`m-4 grid gap-2 ${canManage ? 'grid-cols-[1fr_auto_auto]' : 'grid-cols-1'}`}>
-                <Button
-                  loading={publishingId === template.id}
-                  disabled={publishingId !== null}
-                  onClick={() => handlePublish(template)}
-                >
+                <Button onClick={() => openPublishDialog(template)}>
                   <CalendarPlus size={17} /> Створити найближчу
                 </Button>
                 {canManage && (
@@ -262,6 +268,41 @@ export function EventTemplatesPage() {
             onConfirm={handleDelete}
             onCancel={() => setPendingDelete(null)}
           />
+        )}
+
+        {publishing && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 animate-[dormhub-fade-in_0.15s_ease]"
+            onClick={() => setPublishing(null)}
+          >
+            <div
+              className="w-full max-w-sm rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-5 animate-[dormhub-slide-up_0.2s_ease]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <p className="text-base font-semibold text-[var(--text-primary)]">
+                На який час створити «{publishing.title}»?
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Дата підбереться автоматично — найближчий {weekdayLabel(publishing.weekday).toLowerCase()}.
+              </p>
+              <input
+                required
+                type="time"
+                autoFocus
+                value={publishTime}
+                onChange={(event) => setPublishTime(event.target.value)}
+                className={`${inputClass} mt-4`}
+              />
+              <div className="mt-5 flex gap-3">
+                <Button variant="outline" fullWidth onClick={() => setPublishing(null)} disabled={publishSaving}>
+                  Скасувати
+                </Button>
+                <Button fullWidth onClick={handleConfirmPublish} loading={publishSaving} disabled={!publishTime}>
+                  Створити
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

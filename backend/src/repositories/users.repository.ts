@@ -127,10 +127,15 @@ export const usersRepository = {
   },
 
   /** telegram_id тих, хто підписався на особисті DM-сповіщення про нові
-   * події (окремо від групового чату) — для announceEvent у events.service.ts. */
-  async getSubscribedTelegramIds(): Promise<number[]> {
+   * події (окремо від групового чату) — для announceEvent у events.service.ts.
+   * dormitoryId — фільтр для офлайн-подій (сповіщає лише підписників
+   * свого гуртожитку); без нього (онлайн-подія) — усі підписники. */
+  async getSubscribedTelegramIds(dormitoryId?: string): Promise<number[]> {
     const { rows } = await query<{ telegram_id: string }>(
-      'select telegram_id from users where notify_new_events = true',
+      dormitoryId
+        ? 'select telegram_id from users where notify_new_events = true and dormitory_id = $1'
+        : 'select telegram_id from users where notify_new_events = true',
+      dormitoryId ? [dormitoryId] : [],
     )
     return rows.map((row) => Number(row.telegram_id))
   },

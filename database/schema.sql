@@ -76,6 +76,8 @@ create table if not exists events (
   time time not null,
   location text not null,
   max_participants integer not null,
+  -- Дедуплікація нагадувань "за 30 хвилин" (event-reminders.service.ts).
+  reminder_sent_at timestamptz,
   -- Гуртожиток, до якого належить подія — завжди береться з creator's
   -- users.dormitory_id на backend, ніколи з клієнтського запиту (див.
   -- events.service.createEvent). NOT NULL: кожна подія завжди належить
@@ -89,6 +91,9 @@ create table if not exists events (
 create index if not exists idx_events_creator_id on events (creator_id);
 create index if not exists idx_events_date on events (date);
 create index if not exists idx_events_dormitory_id on events (dormitory_id);
+create index if not exists idx_events_reminder_pending
+  on events (date, time)
+  where reminder_sent_at is null;
 
 -- =========================================================
 -- Регулярні шаблони ігор для адмін-панелі

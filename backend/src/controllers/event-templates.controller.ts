@@ -2,7 +2,11 @@ import type { Request, Response } from 'express'
 import * as eventsService from '../services/events.service'
 import { IMAGE_EXTENSIONS_BY_CONTENT_TYPE, saveUpload } from '../utils/uploads'
 import { AppError } from '../utils/AppError'
-import { eventTemplateIdParamSchema, eventTemplateSchema } from '../validation/event.schemas'
+import {
+  createEventFromTemplateSchema,
+  eventTemplateIdParamSchema,
+  eventTemplateSchema,
+} from '../validation/event.schemas'
 import { adminRepository } from '../repositories/admin.repository'
 import { hostsRepository } from '../repositories/hosts.repository'
 
@@ -62,10 +66,12 @@ export async function deleteEventTemplate(req: Request, res: Response): Promise<
 
 export async function createFromEventTemplate(req: Request, res: Response): Promise<void> {
   const { templateId } = eventTemplateIdParamSchema.parse(req.params)
+  const { time } = createEventFromTemplateSchema.parse(req.body ?? {})
   const event = await eventsService.createEventFromTemplate(
     templateId,
     req.user.id,
     req.user.dormitoryId,
+    time,
   )
   res.status(201).json({ event })
 }

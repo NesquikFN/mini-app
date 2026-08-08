@@ -5,7 +5,7 @@ import {
   type EventTemplateInput,
 } from '../repositories/event-templates.repository'
 import { AppError } from '../utils/AppError'
-import { addDays, toISODate } from '../utils/date'
+import { addDaysToISODate, kyivNow } from '../utils/kyivTime'
 import type { Event } from '../types/event'
 import type { PublicUser } from '../types/user'
 import type { EventTemplate } from '../types/admin'
@@ -197,11 +197,15 @@ export async function announceEvent(event: EventResponse): Promise<void> {
     console.error('Не вдалося надіслати Telegram-анонс події:', error)
   }
 
-  const subscriberIds = await usersRepository.getSubscribedTelegramIds()
+  // Онлайн-подія доступна всім гуртожиткам — сповіщаємо всіх підписників.
+  // Офлайн-подія лишається в межах свого гуртожитку — так само й тут.
+  const subscriberIds = await usersRepository.getSubscribedTelegramIds(
+    event.isOnline ? undefined : event.dormitoryId,
+  )
   await Promise.all(
     subscriberIds.map(async (telegramId) => {
       try {
-        await sendEventAnnouncement(String(telegramId), event, creatorInfo)
+        await sendEventAnnouncement(String(telegramId), event, creatorInfo, undefined, true)
       } catch (error) {
         console.error(`Не вдалося надіслати особисте сповіщення про подію користувачу ${telegramId}:`, error)
       }
@@ -354,20 +358,24 @@ export async function deleteEventTemplate(id: string): Promise<void> {
 }
 
 function nextTemplateDate(weekday: number, time: string): string {
-  const now = new Date()
-  let daysAhead = (weekday - now.getDay() + 7) % 7
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  if (daysAhead === 0 && time <= currentTime) daysAhead = 7
-  return toISODate(addDays(now, daysAhead))
+  const now = kyivNow()
+  let daysAhead = (weekday - now.weekday + 7) % 7
+  if (daysAhead === 0 && time <= now.time) daysAhead = 7
+  return addDaysToISODate(now.date, daysAhead)
 }
 
 export async function createEventFromTemplate(
   templateId: string,
   creatorId: string,
   creatorDormitoryId?: string,
+  /** Той, хто натискає "Створити", обирає час гри сам — шаблон дає лише
+   * день тижня та підказку-за-замовчуванням для пікера. */
+  overrideTime?: string,
 ): Promise<EventResponse> {
   const template = await eventTemplatesRepository.findById(templateId)
   if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+
+  const time = overrideTime ?? template.time.slice(0, 5)
 
   try {
     const event = await createEvent(
@@ -376,8 +384,8 @@ export async function createEventFromTemplate(
       {
         title: template.title,
         description: template.description,
-        date: nextTemplateDate(template.weekday, template.time.slice(0, 5)),
-        time: template.time.slice(0, 5),
+        date: nextTemplateDate(template.weekday, time),
+        time,
         location: template.isOnline ? 'Онлайн' : template.location,
         isOnline: template.isOnline,
         maxParticipants: template.maxParticipants,

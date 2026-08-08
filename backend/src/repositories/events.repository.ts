@@ -247,6 +247,36 @@ export const eventsRepository = {
     return rows.map((row) => row.user_id)
   },
 
+  async getParticipantTelegramIds(eventId: string): Promise<number[]> {
+    const { rows } = await query<{ telegram_id: string }>(
+      `select u.telegram_id from event_participants ep
+       join users u on u.id = ep.user_id
+       where ep.event_id = $1`,
+      [eventId],
+    )
+    return rows.map((row) => Number(row.telegram_id))
+  },
+
+  /** Події, що стартують у вікні (nowTs, nowTs + windowMinutes] і ще не
+   * отримали нагадування. `date`/`time` — наївні (без tz) колонки, тож
+   * $1/$2 передаються як наївні timestamp-рядки в київському "стінному"
+   * часі (див. utils/kyivTime.ts) — жодної tz-математики на боці Postgres. */
+  async findDueForReminder(nowTs: string, windowEndTs: string): Promise<Event[]> {
+    const { rows } = await query<EventRow>(
+      `${EVENTS_BASE_SELECT}
+       where e.reminder_sent_at is null
+         and (e.date + e.time) > $1::timestamp
+         and (e.date + e.time) <= $2::timestamp
+       group by e.id`,
+      [nowTs, windowEndTs],
+    )
+    return rows.map(toEvent)
+  },
+
+  async markReminderSent(eventId: string): Promise<void> {
+    await query('update events set reminder_sent_at = now() where id = $1', [eventId])
+  },
+
   /**
    * Batch fetch of the first `limit` participants per event, keyed by
    * event id — used to show avatar-stack previews on event cards without
