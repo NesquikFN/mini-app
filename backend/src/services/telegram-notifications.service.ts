@@ -92,16 +92,54 @@ export async function listAvailableChats(telegramUserId: number): Promise<Telegr
   return checked.filter((chat): chat is TelegramChatOption => chat !== null)
 }
 
+// Telegram MarkdownV2 special characters that must be escaped outside of
+// an intentional entity, or the API rejects the message with a 400
+// ("can't find end of the entity").
+const MDV2_SPECIAL = /[_*[\]()~`>#+\-=|{}.!\\]/g
+
+function escapeMarkdownV2(text: string): string {
+  return text.replace(MDV2_SPECIAL, (ch) => `\\${ch}`)
+}
+
+/**
+ * Event descriptions are typed by admins using casual **bold** markers
+ * (not Telegram's own single-asterisk syntax), so they show up as raw
+ * asterisks unless translated. Everything outside a **...** pair is
+ * escaped so stray Markdown-special characters in free text don't break
+ * parsing.
+ */
+function toTelegramMarkdown(text: string): string {
+  return text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((segment) => {
+      const bold = segment.match(/^\*\*([^*]+)\*\*$/)
+      return bold ? `*${escapeMarkdownV2(bold[1])}*` : escapeMarkdownV2(segment)
+    })
+    .join('')
+}
+
+export interface AnnouncementCreator {
+  firstName: string
+  username?: string
+}
+
 export async function sendEventAnnouncement(
   chatId: string,
   event: EventResponse,
+  creator?: AnnouncementCreator,
 ): Promise<void> {
   const location = event.isOnline ? 'Онлайн' : event.location
+  const creatorName = creator
+    ? creator.username
+      ? `@${escapeMarkdownV2(creator.username)}`
+      : escapeMarkdownV2(creator.firstName)
+    : undefined
   const text = [
-    `🎉 Нова подія: ${event.title}`,
-    `📅 ${event.date} о ${event.time.slice(0, 5)}`,
-    `📍 ${location}`,
-    event.description ? `\n${event.description}` : '',
+    `🎉 Нова подія: *${escapeMarkdownV2(event.title)}*`,
+    `📅 ${escapeMarkdownV2(event.date)} о ${escapeMarkdownV2(event.time.slice(0, 5))}`,
+    `📍 ${escapeMarkdownV2(location)}`,
+    creatorName ? `👤 Створив: ${creatorName}` : '',
+    event.description ? `\n${toTelegramMarkdown(event.description)}` : '',
   ].filter(Boolean).join('\n')
 
   if (event.imageUrl) {
@@ -109,9 +147,14 @@ export async function sendEventAnnouncement(
       chat_id: chatId,
       photo: event.imageUrl,
       caption: text.slice(0, 1024),
+      parse_mode: 'MarkdownV2',
     })
     return
   }
 
-  await botApi('sendMessage', { chat_id: chatId, text: text.slice(0, 4096) })
+  await botApi('sendMessage', {
+    chat_id: chatId,
+    text: text.slice(0, 4096),
+    parse_mode: 'MarkdownV2',
+  })
 }

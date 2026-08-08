@@ -149,7 +149,13 @@ export async function createEvent(
 export async function announceEvent(event: EventResponse): Promise<void> {
   try {
     const settings = await settingsRepository.getNotificationSettings()
-    if (settings.chatId) await sendEventAnnouncement(settings.chatId, event)
+    if (!settings.chatId) return
+    const creator = await usersRepository.getPublicUserById(event.creatorId)
+    await sendEventAnnouncement(
+      settings.chatId,
+      event,
+      creator ? { firstName: creator.firstName, username: creator.username } : undefined,
+    )
   } catch (error) {
     console.error('Не вдалося надіслати Telegram-анонс події:', error)
   }
