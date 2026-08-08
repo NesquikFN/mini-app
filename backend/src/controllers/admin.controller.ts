@@ -48,11 +48,14 @@ export async function updateNotificationSettings(req: Request, res: Response): P
       .some((chat) => chat.id === chatId && chat.title === chatTitle)
     if (!allowed) throw new AppError(403, 'TELEGRAM_CHAT_FORBIDDEN', 'Цей чат недоступний')
 
-    if (threadId) {
-      const allowedThread = (await telegramNotifications.listAvailableTopics(chatId))
-        .some((topic) => topic.id === threadId && topic.title === threadTitle)
-      if (!allowedThread) throw new AppError(403, 'TELEGRAM_THREAD_FORBIDDEN', 'Ця гілка недоступна')
-    }
+    // Not re-validated against listAvailableTopics here (unlike the chat
+    // above): topic discovery only has getUpdates() to go on, which has
+    // no persistence guarantee — a topic already shown to the admin can
+    // fall out of that window by the time they hit Save on a busy chat,
+    // producing a false "unavailable" even though the topic still exists.
+    // A bogus message_thread_id just fails the announcement later with a
+    // clear error (see events.service.announceEvent), so trusting the
+    // already-chat-scoped value here is safe.
   }
   res.json(await settingsRepository.setNotificationChat(
     chatId ?? undefined,
