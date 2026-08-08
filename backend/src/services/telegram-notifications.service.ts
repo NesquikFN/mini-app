@@ -1,5 +1,6 @@
 import { env } from '../config/env'
 import { AppError } from '../utils/AppError'
+import { telegramRegistryRepository } from '../repositories/telegram-registry.repository'
 import type { EventResponse } from './events.service'
 
 export interface TelegramChatOption {
@@ -18,20 +19,20 @@ interface TelegramChat {
   title?: string
   username?: string
   type: string
-  is_forum?: boolean
 }
 
-interface TelegramMessage {
+export interface TelegramWebhookMessage {
   chat: TelegramChat
   message_thread_id?: number
   forum_topic_created?: { name: string }
+  forum_topic_edited?: { name?: string }
 }
 
-interface TelegramUpdate {
-  message?: TelegramMessage
-  channel_post?: TelegramMessage
-  my_chat_member?: { chat: TelegramChat }
-  chat_member?: { chat: TelegramChat }
+export interface TelegramWebhookUpdate {
+  update_id: number
+  message?: TelegramWebhookMessage
+  channel_post?: TelegramWebhookMessage
+  my_chat_member?: { chat: TelegramChat; new_chat_member: { status: string } }
 }
 
 async function botApi<T>(method: string, body?: Record<string, unknown>): Promise<T> {
@@ -50,29 +51,12 @@ async function botApi<T>(method: string, body?: Record<string, unknown>): Promis
   return payload.result
 }
 
-async function discoveredChats(): Promise<TelegramChatOption[]> {
-  const updates = await botApi<TelegramUpdate[]>('getUpdates')
-  const chats = new Map<string, TelegramChatOption>()
-  for (const update of updates) {
-    const chat = update.message?.chat ?? update.channel_post?.chat ??
-      update.my_chat_member?.chat ?? update.chat_member?.chat
-    if (!chat || !['group', 'supergroup', 'channel'].includes(chat.type)) continue
-    chats.set(String(chat.id), {
-      id: String(chat.id),
-      title: chat.title ?? (chat.username ? `@${chat.username}` : String(chat.id)),
-      type: chat.type as TelegramChatOption['type'],
-    })
-  }
-  return [...chats.values()].sort((a, b) => a.title.localeCompare(b.title, 'uk'))
-}
-
-let botIdPromise: Promise<number> | undefined
-function getBotId(): Promise<number> {
-  botIdPromise ??= botApi<{ id: number }>('getMe').then((me) => me.id)
-  return botIdPromise
-}
-
 const ACTIVE_MEMBER_STATUSES = ['creator', 'administrator', 'member']
+const TRACKED_CHAT_TYPES = ['group', 'supergroup', 'channel']
+
+function chatTitle(chat: TelegramChat): string {
+  return chat.title ?? (chat.username ? `@${chat.username}` : String(chat.id))
+}
 
 async function isActiveMember(chatId: string, userId: number): Promise<boolean> {
   try {
@@ -87,47 +71,56 @@ async function isActiveMember(chatId: string, userId: number): Promise<boolean> 
 }
 
 /**
- * getUpdates() replays Telegram's update history (no offset is ever
- * acknowledged — see discoveredChats), so it still lists chats the bot
- * was later removed from. Re-checking both the bot's own membership and
- * the admin's drops those stale entries instead of showing dead chats.
+ * Persists chat/topic knowledge as Telegram delivers it, instead of
+ * re-deriving it from getUpdates() on every request — that history has
+ * no retention guarantee (no offset is ever acknowledged), so a chat or
+ * topic already seen once could silently fall out of it later, especially
+ * once other, busier chats push it out of the window. This is meant to
+ * be called from the webhook route for every incoming update.
+ */
+export async function handleTelegramWebhookUpdate(update: TelegramWebhookUpdate): Promise<void> {
+  const message = update.message ?? update.channel_post
+  if (message && TRACKED_CHAT_TYPES.includes(message.chat.type)) {
+    const chatId = String(message.chat.id)
+    await telegramRegistryRepository.upsertChat(chatId, chatTitle(message.chat), message.chat.type, true)
+
+    const topicName = message.forum_topic_created?.name ?? message.forum_topic_edited?.name
+    if (message.message_thread_id && topicName) {
+      await telegramRegistryRepository.upsertTopic(chatId, String(message.message_thread_id), topicName)
+    }
+  }
+
+  if (update.my_chat_member && TRACKED_CHAT_TYPES.includes(update.my_chat_member.chat.type)) {
+    const { chat, new_chat_member } = update.my_chat_member
+    await telegramRegistryRepository.upsertChat(
+      String(chat.id),
+      chatTitle(chat),
+      chat.type,
+      ACTIVE_MEMBER_STATUSES.includes(new_chat_member.status),
+    )
+  }
+}
+
+/**
+ * Chats come from our own registry (kept current by the webhook); the
+ * requesting admin's membership is still checked live via getChatMember
+ * — that's cheap, always accurate, and scopes the list to chats *this*
+ * admin can actually see, not just any chat the bot happens to be in.
  */
 export async function listAvailableChats(telegramUserId: number): Promise<TelegramChatOption[]> {
-  const [chats, botId] = await Promise.all([discoveredChats(), getBotId()])
-  const checked = await Promise.all(chats.map(async (chat) => {
-    const [botIsMember, userIsMember] = await Promise.all([
-      isActiveMember(chat.id, botId),
-      isActiveMember(chat.id, telegramUserId),
-    ])
-    return botIsMember && userIsMember ? chat : null
+  const stored = await telegramRegistryRepository.findMemberChats()
+  const checked = await Promise.all(stored.map(async (chat) => {
+    const userIsMember = await isActiveMember(chat.chatId, telegramUserId)
+    return userIsMember
+      ? { id: chat.chatId, title: chat.title, type: chat.type as TelegramChatOption['type'] }
+      : null
   }))
   return checked.filter((chat): chat is TelegramChatOption => chat !== null)
 }
 
-/**
- * The Bot API has no "list topics" endpoint, so — like discoveredChats —
- * this reads topic names out of update history (forum_topic_created
- * service messages) and only returns anything for chats with Topics
- * enabled at all.
- */
 export async function listAvailableTopics(chatId: string): Promise<TelegramTopicOption[]> {
-  const chat = await botApi<TelegramChat>('getChat', { chat_id: chatId })
-  if (!chat.is_forum) return []
-
-  const updates = await botApi<TelegramUpdate[]>('getUpdates')
-  const topics = new Map<string, TelegramTopicOption>()
-  for (const update of updates) {
-    const message = update.message ?? update.channel_post
-    if (!message || String(message.chat.id) !== chatId || !message.message_thread_id) continue
-    const threadId = String(message.message_thread_id)
-    const title = message.forum_topic_created?.name
-    if (title) {
-      topics.set(threadId, { id: threadId, title })
-    } else if (!topics.has(threadId)) {
-      topics.set(threadId, { id: threadId, title: `Гілка #${threadId}` })
-    }
-  }
-  return [...topics.values()].sort((a, b) => a.title.localeCompare(b.title, 'uk'))
+  const topics = await telegramRegistryRepository.findTopics(chatId)
+  return topics.map((topic) => ({ id: topic.threadId, title: topic.title }))
 }
 
 // Telegram MarkdownV2 special characters that must be escaped outside of

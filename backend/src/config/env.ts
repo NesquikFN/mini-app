@@ -18,6 +18,11 @@ const envSchema = z.object({
   // того локальна розробка йде через DEV_AUTH. Реальний Telegram-логін без
   // токена коректно впаде з зрозумілою помилкою (див. auth.service.ts).
   BOT_TOKEN: z.string().optional().default(''),
+  // Перевіряє заголовок X-Telegram-Bot-Api-Secret-Token на POST
+  // /api/telegram/webhook — без нього будь-хто в інтернеті міг би слати
+  // нам підроблені "оновлення". Задається при реєстрації вебхука
+  // (setWebhook ...&secret_token=...) і має збігатися з цим значенням.
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional().default(''),
   JWT_SECRET: z
     .string()
     .min(16, 'JWT_SECRET має бути щонайменше 16 символів (openssl rand -hex 32)'),
