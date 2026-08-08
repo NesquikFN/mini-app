@@ -7,8 +7,8 @@ Telegram Mini App для мешканців гуртожитку. Дозволя
 ## Технології
 
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS, Telegram Mini Apps API
-- **Backend:** Node.js, Express, TypeScript, Zod, Supabase JS client
-- **База даних:** Supabase (PostgreSQL)
+- **Backend:** Node.js, Express, TypeScript, Zod, pg (node-postgres)
+- **База даних:** PostgreSQL (Railway)
 - **Інше:** ESLint, Prettier, Git, dotenv
 
 ## Структура проекту
@@ -19,11 +19,9 @@ dormhub/
 │   └── admin/               # Окрема адмін-панель (React SPA), див. розділ "Адмін-панель"
 ├── backend/                 # Express API
 ├── database/
-│   ├── schema.sql           # повна SQL-схема — запустити один раз у Supabase SQL Editor
+│   ├── schema.sql           # повна SQL-схема — запустити один раз через psql
 │   ├── seed.sql              # тестові дані — запустити після schema.sql
-│   └── migrations/
-│       ├── 0001_init_schema.sql   # та сама схема, версійована для supabase CLI
-│       └── 0002_admin_users.sql   # таблиця admin_users для адмін-панелі
+│   └── migrations/           # та сама схема версіями, для послідовного застосування
 ├── .gitignore
 ├── README.md
 └── package.json            # npm workspaces (frontend + frontend/admin + backend)
@@ -47,20 +45,19 @@ npm run dev --workspace=frontend
 
 ## Backend
 
-### 1. Налаштування Supabase (потрібно зробити один раз)
+### 1. Налаштування Postgres (потрібно зробити один раз)
 
-1. Створіть акаунт і новий проєкт на [supabase.com](https://supabase.com) (безкоштовного плану достатньо).
-2. Дочекайтесь, поки Supabase підготує проєкт (це займає 1-2 хвилини).
-3. Відкрийте **SQL Editor** (іконка в лівому меню) → **New query**.
-4. Скопіюйте весь вміст файлу [`database/schema.sql`](database/schema.sql), вставте в редактор і натисніть **Run**.
-   Це створить таблиці `users`, `events`, `event_participants`, індекси, увімкне Row Level Security та створить функцію `join_event` (атомарне приєднання до події).
-5. Новим запитом (**New query**) скопіюйте вміст [`database/seed.sql`](database/seed.sql) і теж виконайте.
-   Це додасть тестового користувача та кілька подій українською для перевірки API.
-6. Відкрийте **Project Settings → API**. Звідти знадобляться два значення:
-   - **Project URL** → це `SUPABASE_URL`;
-   - **service_role** ключ (у розділі "Project API keys", **не** `anon public`) → це `SUPABASE_SERVICE_ROLE_KEY`.
-
-   ⚠️ **`service_role` ключ — серверний секрет.** Він дає повний доступ до бази в обхід Row Level Security. Ніколи не вставляйте його у frontend-код, не публікуйте, не комітьте в Git.
+1. Створіть Postgres-сервіс (наприклад, на [Railway](https://railway.com) — `New → Database → PostgreSQL`, або будь-який інший хостинг Postgres).
+2. Застосуйте схему через `psql`:
+   ```bash
+   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql
+   ```
+   Це створить усі таблиці, індекси та функцію `join_event` (атомарне приєднання до події).
+3. За бажанням — тестові дані: `psql "$DATABASE_URL" -f database/seed.sql`.
+4. Локальна розробка: якщо база захована за приватною мережею (як Railway за замовчуванням), піднімай тунель окремим процесом і тримай його відкритим:
+   ```bash
+   railway connect Postgres --tunnel-only --port 15432
+   ```
 
 ### 2. Налаштування backend
 
@@ -69,12 +66,7 @@ cd backend
 cp .env.example .env
 ```
 
-Відкрийте `backend/.env` і вставте значення з кроку 1:
-
-```text
-SUPABASE_URL=https://<ваш-проєкт>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<service_role ключ>
-```
+Відкрийте `backend/.env` і впишіть свій `DATABASE_URL` (при локальній розробці через тунель — `postgresql://postgres:<пароль>@127.0.0.1:15432/railway`).
 
 ### 3. Запуск
 
@@ -82,7 +74,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service_role ключ>
 npm run dev --workspace=backend
 ```
 
-Якщо `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` не задані або некоректні — backend одразу завершиться з зрозумілим повідомленням про помилку (це навмисно: без бази даних API працювати не може).
+Якщо `DATABASE_URL` не заданий або з'єднання не вдається — backend одразу завершиться з зрозумілим повідомленням про помилку (це навмисно: без бази даних API працювати не може).
 
 ### 4. Перевірка API
 
@@ -115,8 +107,8 @@ curl http://localhost:3000/api/events
 
 1. Спершу людина має хоч раз відкрити звичайний Mini App або адмінку через
    Telegram (або через DEV_AUTH локально) — так з'явиться рядок у `users`.
-2. Дізнайтесь її `telegram_id` (власний акаунт: [@userinfobot](https://t.me/userinfobot) в Telegram; або погляньте в таблицю `users` в Supabase).
-3. У Supabase → SQL Editor виконайте (підставивши реальний `telegram_id`):
+2. Дізнайтесь її `telegram_id` (власний акаунт: [@userinfobot](https://t.me/userinfobot) в Telegram; або погляньте в таблицю `users` через `psql`).
+3. Через `psql "$DATABASE_URL"` виконайте (підставивши реальний `telegram_id`):
    ```sql
    insert into admin_users (user_id)
    select id from users where telegram_id = 123456789
@@ -139,11 +131,10 @@ npm run dev --workspace=admin
 (`http://localhost:3000`) через Vite-проксі — окремо піднімати нічого не
 треба, досить щоб `npm run dev --workspace=backend` вже працював.
 
-## Безпека Supabase
+## Безпека бази даних
 
-- Row Level Security увімкнено на всіх таблицях (включно з `admin_users`), публічних policy немає — anon/authenticated ролі (тобто прямі запити з браузера) не бачать нічого.
-- Backend звертається до Supabase через `service_role` ключ, який ігнорує RLS повністю — тому у нього є доступ, попри відсутність policy.
-- Frontend наразі **не** звертається до Supabase напряму і не матиме до нього прямого доступу — весь трафік іде через backend API.
+- Frontend ніколи не звертається до Postgres напряму — весь трафік іде через backend API.
+- `DATABASE_URL` — серверний секрет (повний доступ до бази). Ніколи не вставляйте його у frontend-код, не публікуйте, не комітьте в Git.
 
 ## Статус розробки
 
