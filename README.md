@@ -68,6 +68,12 @@ cp .env.example .env
 
 Відкрийте `backend/.env` і впишіть свій `DATABASE_URL` (при локальній розробці через тунель — `postgresql://postgres:<пароль>@127.0.0.1:15432/railway`).
 
+Для кнопок «Приєднатися» у Telegram також вкажіть `TELEGRAM_APP_SHORT_NAME`.
+Його можна знайти в BotFather: `/mybots` → потрібний бот → `Bot Settings` →
+`Mini Apps` → ваш застосунок. Це значення з прямого посилання
+`t.me/<bot_username>/<short_name>`. Якщо замість окремого застосунку в
+BotFather налаштовано `Main Mini App`, змінну можна залишити порожньою.
+
 ### 3. Запуск
 
 ```bash

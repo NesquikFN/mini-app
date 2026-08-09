@@ -105,6 +105,15 @@ function getBotUsername(): Promise<string> {
   return botUsernamePromise
 }
 
+export function buildMiniAppDeepLink(
+  botUsername: string,
+  startParam: string,
+  shortName = env.TELEGRAM_APP_SHORT_NAME,
+): string {
+  const appPath = shortName ? `/${shortName}` : ''
+  return `https://t.me/${botUsername}${appPath}?startapp=${encodeURIComponent(startParam)}`
+}
+
 async function isActiveMember(chatId: string, userId: number): Promise<boolean> {
   try {
     const member = await botApi<{ status: string }>('getChatMember', {
@@ -300,17 +309,18 @@ export async function sendEventAnnouncement(
       // only allows that in private chats with the bot, and a plain `url`
       // button (even same-domain) just opens as a normal link with no
       // initData at all. The documented way to deep-link into the Mini App
-      // from a group message is a t.me/<bot>?startapp=... link: Telegram
-      // recognizes it and launches the Mini App itself, passing the value
-      // through as initDataUnsafe.start_param (read on the frontend to jump
-      // straight to this event). Resolved *inside* this callback (not
+      // from a group message is a Direct Mini App link. Named apps require
+      // t.me/<bot>/<short_name>?startapp=...; only a BotFather-configured
+      // Main Mini App may omit /<short_name>. Telegram passes the value as
+      // start_param (read on the frontend to jump straight to this event).
+      // The bot username is resolved *inside* this callback (not
       // above, before sendAndLog) so a getMe failure is itself logged as
       // a failed send, instead of throwing past sendAndLog unnoticed.
       const botUsername = await getBotUsername()
       const replyMarkup = {
         inline_keyboard: [[{
           text: '🎉 Приєднатися',
-          url: `https://t.me/${botUsername}?startapp=event_${event.id}`,
+          url: buildMiniAppDeepLink(botUsername, `event_${event.id}`),
         }]],
       }
 

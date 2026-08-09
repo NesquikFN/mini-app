@@ -18,6 +18,15 @@ const envSchema = z.object({
   // того локальна розробка йде через DEV_AUTH. Реальний Telegram-логін без
   // токена коректно впаде з зрозумілою помилкою (див. auth.service.ts).
   BOT_TOKEN: z.string().optional().default(''),
+  // Short name from BotFather → Bot Settings → Mini Apps. When present,
+  // event buttons use the Direct Mini App form:
+  // t.me/<bot>/<short_name>?startapp=event_<uuid>. Leave empty only when
+  // the bot has a Main Mini App configured in BotFather.
+  TELEGRAM_APP_SHORT_NAME: z
+    .string()
+    .regex(/^[A-Za-z0-9_]*$/, 'TELEGRAM_APP_SHORT_NAME має містити лише літери, цифри та _')
+    .optional()
+    .default(''),
   // Перевіряє заголовок X-Telegram-Bot-Api-Secret-Token на POST
   // /api/telegram/webhook — без нього будь-хто в інтернеті міг би слати
   // нам підроблені "оновлення". Задається при реєстрації вебхука

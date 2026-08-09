@@ -23,6 +23,8 @@ export function getTelegramInitData(): string | undefined {
  * never trusted as auth or data. */
 export function getTelegramStartParam(): string | undefined {
   return getTelegramWebApp()?.initDataUnsafe.start_param
+    ?? new URLSearchParams(window.location.search).get('tgWebAppStartParam')
+    ?? undefined
 }
 
 /** Mini App bootstrap: signal readiness and expand to full height. Safe
