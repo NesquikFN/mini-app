@@ -27,7 +27,7 @@ import { AdminBannedUsersPage } from './pages/admin/AdminBannedUsersPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminNotificationLogPage } from './pages/admin/AdminNotificationLogPage'
 import { EventTemplatesPage } from './pages/EventTemplatesPage'
-import { getTelegramStartParam } from './services/telegram'
+import { getTelegramStartParam, getTelegramWebApp } from './services/telegram'
 
 /** Jumps straight to an event when the Mini App was opened via the
  * "🎉 Приєднатися" button on a group announcement (a t.me/<bot>?startapp=
@@ -37,7 +37,17 @@ function StartAppRedirect() {
 
   useEffect(() => {
     const match = getTelegramStartParam()?.match(/^event_([0-9a-fA-F-]{36})$/)
-    if (match) navigate(`/events/${match[1]}`, { replace: true })
+    if (!match) return
+
+    navigate(`/events/${match[1]}`, { replace: true })
+    // bootstrapTelegramWebApp's expand() ran while the very first paint
+    // was still the home route — landing directly on a different,
+    // usually taller route right after (skipping the home page the
+    // client expected to settle on) leaves some Telegram clients with a
+    // stale touch/viewport region from that first paint, so taps below
+    // where the home page's fold was get eaten by Telegram's own chrome
+    // instead of reaching the app. Re-expanding after the swap fixes it.
+    getTelegramWebApp()?.expand()
   }, [navigate])
 
   return null
