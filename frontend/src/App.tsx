@@ -46,14 +46,15 @@ function StartAppRedirect() {
   useEffect(() => {
     if (!deepLinkEventId) return
 
-    navigate(`/events/${deepLinkEventId}`, { replace: true })
-    // bootstrapTelegramWebApp's expand() ran while the very first paint
-    // was still the home route — landing directly on a different,
-    // usually taller route right after (skipping the home page the
-    // client expected to settle on) leaves some Telegram clients with a
-    // stale touch/viewport region from that first paint, so taps below
-    // where the home page's fold was get eaten by Telegram's own chrome
-    // instead of reaching the app. Re-expanding after the swap fixes it.
+    // NOT { replace: true } — confirmed via on-device debug logging that
+    // subsequent <Link>/<NavLink> taps land on the correct element and
+    // fire pointerdown/pointerup/click in full, yet never navigate,
+    // specifically (and only) on this deep-link path. Replacing the
+    // initial history entry leaves the WebView with no "back" target;
+    // some Telegram clients' own anchor-click handling appears to swallow
+    // in-app <a> navigation in that state. Pushing a normal entry instead
+    // (same as every other in-app link click) avoids it.
+    navigate(`/events/${deepLinkEventId}`)
     getTelegramWebApp()?.expand()
   }, [navigate])
 
