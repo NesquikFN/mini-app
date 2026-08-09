@@ -5,6 +5,7 @@ export interface Event {
   description: string
   imageUrl?: string
   groupUrl?: string
+  gameUrl?: string
   isOnline: boolean
   date: string
   time: string

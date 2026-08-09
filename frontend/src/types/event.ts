@@ -7,6 +7,7 @@ export interface DormEvent {
   description: string
   imageUrl?: string
   groupUrl?: string
+  gameUrl?: string
   isOnline: boolean
   date: string
   time: string
@@ -33,6 +34,7 @@ export interface CreateEventInput {
   location: string
   maxParticipants: number
   groupUrl?: string
+  gameUrl?: string
   isOnline: boolean
   imageFile?: File
 }

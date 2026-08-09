@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Bell, BellOff, CalendarPlus, Clock, Gamepad2, ImagePlus, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Bell, BellOff, CalendarDays, CalendarPlus, Gamepad2, ImagePlus, Link2, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -53,6 +53,7 @@ export function EventTemplatesPage() {
   const [notifyToggling, setNotifyToggling] = useState(false)
   const [publishing, setPublishing] = useState<EventTemplate | null>(null)
   const [publishTime, setPublishTime] = useState('')
+  const [publishGameUrl, setPublishGameUrl] = useState('')
   const [publishSaving, setPublishSaving] = useState(false)
 
   const load = useCallback(() => {
@@ -111,7 +112,8 @@ export function EventTemplatesPage() {
 
   function openPublishDialog(template: EventTemplate) {
     setPublishing(template)
-    setPublishTime(template.time.slice(0, 5))
+    setPublishTime('')
+    setPublishGameUrl(template.gameUrl ?? '')
     setErrorMessage(null)
   }
 
@@ -120,7 +122,11 @@ export function EventTemplatesPage() {
     setPublishSaving(true)
     setErrorMessage(null)
     try {
-      const event = await createEventFromTemplate(publishing.id, publishTime)
+      const event = await createEventFromTemplate(
+        publishing.id,
+        publishTime,
+        publishGameUrl.trim() || null,
+      )
       reloadEvents()
       setSuccessMessage(`Подію «${event.title}» створено на ${formatEventDate(event.date)} о ${publishTime}.`)
       setPublishing(null)
@@ -232,8 +238,14 @@ export function EventTemplatesPage() {
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate font-semibold text-[var(--text-primary)]">{template.title}</h2>
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
-                    <span className="inline-flex items-center gap-1"><Clock size={13} /> {weekdayLabel(template.weekday)}, {template.time.slice(0, 5)}</span>
+                    <span className="inline-flex items-center gap-1"><CalendarDays size={13} /> {weekdayLabel(template.weekday)}</span>
                     <span className="inline-flex items-center gap-1"><MapPin size={13} /> {template.isOnline ? 'Онлайн' : template.location}</span>
+                    {(template.gameUrl || template.gameUrlRequired) && (
+                      <span className="inline-flex items-center gap-1">
+                        <Link2 size={13} />
+                        {template.gameUrlRequired ? 'Посилання обовʼязкове' : 'Посилання задано'}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-[var(--text-disabled)]">
                     {template.isOnline ? 'Доступно всім гуртожиткам' : getDormitoryName(template.dormitoryId)}
@@ -275,9 +287,13 @@ export function EventTemplatesPage() {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 animate-[dormhub-fade-in_0.15s_ease]"
             onClick={() => setPublishing(null)}
           >
-            <div
+            <form
               className="w-full max-w-sm rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-5 animate-[dormhub-slide-up_0.2s_ease]"
               onClick={(event) => event.stopPropagation()}
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleConfirmPublish()
+              }}
             >
               <p className="text-base font-semibold text-[var(--text-primary)]">
                 На який час створити «{publishing.title}»?
@@ -293,15 +309,31 @@ export function EventTemplatesPage() {
                 onChange={(event) => setPublishTime(event.target.value)}
                 className={`${inputClass} mt-4`}
               />
+              <label className="mt-4 flex flex-col gap-1.5 text-sm text-[var(--text-primary)]">
+                Посилання на гру {publishing.gameUrlRequired ? '(обовʼязково)' : '(необовʼязково)'}
+                <input
+                  required={publishing.gameUrlRequired}
+                  type="url"
+                  value={publishGameUrl}
+                  onChange={(event) => setPublishGameUrl(event.target.value)}
+                  placeholder="https://game.example/join"
+                  className={inputClass}
+                />
+              </label>
               <div className="mt-5 flex gap-3">
                 <Button variant="outline" fullWidth onClick={() => setPublishing(null)} disabled={publishSaving}>
                   Скасувати
                 </Button>
-                <Button fullWidth onClick={handleConfirmPublish} loading={publishSaving} disabled={!publishTime}>
+                <Button
+                  type="submit"
+                  fullWidth
+                  loading={publishSaving}
+                  disabled={!publishTime || (publishing.gameUrlRequired && !publishGameUrl.trim())}
+                >
                   Створити
                 </Button>
               </div>
-            </div>
+            </form>
           </div>
         )}
       </div>
@@ -324,11 +356,12 @@ function TemplateForm({
   const [title, setTitle] = useState(template?.title ?? '')
   const [description, setDescription] = useState(template?.description ?? '')
   const [weekday, setWeekday] = useState(template?.weekday ?? 5)
-  const [time, setTime] = useState(template?.time.slice(0, 5) ?? '19:00')
   const [isOnline, setIsOnline] = useState(template?.isOnline ?? false)
   const [location, setLocation] = useState(template?.isOnline ? '' : template?.location ?? '')
   const [maxParticipants, setMaxParticipants] = useState(String(template?.maxParticipants ?? 12))
   const [groupUrl, setGroupUrl] = useState(template?.groupUrl ?? '')
+  const [gameUrl, setGameUrl] = useState(template?.gameUrl ?? '')
+  const [gameUrlRequired, setGameUrlRequired] = useState(template?.gameUrlRequired ?? false)
   const [dormitoryId, setDormitoryId] = useState(template?.dormitoryId ?? dormitories[0]?.id ?? '')
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | undefined>(template?.imageUrl)
@@ -356,11 +389,12 @@ function TemplateForm({
       title: title.trim(),
       description: description.trim(),
       weekday,
-      time,
       isOnline,
       location: isOnline ? 'Онлайн' : location.trim(),
       maxParticipants: Number(maxParticipants),
       groupUrl: groupUrl.trim() || undefined,
+      gameUrl: gameUrl.trim() || undefined,
+      gameUrlRequired,
       imageFile,
       dormitoryId: isOnline ? undefined : dormitoryId,
     })
@@ -385,12 +419,9 @@ function TemplateForm({
         <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} className="sr-only" />
       </label>
       {imageError && <p className="-mt-2 text-xs text-red-400">{imageError}</p>}
-      <div className="grid grid-cols-2 gap-2">
-        <select value={weekday} onChange={(event) => setWeekday(Number(event.target.value))} className={inputClass}>
-          {WEEKDAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
-        </select>
-        <input required type="time" value={time} onChange={(event) => setTime(event.target.value)} className={inputClass} />
-      </div>
+      <select value={weekday} onChange={(event) => setWeekday(Number(event.target.value))} className={inputClass}>
+        {WEEKDAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
+      </select>
       <label className="flex items-center justify-between rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 py-3 text-sm text-[var(--text-primary)]">
         Онлайн-подія
         <input type="checkbox" checked={isOnline} onChange={(event) => setIsOnline(event.target.checked)} className="h-5 w-5 accent-[var(--accent)]" />
@@ -405,6 +436,11 @@ function TemplateForm({
       )}
       <input required min={1} type="number" value={maxParticipants} onChange={(event) => setMaxParticipants(event.target.value)} placeholder="Максимум учасників" className={inputClass} />
       <input value={groupUrl} onChange={(event) => setGroupUrl(event.target.value)} placeholder="@group або https://t.me/group" className={inputClass} />
+      <input type="url" value={gameUrl} onChange={(event) => setGameUrl(event.target.value)} placeholder="Посилання на гру (необовʼязково)" className={inputClass} />
+      <label className="flex items-center justify-between rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 py-3 text-sm text-[var(--text-primary)]">
+        Вимагати посилання під час запуску
+        <input type="checkbox" checked={gameUrlRequired} onChange={(event) => setGameUrlRequired(event.target.checked)} className="h-5 w-5 accent-[var(--accent)]" />
+      </label>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" disabled={saving} onClick={onCancel}>Скасувати</Button>
         <Button type="submit" loading={saving}>{template ? 'Зберегти' : 'Створити шаблон'}</Button>

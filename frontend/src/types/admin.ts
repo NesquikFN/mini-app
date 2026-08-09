@@ -139,11 +139,12 @@ export interface EventTemplate {
   title: string
   description: string
   weekday: number
-  time: string
   location: string
   isOnline: boolean
   maxParticipants: number
   groupUrl?: string
+  gameUrl?: string
+  gameUrlRequired: boolean
   imageUrl?: string
   dormitoryId?: string
   createdAt: string
@@ -154,11 +155,12 @@ export interface EventTemplateInput {
   title: string
   description: string
   weekday: number
-  time: string
   location: string
   isOnline: boolean
   maxParticipants: number
   groupUrl?: string
+  gameUrl?: string
+  gameUrlRequired: boolean
   imageFile?: File
   dormitoryId?: string
 }

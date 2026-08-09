@@ -122,11 +122,12 @@ create table if not exists event_templates (
   title text not null,
   description text,
   weekday smallint not null check (weekday between 0 and 6),
-  time time not null,
   location text not null,
   is_online boolean not null default false,
   max_participants integer not null check (max_participants > 0),
   group_url text,
+  game_url text,
+  game_url_required boolean not null default false,
   image_url text,
   dormitory_id uuid references dormitories (id),
   created_at timestamptz not null default now(),
@@ -138,6 +139,9 @@ create index if not exists idx_event_templates_dormitory_id on event_templates (
 
 alter table events
   add column if not exists source_template_id uuid references event_templates (id) on delete set null;
+
+alter table events
+  add column if not exists game_url text;
 
 create unique index if not exists idx_events_template_date_unique
   on events (source_template_id, date)

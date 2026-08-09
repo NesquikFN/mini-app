@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Archive, CalendarDays, Clock, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
+import { Archive, CalendarDays, Clock, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -365,6 +365,18 @@ export function EventDetailPage() {
         </section>
 
         {actionError && <p className="text-sm text-red-400">{actionError}</p>}
+
+        {event.gameUrl && (
+          <a
+            href={event.gameUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 text-[15px] font-semibold text-white transition-transform active:scale-[0.97]"
+          >
+            <ExternalLink size={19} />
+            Відкрити гру
+          </a>
+        )}
 
         {telegramGroupUrl && !isArchived && (
           <a

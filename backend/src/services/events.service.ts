@@ -20,6 +20,7 @@ export interface EventResponse {
   description: string
   imageUrl?: string
   groupUrl?: string
+  gameUrl?: string
   isOnline: boolean
   date: string
   time: string
@@ -52,6 +53,7 @@ function toEventResponse(event: Event): EventResponse {
     description: event.description,
     imageUrl: event.imageUrl,
     groupUrl: event.groupUrl,
+    gameUrl: event.gameUrl,
     isOnline: event.isOnline,
     date: event.date,
     time: event.time,
@@ -168,6 +170,7 @@ export async function createEvent(
     title: input.title,
     description: input.description,
     groupUrl: input.groupUrl,
+    gameUrl: input.gameUrl,
     isOnline: input.isOnline,
     date: input.date,
     time: input.time,
@@ -372,15 +375,22 @@ function nextTemplateDate(weekday: number, time: string): string {
 export async function createEventFromTemplate(
   templateId: string,
   creatorId: string,
-  creatorDormitoryId?: string,
-  /** Той, хто натискає "Створити", обирає час гри сам — шаблон дає лише
-   * день тижня та підказку-за-замовчуванням для пікера. */
-  overrideTime?: string,
+  creatorDormitoryId: string | undefined,
+  /** Час завжди вводиться під час запуску. null для gameUrl означає, що
+   * користувач свідомо залишив поле порожнім; undefined — старий клієнт,
+   * для якого використовуємо значення шаблону. */
+  time: string,
+  overrideGameUrl?: string | null,
 ): Promise<EventResponse> {
   const template = await eventTemplatesRepository.findById(templateId)
   if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
 
-  const time = overrideTime ?? template.time.slice(0, 5)
+  const gameUrl = overrideGameUrl === undefined
+    ? template.gameUrl
+    : overrideGameUrl ?? undefined
+  if (template.gameUrlRequired && !gameUrl) {
+    throw new AppError(400, 'GAME_URL_REQUIRED', 'Вкажіть посилання на гру')
+  }
 
   try {
     const event = await createEvent(
@@ -395,6 +405,7 @@ export async function createEventFromTemplate(
         isOnline: template.isOnline,
         maxParticipants: template.maxParticipants,
         groupUrl: template.groupUrl,
+        gameUrl,
         deferNotification: Boolean(template.imageUrl),
       },
       template.id,

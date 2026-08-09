@@ -6,11 +6,12 @@ interface EventTemplateRow {
   title: string
   description: string | null
   weekday: number
-  time: string
   location: string
   is_online: boolean
   max_participants: number
   group_url: string | null
+  game_url: string | null
+  game_url_required: boolean
   image_url: string | null
   dormitory_id: string | null
   created_at: string
@@ -21,11 +22,12 @@ export interface EventTemplateInput {
   title: string
   description: string
   weekday: number
-  time: string
   location: string
   isOnline: boolean
   maxParticipants: number
   groupUrl?: string
+  gameUrl?: string
+  gameUrlRequired: boolean
   dormitoryId?: string
 }
 
@@ -35,11 +37,12 @@ function toTemplate(row: EventTemplateRow): EventTemplate {
     title: row.title,
     description: row.description ?? '',
     weekday: row.weekday,
-    time: row.time,
     location: row.location,
     isOnline: row.is_online,
     maxParticipants: row.max_participants,
     groupUrl: row.group_url ?? undefined,
+    gameUrl: row.game_url ?? undefined,
+    gameUrlRequired: row.game_url_required,
     imageUrl: row.image_url ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
     createdAt: row.created_at,
@@ -50,7 +53,7 @@ function toTemplate(row: EventTemplateRow): EventTemplate {
 export const eventTemplatesRepository = {
   async findAll(): Promise<EventTemplate[]> {
     const { rows } = await query<EventTemplateRow>(
-      'select * from event_templates order by weekday asc, time asc',
+      'select * from event_templates order by weekday asc, title asc',
     )
     return rows.map(toTemplate)
   },
@@ -63,19 +66,20 @@ export const eventTemplatesRepository = {
   async insert(input: EventTemplateInput): Promise<EventTemplate> {
     const { rows } = await query<EventTemplateRow>(
       `insert into event_templates
-         (title, description, weekday, time, location, is_online,
-          max_participants, group_url, dormitory_id, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+         (title, description, weekday, location, is_online,
+          max_participants, group_url, game_url, game_url_required, dormitory_id, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
        returning *`,
       [
         input.title,
         input.description || null,
         input.weekday,
-        input.time,
         input.location,
         input.isOnline,
         input.maxParticipants,
         input.groupUrl || null,
+        input.gameUrl || null,
+        input.gameUrlRequired,
         input.dormitoryId ?? null,
       ],
     )
@@ -85,8 +89,9 @@ export const eventTemplatesRepository = {
   async update(id: string, input: EventTemplateInput): Promise<EventTemplate | null> {
     const { rows } = await query<EventTemplateRow>(
       `update event_templates set
-         title = $2, description = $3, weekday = $4, time = $5, location = $6,
-         is_online = $7, max_participants = $8, group_url = $9, dormitory_id = $10,
+         title = $2, description = $3, weekday = $4, location = $5,
+         is_online = $6, max_participants = $7, group_url = $8,
+         game_url = $9, game_url_required = $10, dormitory_id = $11,
          updated_at = now()
        where id = $1
        returning *`,
@@ -95,11 +100,12 @@ export const eventTemplatesRepository = {
         input.title,
         input.description || null,
         input.weekday,
-        input.time,
         input.location,
         input.isOnline,
         input.maxParticipants,
         input.groupUrl || null,
+        input.gameUrl || null,
+        input.gameUrlRequired,
         input.dormitoryId ?? null,
       ],
     )

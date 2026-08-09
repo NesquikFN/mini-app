@@ -66,12 +66,13 @@ export async function deleteEventTemplate(req: Request, res: Response): Promise<
 
 export async function createFromEventTemplate(req: Request, res: Response): Promise<void> {
   const { templateId } = eventTemplateIdParamSchema.parse(req.params)
-  const { time } = createEventFromTemplateSchema.parse(req.body ?? {})
+  const { time, gameUrl } = createEventFromTemplateSchema.parse(req.body ?? {})
   const event = await eventsService.createEventFromTemplate(
     templateId,
     req.user.id,
     req.user.dormitoryId,
     time,
+    gameUrl,
   )
   res.status(201).json({ event })
 }

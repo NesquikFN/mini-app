@@ -581,10 +581,14 @@ export async function deleteEventTemplate(id: string): Promise<void> {
   await request<{ success: boolean }>(`/event-templates/${id}`, { method: 'DELETE' })
 }
 
-export async function createEventFromTemplate(id: string, time: string): Promise<DormEvent> {
+export async function createEventFromTemplate(
+  id: string,
+  time: string,
+  gameUrl: string | null,
+): Promise<DormEvent> {
   const data = await request<{ event: DormEvent }>(
     `/event-templates/${id}/create-event`,
-    { method: 'POST', body: JSON.stringify({ time }) },
+    { method: 'POST', body: JSON.stringify({ time, gameUrl }) },
   )
   return data.event
 }

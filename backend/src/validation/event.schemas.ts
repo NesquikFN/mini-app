@@ -26,6 +26,17 @@ const telegramGroupUrlSchema = z
     value.startsWith('@') ? `https://t.me/${value.slice(1)}` : value,
   )
 
+const gameUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => {
+    try {
+      return ['http:', 'https:'].includes(new URL(value).protocol)
+    } catch {
+      return false
+    }
+  }, 'Вкажіть коректне посилання на гру')
+
 export const createEventSchema = z.object({
   title: z.string().trim().min(1, 'Назва обовʼязкова'),
   description: z.string().trim().default(''),
@@ -33,6 +44,7 @@ export const createEventSchema = z.object({
   time: timeSchema,
   location: z.string().trim().min(1, 'Місце обовʼязкове'),
   groupUrl: telegramGroupUrlSchema.optional(),
+  gameUrl: gameUrlSchema.optional(),
   deferNotification: z.boolean().optional(),
   isOnline: z.boolean().default(false),
   maxParticipants: z
@@ -70,10 +82,9 @@ export const eventTemplateIdParamSchema = z.object({
   templateId: z.uuid('Некоректний шаблон'),
 })
 
-// Час запуску гри тепер обирає той, хто натискає "Створити" — шаблон
-// лишає лише день тижня та час-за-замовчуванням для відображення.
 export const createEventFromTemplateSchema = z.object({
-  time: timeSchema.optional(),
+  time: timeSchema,
+  gameUrl: gameUrlSchema.nullable().optional(),
 })
 
 export const eventTemplateSchema = z
@@ -81,11 +92,12 @@ export const eventTemplateSchema = z
     title: z.string().trim().min(1, 'Назва обовʼязкова'),
     description: z.string().trim().default(''),
     weekday: z.number().int().min(0).max(6),
-    time: timeSchema,
     location: z.string().trim().min(1, 'Місце обовʼязкове'),
     isOnline: z.boolean().default(false),
     maxParticipants: z.number().int().positive(),
     groupUrl: telegramGroupUrlSchema.optional(),
+    gameUrl: gameUrlSchema.optional(),
+    gameUrlRequired: z.boolean().default(false),
     dormitoryId: z.uuid('Некоректний гуртожиток').optional(),
   })
   .superRefine((value, ctx) => {

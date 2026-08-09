@@ -13,6 +13,7 @@ interface EventRow {
   description: string | null
   image_url: string | null
   group_url: string | null
+  game_url: string | null
   is_online: boolean
   date: string
   time: string
@@ -30,6 +31,7 @@ export interface NewEvent {
   description: string
   imageUrl?: string
   groupUrl?: string
+  gameUrl?: string
   isOnline: boolean
   date: string
   time: string
@@ -58,6 +60,7 @@ function toEvent(row: EventRow): Event {
     description: row.description ?? '',
     imageUrl: row.image_url ?? undefined,
     groupUrl: row.group_url ?? undefined,
+    gameUrl: row.game_url ?? undefined,
     isOnline: row.is_online,
     date: row.date,
     time: row.time,
@@ -152,9 +155,9 @@ export const eventsRepository = {
   async insert(newEvent: NewEvent): Promise<Event> {
     const { rows } = await query<{ id: string }>(
       `insert into events
-         (creator_id, title, description, image_url, group_url, is_online,
+         (creator_id, title, description, image_url, group_url, game_url, is_online,
           date, time, location, max_participants, dormitory_id, source_template_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        returning id`,
       [
         newEvent.creatorId,
@@ -162,6 +165,7 @@ export const eventsRepository = {
         newEvent.description || null,
         newEvent.imageUrl || null,
         newEvent.groupUrl || null,
+        newEvent.gameUrl || null,
         newEvent.isOnline,
         newEvent.date,
         newEvent.time,
@@ -192,6 +196,7 @@ export const eventsRepository = {
     if (patch.description !== undefined) columns.description = patch.description || null
     if (patch.imageUrl !== undefined) columns.image_url = patch.imageUrl || null
     if (patch.groupUrl !== undefined) columns.group_url = patch.groupUrl || null
+    if (patch.gameUrl !== undefined) columns.game_url = patch.gameUrl || null
     if (patch.isOnline !== undefined) columns.is_online = patch.isOnline
     if (patch.date !== undefined) columns.date = patch.date
     if (patch.time !== undefined) columns.time = patch.time
