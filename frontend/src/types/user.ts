@@ -4,6 +4,10 @@ export interface AuthUser {
   firstName: string
   username?: string
   photoUrl?: string
+  nickname?: string
+  instagram?: string
+  bio?: string
+  age?: number
   /** FK на dormitories.id, ще не обраний користувачем — undefined. */
   dormitoryId?: string
   /** Особиста підписка на DM-сповіщення про нові події від бота. */
@@ -17,5 +21,16 @@ export interface PublicUser {
   firstName: string
   username?: string
   photoUrl?: string
+  nickname?: string
+  instagram?: string
+  bio?: string
+  age?: number
   dormitoryId?: string
+}
+
+export interface UpdateProfileInput {
+  nickname: string | null
+  instagram: string | null
+  bio: string | null
+  age: number | null
 }

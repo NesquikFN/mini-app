@@ -42,6 +42,10 @@ create table if not exists users (
   first_name text not null,
   last_name text,
   photo_url text,
+  nickname varchar(40),
+  instagram varchar(30),
+  bio varchar(500),
+  age smallint check (age between 13 and 120),
   banned_until timestamptz,
   banned_permanently boolean not null default false,
   -- Гуртожиток користувача. Nullable: новий користувач обирає його при

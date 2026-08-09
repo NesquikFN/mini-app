@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CalendarX, Home, Settings } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { AtSign, Cake, CalendarX, Home, Pencil, Settings } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { Avatar } from '../components/Avatar'
 import { EventCard } from '../components/EventCard'
@@ -26,6 +26,8 @@ export function ProfilePage() {
   } = useCurrentUser()
   const { status: adminStatus } = useAdminStatus()
   const { getDormitoryName } = useDormitories()
+  const location = useLocation()
+  const profileSaved = Boolean((location.state as { profileSaved?: boolean } | null)?.profileSaved)
 
   const [myEvents, setMyEvents] = useState<MyEventsResponse | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -76,11 +78,16 @@ export function ProfilePage() {
 
         {!isLoading && !hasError && user && myEvents && (
           <>
+            {profileSaved && (
+              <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                Профіль збережено.
+              </p>
+            )}
             <div className="flex items-center gap-4">
-              <Avatar name={user.firstName} photoUrl={user.photoUrl} size={56} />
-              <div>
+              <Avatar name={user.nickname ?? user.firstName} photoUrl={user.photoUrl} size={56} />
+              <div className="min-w-0 flex-1">
                 <p className="text-lg font-semibold text-[var(--text-primary)]">
-                  {user.firstName}
+                  {user.nickname ?? user.firstName}
                 </p>
                 {user.username && (
                   <p className="text-sm text-[var(--text-secondary)]">@{user.username}</p>
@@ -90,7 +97,37 @@ export function ProfilePage() {
                   {getDormitoryName(user.dormitoryId) || 'Гуртожиток не вказано'}
                 </p>
               </div>
+              <Link
+                to="/profile/edit"
+                aria-label="Редагувати профіль"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--surface-border)] bg-[var(--surface-card)] text-[var(--accent)] active:scale-95"
+              >
+                <Pencil size={18} />
+              </Link>
             </div>
+
+            {(user.instagram || user.age || user.bio) && (
+              <div className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+                <div className="flex flex-wrap gap-2">
+                  {user.instagram && (
+                    <a
+                      href={`https://instagram.com/${user.instagram}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft-bg)] px-3 py-1.5 text-sm font-medium text-[var(--accent)]"
+                    >
+                      <AtSign size={15} /> {user.instagram}
+                    </a>
+                  )}
+                  {user.age && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-card-alt)] px-3 py-1.5 text-sm text-[var(--text-secondary)]">
+                      <Cake size={15} /> Вік: {user.age}
+                    </span>
+                  )}
+                </div>
+                {user.bio && <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{user.bio}</p>}
+              </div>
+            )}
 
             {adminStatus === 'admin' && (
               <Link

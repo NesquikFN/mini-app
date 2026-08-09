@@ -8,6 +8,10 @@ interface UserRow {
   first_name: string
   last_name: string | null
   photo_url: string | null
+  nickname: string | null
+  instagram: string | null
+  bio: string | null
+  age: number | null
   dormitory_id: string | null
   banned_until: string | null
   banned_permanently: boolean
@@ -22,6 +26,10 @@ function toAuthUser(row: UserRow): AuthUser {
     firstName: row.first_name,
     username: row.username ?? undefined,
     photoUrl: row.photo_url ?? undefined,
+    nickname: row.nickname ?? undefined,
+    instagram: row.instagram ?? undefined,
+    bio: row.bio ?? undefined,
+    age: row.age ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
     bannedUntil: row.banned_until ?? undefined,
     bannedPermanently: row.banned_permanently,
@@ -37,6 +45,10 @@ function toAdminUserView(row: UserRow): AdminUserView {
     lastName: row.last_name ?? undefined,
     username: row.username ?? undefined,
     photoUrl: row.photo_url ?? undefined,
+    nickname: row.nickname ?? undefined,
+    instagram: row.instagram ?? undefined,
+    bio: row.bio ?? undefined,
+    age: row.age ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
     createdAt: row.created_at,
     bannedUntil: row.banned_until ?? undefined,
@@ -49,6 +61,10 @@ interface PublicUserRow {
   first_name: string
   username: string | null
   photo_url: string | null
+  nickname: string | null
+  instagram: string | null
+  bio: string | null
+  age: number | null
   dormitory_id: string | null
 }
 
@@ -58,6 +74,10 @@ function toPublicUser(row: PublicUserRow): PublicUser {
     firstName: row.first_name,
     username: row.username ?? undefined,
     photoUrl: row.photo_url ?? undefined,
+    nickname: row.nickname ?? undefined,
+    instagram: row.instagram ?? undefined,
+    bio: row.bio ?? undefined,
+    age: row.age ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
   }
 }
@@ -69,7 +89,14 @@ export interface NewUser {
   photoUrl?: string
 }
 
-const PUBLIC_USER_COLUMNS = 'id, first_name, username, photo_url, dormitory_id'
+const PUBLIC_USER_COLUMNS = 'id, first_name, username, photo_url, nickname, instagram, bio, age, dormitory_id'
+
+export interface UserProfileUpdate {
+  nickname?: string | null
+  instagram?: string | null
+  bio?: string | null
+  age?: number | null
+}
 
 export const usersRepository = {
   async getUserByTelegramId(telegramId: number): Promise<AuthUser | null> {
@@ -122,6 +149,28 @@ export const usersRepository = {
     const { rows } = await query<UserRow>(
       'update users set notify_new_events = $2 where id = $1 returning *',
       [id, notify],
+    )
+    return toAuthUser(rows[0])
+  },
+
+  async updateProfile(id: string, input: UserProfileUpdate): Promise<AuthUser> {
+    const columns: string[] = []
+    const values: unknown[] = [id]
+
+    for (const [column, value] of [
+      ['nickname', input.nickname],
+      ['instagram', input.instagram],
+      ['bio', input.bio],
+      ['age', input.age],
+    ] as const) {
+      if (value === undefined) continue
+      values.push(value)
+      columns.push(`${column} = $${values.length}`)
+    }
+
+    const { rows } = await query<UserRow>(
+      `update users set ${columns.join(', ')} where id = $1 returning *`,
+      values,
     )
     return toAuthUser(rows[0])
   },

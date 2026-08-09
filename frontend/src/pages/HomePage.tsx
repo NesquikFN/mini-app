@@ -38,7 +38,7 @@ export function HomePage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <p className="text-xl font-semibold text-[var(--text-primary)]">
-            👋 Привіт{user?.firstName ? `, ${user.firstName}` : ''}!
+            👋 Привіт{user ? `, ${user.nickname ?? user.firstName}` : ''}!
           </p>
           <SocialLinks links={socialLinks} />
         </div>

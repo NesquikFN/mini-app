@@ -4,6 +4,10 @@ export interface AuthUser {
   firstName: string
   username?: string
   photoUrl?: string
+  nickname?: string
+  instagram?: string
+  bio?: string
+  age?: number
   /** FK на dormitories.id. Ще не обраний користувачем — undefined. */
   dormitoryId?: string
   bannedUntil?: string
@@ -22,6 +26,10 @@ export interface AdminUserView {
   lastName?: string
   username?: string
   photoUrl?: string
+  nickname?: string
+  instagram?: string
+  bio?: string
+  age?: number
   dormitoryId?: string
   createdAt: string
   bannedUntil?: string
@@ -38,5 +46,9 @@ export interface PublicUser {
   firstName: string
   username?: string
   photoUrl?: string
+  nickname?: string
+  instagram?: string
+  bio?: string
+  age?: number
   dormitoryId?: string
 }

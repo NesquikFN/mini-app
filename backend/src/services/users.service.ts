@@ -2,6 +2,7 @@ import { usersRepository } from '../repositories/users.repository'
 import { dormitoriesRepository } from '../repositories/dormitories.repository'
 import { AppError } from '../utils/AppError'
 import type { AuthUser, PublicUser } from '../types/user'
+import type { UserProfileUpdate } from '../repositories/users.repository'
 import type { EventResponse } from './events.service'
 import * as eventsService from './events.service'
 import { adminRepository } from '../repositories/admin.repository'
@@ -39,4 +40,11 @@ export async function updateDormitory(userId: string, dormitoryId: string): Prom
 
 export async function updateNotifyNewEvents(userId: string, notify: boolean): Promise<AuthUser> {
   return usersRepository.setNotifyNewEvents(userId, notify)
+}
+
+export async function updateProfile(
+  userId: string,
+  input: UserProfileUpdate,
+): Promise<AuthUser> {
+  return usersRepository.updateProfile(userId, input)
 }

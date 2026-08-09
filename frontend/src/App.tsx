@@ -15,6 +15,7 @@ import { EventDetailPage } from './pages/EventDetailPage'
 import { CreateEventPage } from './pages/CreateEventPage'
 import { EditEventPage } from './pages/EditEventPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { EditProfilePage } from './pages/EditProfilePage'
 import { UserProfilePage } from './pages/UserProfilePage'
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage'
@@ -73,6 +74,7 @@ function App() {
                       <Route path="/create" element={<CreateEventPage />} />
                       <Route path="/templates" element={<EventTemplatesPage />} />
                       <Route path="/profile" element={<ProfilePage />} />
+                      <Route path="/profile/edit" element={<EditProfilePage />} />
                       <Route path="/users/:id" element={<UserProfilePage />} />
                     </Route>
                   </Route>

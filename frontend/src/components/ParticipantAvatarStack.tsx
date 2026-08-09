@@ -32,7 +32,7 @@ export function ParticipantAvatarStack({ participants, totalCount, size = 28 }: 
           className="shrink-0 rounded-full border-2 border-[var(--surface-card)]"
           style={{ marginLeft: index === 0 ? 0 : -OVERLAP, zIndex: MAX_VISIBLE - index }}
         >
-          <Avatar name={user.firstName} photoUrl={user.photoUrl} size={size} />
+          <Avatar name={user.nickname ?? user.firstName} photoUrl={user.photoUrl} size={size} />
         </div>
       ))}
       {overflow > 0 && (

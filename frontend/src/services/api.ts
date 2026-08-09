@@ -1,5 +1,5 @@
 import type { CreateEventInput, DormEvent } from '../types/event'
-import type { AuthUser, PublicUser } from '../types/user'
+import type { AuthUser, PublicUser, UpdateProfileInput } from '../types/user'
 import type { Dormitory } from '../types/dormitory'
 import type { EventsScope } from '../context/EventsContext'
 import type {
@@ -329,6 +329,14 @@ export async function updateMyNotifyNewEvents(notifyNewEvents: boolean): Promise
   const data = await request<MeResponse>('/me', {
     method: 'PATCH',
     body: JSON.stringify({ notifyNewEvents }),
+  })
+  return data.user
+}
+
+export async function updateMyProfile(input: UpdateProfileInput): Promise<AuthUser> {
+  const data = await request<MeResponse>('/me', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
   })
   return data.user
 }

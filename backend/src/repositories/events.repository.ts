@@ -300,8 +300,9 @@ export const eventsRepository = {
       first_name: string
       username: string | null
       photo_url: string | null
+      nickname: string | null
     }>(
-      `select event_id, id, first_name, username, photo_url
+      `select event_id, id, first_name, username, photo_url, nickname
        from (
          select
            ep.event_id,
@@ -309,6 +310,7 @@ export const eventsRepository = {
            u.first_name,
            u.username,
            u.photo_url,
+           u.nickname,
            row_number() over (partition by ep.event_id order by ep.created_at asc) as rn
          from event_participants ep
          join users u on u.id = ep.user_id
@@ -325,6 +327,7 @@ export const eventsRepository = {
         firstName: row.first_name,
         username: row.username ?? undefined,
         photoUrl: row.photo_url ?? undefined,
+        nickname: row.nickname ?? undefined,
       })
       byEvent.set(row.event_id, preview)
     }

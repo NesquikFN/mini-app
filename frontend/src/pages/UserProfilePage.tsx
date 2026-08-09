@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CalendarX, Home, ShieldCheck, UserRoundX } from 'lucide-react'
+import { AtSign, Cake, CalendarX, Home, ShieldCheck, UserRoundX } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { EventCard } from '../components/EventCard'
@@ -63,12 +63,12 @@ export function UserProfilePage() {
           <div className="flex flex-col gap-6">
             <section className="flex flex-col items-center rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-card)] px-5 py-8 text-center">
               <Avatar
-                name={profile.user.firstName}
+                name={profile.user.nickname ?? profile.user.firstName}
                 photoUrl={profile.user.photoUrl}
                 size={88}
               />
               <h1 className="mt-4 text-xl font-semibold text-[var(--text-primary)]">
-                {profile.user.firstName}
+                {profile.user.nickname ?? profile.user.firstName}
               </h1>
               <div className="mt-1 flex items-center justify-center gap-2">
                 {profile.user.username && (
@@ -86,6 +86,30 @@ export function UserProfilePage() {
                 <Home size={16} />
                 {getDormitoryName(profile.user.dormitoryId) || 'Гуртожиток не вказано'}
               </p>
+              {(profile.user.instagram || profile.user.age) && (
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {profile.user.instagram && (
+                    <a
+                      href={`https://instagram.com/${profile.user.instagram}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft-bg)] px-3 py-1.5 text-sm font-medium text-[var(--accent)]"
+                    >
+                      <AtSign size={15} /> {profile.user.instagram}
+                    </a>
+                  )}
+                  {profile.user.age && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-card-alt)] px-3 py-1.5 text-sm text-[var(--text-secondary)]">
+                      <Cake size={15} /> Вік: {profile.user.age}
+                    </span>
+                  )}
+                </div>
+              )}
+              {profile.user.bio && (
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">
+                  {profile.user.bio}
+                </p>
+              )}
             </section>
 
             <section className="flex flex-col gap-3">

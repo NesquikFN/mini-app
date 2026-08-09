@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { UserContext, type UserStatus } from './UserContext'
-import type { AuthUser } from '../types/user'
-import { fetchCurrentUser, getErrorMessage } from '../services/api'
+import type { AuthUser, UpdateProfileInput } from '../types/user'
+import { fetchCurrentUser, getErrorMessage, updateMyProfile } from '../services/api'
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -30,8 +30,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
     runFetch()
   }, [runFetch])
 
+  const updateProfile = useCallback(async (input: UpdateProfileInput) => {
+    const updated = await updateMyProfile(input)
+    setUser(updated)
+    return updated
+  }, [])
+
   return (
-    <UserContext.Provider value={{ user, status, errorMessage, reload }}>
+    <UserContext.Provider value={{ user, status, errorMessage, reload, updateProfile }}>
       {children}
     </UserContext.Provider>
   )

@@ -16,6 +16,19 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
   if (input.notifyNewEvents !== undefined) {
     user = await usersService.updateNotifyNewEvents(user.id, input.notifyNewEvents)
   }
+  if (
+    input.nickname !== undefined ||
+    input.instagram !== undefined ||
+    input.bio !== undefined ||
+    input.age !== undefined
+  ) {
+    user = await usersService.updateProfile(user.id, {
+      nickname: input.nickname,
+      instagram: input.instagram,
+      bio: input.bio,
+      age: input.age,
+    })
+  }
   res.json({ user })
 }
 
