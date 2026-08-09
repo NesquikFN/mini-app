@@ -391,6 +391,10 @@ export async function fetchAdminNotificationLog(
   return request<NotificationLogResponse>(`/admin/notification-log?${params.toString()}`)
 }
 
+export async function clearAdminNotificationLog(): Promise<void> {
+  await request<{ success: boolean }>('/admin/notification-log', { method: 'DELETE' })
+}
+
 export async function deleteAdminUser(id: string): Promise<void> {
   await request<{ success: boolean }>(`/admin/users/${id}`, { method: 'DELETE' })
 }

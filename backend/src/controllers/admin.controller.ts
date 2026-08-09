@@ -166,3 +166,8 @@ export async function listNotificationLog(req: Request, res: Response): Promise<
     pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
   })
 }
+
+export async function clearNotificationLog(_req: Request, res: Response): Promise<void> {
+  await notificationLogRepository.clear()
+  res.json({ success: true })
+}

@@ -96,4 +96,8 @@ export const notificationLogRepository = {
     ])
     return { entries: rows.map(toEntry), total: Number(countRows[0].count) }
   },
+
+  async clear(): Promise<void> {
+    await query('delete from notification_log')
+  },
 }

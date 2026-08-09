@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertCircle, CheckCircle2, History } from 'lucide-react'
+import { AlertCircle, CheckCircle2, History, Trash2 } from 'lucide-react'
+import { Button } from '../../components/Button'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PaginationControls } from '../../components/PaginationControls'
 import { LoadingState } from '../../components/LoadingState'
 import { EmptyState } from '../../components/EmptyState'
-import { fetchAdminNotificationLog, getErrorMessage } from '../../services/api'
+import { clearAdminNotificationLog, fetchAdminNotificationLog, getErrorMessage } from '../../services/api'
 import type { NotificationKind, NotificationLogEntry, NotificationLogResponse } from '../../types/admin'
 
 type Status = 'loading' | 'success' | 'error'
@@ -23,6 +25,8 @@ export function AdminNotificationLogPage() {
   const [data, setData] = useState<NotificationLogResponse | null>(null)
   const [status, setStatus] = useState<Status>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [confirmingClear, setConfirmingClear] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   const runFetch = useCallback(() => {
     fetchAdminNotificationLog(page, LIMIT)
@@ -46,13 +50,35 @@ export function AdminNotificationLogPage() {
     runFetch()
   }, [runFetch])
 
+  async function handleClear() {
+    setClearing(true)
+    setErrorMessage(null)
+    try {
+      await clearAdminNotificationLog()
+      setConfirmingClear(false)
+      setPage(1)
+      retry()
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setClearing(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-lg font-semibold text-[var(--text-primary)]">Журнал сповіщень</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Усі повідомлення, які бот коли-небудь надсилав — кому, коли і чи вдало.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-[var(--text-primary)]">Журнал сповіщень</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            Усі повідомлення, які бот коли-небудь надсилав — кому, коли і чи вдало.
+          </p>
+        </div>
+        {status === 'success' && data && data.entries.length > 0 && (
+          <Button variant="outline" onClick={() => setConfirmingClear(true)}>
+            <Trash2 size={16} /> Очистити
+          </Button>
+        )}
       </div>
 
       {status === 'loading' && <LoadingState label="Завантажуємо журнал…" />}
@@ -70,6 +96,12 @@ export function AdminNotificationLogPage() {
         <EmptyState icon={<History size={34} />} title="Бот ще нічого не надсилав" />
       )}
 
+      {status === 'success' && errorMessage && (
+        <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {errorMessage}
+        </p>
+      )}
+
       {status === 'success' && data && data.entries.length > 0 && (
         <>
           <div className="flex flex-col gap-2">
@@ -79,6 +111,17 @@ export function AdminNotificationLogPage() {
           </div>
           <PaginationControls pagination={data.pagination} onPageChange={setPage} />
         </>
+      )}
+
+      {confirmingClear && (
+        <ConfirmDialog
+          title="Очистити журнал сповіщень?"
+          description="Усі записи про надіслані повідомлення буде видалено безповоротно."
+          confirmLabel="Очистити"
+          loading={clearing}
+          onConfirm={handleClear}
+          onCancel={() => setConfirmingClear(false)}
+        />
       )}
     </div>
   )
