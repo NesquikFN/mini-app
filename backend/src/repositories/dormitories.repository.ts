@@ -19,7 +19,10 @@ function toDormitory(row: DormitoryRow): Dormitory {
 
 export const dormitoriesRepository = {
   async findAll(): Promise<Dormitory[]> {
-    const { rows } = await query<DormitoryRow>('select * from dormitories order by name asc')
+    const { rows } = await query<DormitoryRow>(
+      `select * from dormitories
+       order by case when name = 'Без гуртожитку' then 1 else 0 end, name asc`,
+    )
     return rows.map(toDormitory)
   },
 

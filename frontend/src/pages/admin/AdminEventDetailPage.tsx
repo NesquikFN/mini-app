@@ -8,6 +8,7 @@ import { LoadingState } from '../../components/LoadingState'
 import { EmptyState } from '../../components/EmptyState'
 import { useTelegramBackButton } from '../../hooks/useTelegramBackButton'
 import { useDormitories } from '../../hooks/useDormitories'
+import { FormattedText } from '../../components/FormattedText'
 import { formatEventDate, formatEventTime } from '../../utils/date'
 import {
   deleteAdminEvent,
@@ -142,7 +143,10 @@ export function AdminEventDetailPage() {
       {event.description && (
         <section>
           <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Опис</h2>
-          <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{event.description}</p>
+          <FormattedText
+            text={event.description}
+            className="text-sm leading-relaxed text-[var(--text-secondary)]"
+          />
         </section>
       )}
 

@@ -11,6 +11,7 @@ import { LoadingState } from '../components/LoadingState'
 import { UserRow } from '../components/UserRow'
 import { ParticipantsModal } from '../components/ParticipantsModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { FormattedText } from '../components/FormattedText'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import { fetchEventDetail, fetchEventShareLink, getErrorMessage, type EventDetailResponse } from '../services/api'
 
@@ -318,9 +319,10 @@ export function EventDetailPage() {
             <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
               Опис
             </h2>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">
-              {event.description}
-            </p>
+            <FormattedText
+              text={event.description}
+              className="text-sm leading-relaxed text-[var(--text-secondary)]"
+            />
           </section>
         )}
 
