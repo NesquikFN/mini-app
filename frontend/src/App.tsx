@@ -25,6 +25,7 @@ import { AdminEventsPage } from './pages/admin/AdminEventsPage'
 import { AdminEventDetailPage } from './pages/admin/AdminEventDetailPage'
 import { AdminAdminsPage } from './pages/admin/AdminAdminsPage'
 import { AdminHostsPage } from './pages/admin/AdminHostsPage'
+import { AdminVipsPage } from './pages/admin/AdminVipsPage'
 import { AdminBannedUsersPage } from './pages/admin/AdminBannedUsersPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminNotificationLogPage } from './pages/admin/AdminNotificationLogPage'
@@ -92,6 +93,7 @@ function App() {
                         <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
                         <Route path="/admin/admins" element={<AdminAdminsPage />} />
                         <Route path="/admin/hosts" element={<AdminHostsPage />} />
+                        <Route path="/admin/vips" element={<AdminVipsPage />} />
                         <Route path="/admin/banned" element={<AdminBannedUsersPage />} />
                         <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                         <Route path="/admin/notification-log" element={<AdminNotificationLogPage />} />

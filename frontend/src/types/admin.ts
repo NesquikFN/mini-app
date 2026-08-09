@@ -19,6 +19,7 @@ export type NotificationKind =
   | 'group_announcement'
   | 'personal_announcement'
   | 'event_reminder'
+  | 'join_confirmation'
   | 'start_greeting'
   | 'notifications_off_confirmation'
   | 'registration_approved'
@@ -61,6 +62,10 @@ export interface AdminListItem extends AdminUserView {
 
 export interface HostListItem extends AdminUserView {
   hostSince: string
+}
+
+export interface VipListItem extends AdminUserView {
+  vipSince: string
 }
 
 export interface AdminUserListItem extends AdminUserView {
@@ -138,7 +143,6 @@ export interface EventTemplate {
   id: string
   title: string
   description: string
-  weekday: number
   location: string
   isOnline: boolean
   maxParticipants: number
@@ -154,7 +158,6 @@ export interface EventTemplate {
 export interface EventTemplateInput {
   title: string
   description: string
-  weekday: number
   location: string
   isOnline: boolean
   maxParticipants: number

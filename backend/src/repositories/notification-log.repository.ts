@@ -4,6 +4,7 @@ export type NotificationKind =
   | 'group_announcement'
   | 'personal_announcement'
   | 'event_reminder'
+  | 'join_confirmation'
   | 'start_greeting'
   | 'notifications_off_confirmation'
   | 'registration_approved'

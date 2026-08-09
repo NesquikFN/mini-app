@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Archive, CalendarDays, Clock, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
+import { Archive, CalendarDays, Clock, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -199,6 +199,11 @@ export function EventDetailPage() {
           <div className="inline-flex items-center gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)]">
             <Archive size={18} className="text-[var(--accent)]" />
             Подію завершено та перенесено в архів
+          </div>
+        )}
+        {event.vipOnly && (
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-400">
+            <Crown size={18} /> Подія тільки для VIP
           </div>
         )}
         {event.imageUrl && (

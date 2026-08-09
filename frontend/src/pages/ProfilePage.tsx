@@ -8,6 +8,7 @@ import { ArchivedEventsSection } from '../components/ArchivedEventsSection'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { InstagramIcon } from '../components/InstagramIcon'
+import { RoleBadges } from '../components/RoleBadges'
 import { isEventPast } from '../utils/date'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useAdminStatus } from '../hooks/useAdminStatus'
@@ -105,6 +106,9 @@ export function ProfilePage() {
                 <p className="text-lg font-semibold text-[var(--text-primary)]">
                   {user.nickname ?? user.firstName}
                 </p>
+                <div className="mt-1">
+                  <RoleBadges isAdmin={user.isAdmin} isHost={user.isHost} isVip={user.isVip} />
+                </div>
                 {user.username && (
                   <p className="text-sm text-[var(--text-secondary)]">@{user.username}</p>
                 )}

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  createEventSchema,
   createEventFromTemplateSchema,
   eventTemplateSchema,
 } from './event.schemas'
@@ -8,7 +9,6 @@ import {
 const templateInput = {
   title: 'Мафія',
   description: '',
-  weekday: 5,
   location: 'Онлайн',
   isOnline: true,
   maxParticipants: 12,
@@ -16,16 +16,17 @@ const templateInput = {
 }
 
 describe('event template launch schema', () => {
-  it('creates a template without a stored time', () => {
+  it('creates a template without a stored date or time', () => {
     const parsed = eventTemplateSchema.parse(templateInput)
     assert.equal('time' in parsed, false)
+    assert.equal('weekday' in parsed, false)
     assert.equal(parsed.gameUrlRequired, true)
   })
 
-  it('requires time when the template is launched', () => {
+  it('requires a date and time when the template is launched', () => {
     assert.equal(createEventFromTemplateSchema.safeParse({ gameUrl: null }).success, false)
     assert.equal(
-      createEventFromTemplateSchema.safeParse({ time: '19:30', gameUrl: null }).success,
+      createEventFromTemplateSchema.safeParse({ date: '2099-09-10', time: '19:30', gameUrl: null }).success,
       true,
     )
   })
@@ -33,14 +34,34 @@ describe('event template launch schema', () => {
   it('accepts a valid game URL and rejects non-web protocols', () => {
     assert.equal(
       createEventFromTemplateSchema.safeParse({
+        date: '2099-09-10',
         time: '19:30',
         gameUrl: 'https://example.com/join',
       }).success,
       true,
     )
     assert.equal(
-      createEventFromTemplateSchema.safeParse({ time: '19:30', gameUrl: 'javascript:alert(1)' }).success,
+      createEventFromTemplateSchema.safeParse({ date: '2099-09-10', time: '19:30', gameUrl: 'javascript:alert(1)' }).success,
       false,
     )
+  })
+})
+
+describe('VIP event schema', () => {
+  const eventInput = {
+    title: 'Закрита зустріч',
+    description: '',
+    date: '2099-09-10',
+    time: '19:30',
+    location: 'Хол',
+    maxParticipants: 10,
+  }
+
+  it('keeps ordinary events non-VIP by default', () => {
+    assert.equal(createEventSchema.parse(eventInput).vipOnly, false)
+  })
+
+  it('accepts an explicit VIP-only event flag', () => {
+    assert.equal(createEventSchema.parse({ ...eventInput, vipOnly: true }).vipOnly, true)
   })
 })

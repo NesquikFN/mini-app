@@ -9,8 +9,9 @@ import { LoadingState } from '../components/LoadingState'
 import { FilterTabs } from '../components/FilterTabs'
 import type { EventsScope } from '../context/EventsContext'
 import { isEventPast, isSameDay, isWithinNextDays } from '../utils/date'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 
-type FilterValue = 'all' | 'today' | 'week' | 'online' | 'archive'
+type FilterValue = 'all' | 'today' | 'week' | 'online' | 'vip' | 'archive'
 
 const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
   { value: 'all', label: 'Усі' },
@@ -27,6 +28,7 @@ const DORM_FILTER_OPTIONS: { value: EventsScope; label: string }[] = [
 
 export function EventsPage() {
   const { events, status, errorMessage, reload, scope, setScope } = useEvents()
+  const { user } = useCurrentUser()
   const [filter, setFilter] = useState<FilterValue>('all')
   const location = useLocation()
   const navigate = useNavigate()
@@ -51,6 +53,7 @@ export function EventsPage() {
       if (filter === 'today') return isSameDay(event.date, new Date())
       if (filter === 'week') return isWithinNextDays(event.date, 7)
       if (filter === 'online') return event.isOnline
+      if (filter === 'vip') return event.vipOnly
       return true
     })
     .sort((a, b) =>
@@ -70,7 +73,11 @@ export function EventsPage() {
       )}
 
       <FilterTabs options={DORM_FILTER_OPTIONS} value={scope} onChange={setScope} />
-      <FilterTabs options={FILTER_OPTIONS} value={filter} onChange={setFilter} />
+      <FilterTabs
+        options={user?.isVip ? [...FILTER_OPTIONS.slice(0, 4), { value: 'vip', label: 'VIP' }, FILTER_OPTIONS[4]] : FILTER_OPTIONS}
+        value={filter}
+        onChange={setFilter}
+      />
 
       <div className="flex flex-col gap-3 px-4 py-4">
         {status === 'loading' && <LoadingState label="Завантажуємо події…" />}

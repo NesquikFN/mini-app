@@ -15,6 +15,7 @@ interface EventRow {
   group_url: string | null
   game_url: string | null
   is_online: boolean
+  is_vip_only: boolean
   date: string
   time: string
   location: string
@@ -33,6 +34,7 @@ export interface NewEvent {
   groupUrl?: string
   gameUrl?: string
   isOnline: boolean
+  vipOnly: boolean
   date: string
   time: string
   location: string
@@ -62,6 +64,7 @@ function toEvent(row: EventRow): Event {
     groupUrl: row.group_url ?? undefined,
     gameUrl: row.game_url ?? undefined,
     isOnline: row.is_online,
+    vipOnly: row.is_vip_only,
     date: row.date,
     time: row.time,
     location: row.location,
@@ -85,6 +88,9 @@ function translateJoinError(error: unknown): never {
   if (message.includes('EVENT_FULL')) {
     throw new AppError(409, 'EVENT_FULL', 'Місць більше немає')
   }
+  if (message.includes('EVENT_VIP_REQUIRED')) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   throw error
 }
 
@@ -92,13 +98,20 @@ export const eventsRepository = {
   /** dormitoryId — необов'язковий server-side фільтр (звідки саме він
    * узятий і чи довіряти йому, вирішує events.service, не тут). Без
    * нього — усі гуртожитки. */
-  async findAll(dormitoryId?: string): Promise<Event[]> {
+  async findAll(dormitoryId?: string, includeVip = false): Promise<Event[]> {
     // Physical events stay scoped to the selected dormitory, while
     // online events are global and must be visible to everyone.
-    const where = dormitoryId ? 'where e.dormitory_id = $1 or e.is_online = true' : ''
+    const conditions: string[] = []
+    const params: unknown[] = []
+    if (dormitoryId) {
+      params.push(dormitoryId)
+      conditions.push(`(e.dormitory_id = $${params.length} or e.is_online = true)`)
+    }
+    if (!includeVip) conditions.push('e.is_vip_only = false')
+    const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : ''
     const { rows } = await query<EventRow>(
       `${EVENTS_BASE_SELECT} ${where} group by e.id order by e.date asc`,
-      dormitoryId ? [dormitoryId] : [],
+      params,
     )
     return rows.map(toEvent)
   },
@@ -156,8 +169,8 @@ export const eventsRepository = {
     const { rows } = await query<{ id: string }>(
       `insert into events
          (creator_id, title, description, image_url, group_url, game_url, is_online,
-          date, time, location, max_participants, dormitory_id, source_template_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          is_vip_only, date, time, location, max_participants, dormitory_id, source_template_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        returning id`,
       [
         newEvent.creatorId,
@@ -167,6 +180,7 @@ export const eventsRepository = {
         newEvent.groupUrl || null,
         newEvent.gameUrl || null,
         newEvent.isOnline,
+        newEvent.vipOnly,
         newEvent.date,
         newEvent.time,
         newEvent.location,
@@ -198,6 +212,7 @@ export const eventsRepository = {
     if (patch.groupUrl !== undefined) columns.group_url = patch.groupUrl || null
     if (patch.gameUrl !== undefined) columns.game_url = patch.gameUrl || null
     if (patch.isOnline !== undefined) columns.is_online = patch.isOnline
+    if (patch.vipOnly !== undefined) columns.is_vip_only = patch.vipOnly
     if (patch.date !== undefined) columns.date = patch.date
     if (patch.time !== undefined) columns.time = patch.time
     if (patch.location !== undefined) columns.location = patch.location
@@ -252,10 +267,11 @@ export const eventsRepository = {
     return rows.map((row) => row.user_id)
   },
 
-  async getParticipantTelegramIds(eventId: string): Promise<number[]> {
+  async getParticipantTelegramIds(eventId: string, vipOnly = false): Promise<number[]> {
     const { rows } = await query<{ telegram_id: string }>(
       `select u.telegram_id from event_participants ep
        join users u on u.id = ep.user_id
+       ${vipOnly ? 'join vip_users v on v.user_id = u.id' : ''}
        where ep.event_id = $1`,
       [eventId],
     )

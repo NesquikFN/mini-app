@@ -14,6 +14,7 @@ import type {
   EventTemplate,
   EventTemplateInput,
   HostListItem,
+  VipListItem,
   NotificationLogResponse,
   RegistrationDetail,
   RegistrationsResponse,
@@ -312,6 +313,8 @@ export async function fetchCurrentUser(): Promise<AuthUser> {
 export interface PublicProfileResponse {
   user: PublicUser
   isAdmin: boolean
+  isHost: boolean
+  isVip: boolean
   createdEvents: DormEvent[]
 }
 
@@ -537,6 +540,23 @@ export async function removeHost(userId: string): Promise<void> {
   await request<{ success: boolean }>(`/admin/hosts/${userId}`, { method: 'DELETE' })
 }
 
+export async function fetchAdminVips(): Promise<VipListItem[]> {
+  const data = await request<{ vips: VipListItem[] }>('/admin/vips')
+  return data.vips
+}
+
+export async function addVipByTelegramId(telegramId: number): Promise<VipListItem> {
+  const data = await request<{ vip: VipListItem }>('/admin/vips', {
+    method: 'POST',
+    body: JSON.stringify({ telegramId }),
+  })
+  return data.vip
+}
+
+export async function removeVip(userId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/vips/${userId}`, { method: 'DELETE' })
+}
+
 export async function fetchEventTemplates(): Promise<EventTemplate[]> {
   const data = await request<{ templates: EventTemplate[] }>('/event-templates')
   return data.templates
@@ -583,12 +603,13 @@ export async function deleteEventTemplate(id: string): Promise<void> {
 
 export async function createEventFromTemplate(
   id: string,
+  date: string,
   time: string,
   gameUrl: string | null,
 ): Promise<DormEvent> {
   const data = await request<{ event: DormEvent }>(
     `/event-templates/${id}/create-event`,
-    { method: 'POST', body: JSON.stringify({ time, gameUrl }) },
+    { method: 'POST', body: JSON.stringify({ date, time, gameUrl }) },
   )
   return data.event
 }

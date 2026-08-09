@@ -5,13 +5,14 @@ import {
   type EventTemplateInput,
 } from '../repositories/event-templates.repository'
 import { AppError } from '../utils/AppError'
-import { addDaysToISODate, kyivNow } from '../utils/kyivTime'
+import { kyivNow } from '../utils/kyivTime'
 import type { Event } from '../types/event'
 import type { PublicUser } from '../types/user'
 import type { EventTemplate } from '../types/admin'
 import type { CreateEventInput, UpdateEventInput } from '../validation/event.schemas'
 import { settingsRepository } from '../repositories/settings.repository'
-import { sendEventAnnouncement } from './telegram-notifications.service'
+import { sendEventAnnouncement, sendEventJoinConfirmation } from './telegram-notifications.service'
+import { vipsRepository } from '../repositories/vips.repository'
 
 export interface EventResponse {
   id: string
@@ -22,6 +23,7 @@ export interface EventResponse {
   groupUrl?: string
   gameUrl?: string
   isOnline: boolean
+  vipOnly: boolean
   date: string
   time: string
   location: string
@@ -55,6 +57,7 @@ function toEventResponse(event: Event): EventResponse {
     groupUrl: event.groupUrl,
     gameUrl: event.gameUrl,
     isOnline: event.isOnline,
+    vipOnly: event.vipOnly,
     date: event.date,
     time: event.time,
     location: event.location,
@@ -105,19 +108,25 @@ export type EventsScope = 'mine' | 'all'
 export async function listEvents(
   scope: EventsScope,
   userDormitoryId: string | undefined,
+  userId: string,
 ): Promise<EventResponse[]> {
+  const includeVip = await vipsRepository.isVip(userId)
   if (scope === 'mine') {
     if (!userDormitoryId) return []
-    const events = await eventsRepository.findAll(userDormitoryId)
+    const events = await eventsRepository.findAll(userDormitoryId, includeVip)
     return attachParticipantPreviews(events.map(toEventResponse))
   }
 
-  const events = await eventsRepository.findAll()
+  const events = await eventsRepository.findAll(undefined, includeVip)
   return attachParticipantPreviews(events.map(toEventResponse))
 }
 
-export async function getEvent(id: string): Promise<EventResponse> {
-  return attachParticipantPreview(toEventResponse(await getEventOrThrow(id)))
+export async function getEvent(id: string, viewerId?: string): Promise<EventResponse> {
+  const event = await getEventOrThrow(id)
+  if (event.vipOnly && viewerId && !(await vipsRepository.isVip(viewerId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
+  return attachParticipantPreview(toEventResponse(event))
 }
 
 export interface EventMembers {
@@ -164,6 +173,9 @@ export async function createEvent(
       'Спочатку оберіть гуртожиток у профілі',
     )
   }
+  if (input.vipOnly && !(await vipsRepository.isVip(creatorId))) {
+    throw new AppError(403, 'VIP_ACCESS_REQUIRED', 'Недостатньо прав для VIP-події')
+  }
 
   const event = await eventsRepository.insert({
     creatorId,
@@ -172,6 +184,7 @@ export async function createEvent(
     groupUrl: input.groupUrl,
     gameUrl: input.gameUrl,
     isOnline: input.isOnline,
+    vipOnly: input.vipOnly,
     date: input.date,
     time: input.time,
     location: input.location,
@@ -193,7 +206,7 @@ export async function announceEvent(event: EventResponse): Promise<void> {
 
   try {
     const settings = await settingsRepository.getNotificationSettings()
-    if (settings.chatId) {
+    if (settings.chatId && !event.vipOnly) {
       await sendEventAnnouncement(settings.chatId, event, creatorInfo, settings.threadId)
     }
   } catch (error) {
@@ -204,6 +217,7 @@ export async function announceEvent(event: EventResponse): Promise<void> {
   // Офлайн-подія лишається в межах свого гуртожитку — так само й тут.
   const subscriberIds = await usersRepository.getSubscribedTelegramIds(
     event.isOnline ? undefined : event.dormitoryId,
+    event.vipOnly,
   )
   await Promise.all(
     subscriberIds.map(async (telegramId) => {
@@ -234,6 +248,9 @@ export async function updateOwnEvent(
   if (event.creatorId !== creatorId) {
     throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Редагувати подію може лише її автор')
   }
+  if ((event.vipOnly || input.vipOnly) && !(await vipsRepository.isVip(creatorId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   if (
     input.maxParticipants !== undefined &&
     input.maxParticipants < event.participantIds.length
@@ -258,6 +275,9 @@ export async function deleteEvent(id: string): Promise<void> {
 
 export async function deleteOwnEvent(id: string, creatorId: string): Promise<void> {
   const event = await getEventOrThrow(id)
+  if (event.vipOnly && !(await vipsRepository.isVip(creatorId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   if (event.creatorId !== creatorId) {
     throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Видалити подію може лише її автор')
   }
@@ -270,6 +290,9 @@ export async function removeOwnEventParticipant(
   participantId: string,
 ): Promise<EventResponse> {
   const event = await getEventOrThrow(eventId)
+  if (event.vipOnly && !(await vipsRepository.isVip(creatorId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   if (event.creatorId !== creatorId) {
     throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Видаляти учасників може лише автор події')
   }
@@ -285,6 +308,9 @@ export async function removeOwnEventParticipant(
 
 export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {
   const event = await getEventOrThrow(eventId)
+  if (event.vipOnly && !(await vipsRepository.isVip(userId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   const now = kyivNow()
   if (`${event.date}T${event.time.slice(0, 5)}` < `${now.date}T${now.time}`) {
     throw new AppError(409, 'EVENT_ARCHIVED', 'Цю подію вже завершено')
@@ -296,11 +322,21 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
   // participantPreview у відповіді дозволяє EventsProvider оновити
   // avatar-стек на картці, підмінивши лише цю подію в списку — без
   // повторного GET /api/events для всіх подій одразу.
-  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
+  const response = await attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
+  const participant = await usersRepository.getUserById(userId)
+  if (participant) {
+    await sendEventJoinConfirmation(String(participant.telegramId), response).catch((error) => {
+      console.error(`Не вдалося надіслати підтвердження приєднання користувачу ${userId}:`, error)
+    })
+  }
+  return response
 }
 
 export async function leaveEvent(eventId: string, userId: string): Promise<EventResponse> {
-  await getEventOrThrow(eventId)
+  const event = await getEventOrThrow(eventId)
+  if (event.vipOnly && !(await vipsRepository.isVip(userId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
 
   const removed = await eventsRepository.removeParticipant(eventId, userId)
   if (!removed) {
@@ -312,14 +348,20 @@ export async function leaveEvent(eventId: string, userId: string): Promise<Event
 
 /** Один batch-запит прев'ю на ОБИДВА списки разом (а не по одному на
  * кожен) — id подій об'єднуються перед єдиним викликом repository. */
-export async function listEventsForUser(userId: string): Promise<UserEvents> {
+export async function listEventsForUser(
+  userId: string,
+  viewerId = userId,
+  privileged = false,
+): Promise<UserEvents> {
   const [created, participating] = await Promise.all([
     eventsRepository.getUserCreatedEvents(userId),
     eventsRepository.getUserParticipatingEvents(userId),
   ])
 
-  const createdResponses = created.map(toEventResponse)
-  const participatingResponses = participating.map(toEventResponse)
+  const includeVip = privileged || await vipsRepository.isVip(viewerId)
+  const visible = (event: Event): boolean => includeVip || !event.vipOnly
+  const createdResponses = created.filter(visible).map(toEventResponse)
+  const participatingResponses = participating.filter(visible).map(toEventResponse)
   const previews = await eventsRepository.findParticipantPreviews([
     ...new Set([...createdResponses, ...participatingResponses].map((event) => event.id)),
   ])
@@ -365,20 +407,14 @@ export async function deleteEventTemplate(id: string): Promise<void> {
   if (!removed) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
 }
 
-function nextTemplateDate(weekday: number, time: string): string {
-  const now = kyivNow()
-  let daysAhead = (weekday - now.weekday + 7) % 7
-  if (daysAhead === 0 && time <= now.time) daysAhead = 7
-  return addDaysToISODate(now.date, daysAhead)
-}
-
 export async function createEventFromTemplate(
   templateId: string,
   creatorId: string,
   creatorDormitoryId: string | undefined,
-  /** Час завжди вводиться під час запуску. null для gameUrl означає, що
+  /** Дата й час завжди вводяться під час запуску. null для gameUrl означає, що
    * користувач свідомо залишив поле порожнім; undefined — старий клієнт,
    * для якого використовуємо значення шаблону. */
+  date: string,
   time: string,
   overrideGameUrl?: string | null,
 ): Promise<EventResponse> {
@@ -399,10 +435,11 @@ export async function createEventFromTemplate(
       {
         title: template.title,
         description: template.description,
-        date: nextTemplateDate(template.weekday, time),
+        date,
         time,
         location: template.isOnline ? 'Онлайн' : template.location,
         isOnline: template.isOnline,
+        vipOnly: false,
         maxParticipants: template.maxParticipants,
         groupUrl: template.groupUrl,
         gameUrl,
@@ -422,7 +459,7 @@ export async function createEventFromTemplate(
       'code' in error &&
       error.code === '23505'
     ) {
-      throw new AppError(409, 'EVENT_ALREADY_CREATED', 'Найближчу подію з цього шаблону вже створено')
+      throw new AppError(409, 'EVENT_ALREADY_CREATED', 'Подію з цього шаблону на обрану дату вже створено')
     }
     throw error
   }

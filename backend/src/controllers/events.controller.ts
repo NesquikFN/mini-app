@@ -12,12 +12,12 @@ import { AppError } from '../utils/AppError'
 
 export async function listEvents(req: Request, res: Response): Promise<void> {
   const { scope } = eventsListQuerySchema.parse(req.query)
-  res.json({ events: await eventsService.listEvents(scope, req.user.dormitoryId) })
+  res.json({ events: await eventsService.listEvents(scope, req.user.dormitoryId, req.user.id) })
 }
 
 export async function getEvent(req: Request, res: Response): Promise<void> {
   const { id } = eventIdParamSchema.parse(req.params)
-  const event = await eventsService.getEvent(id)
+  const event = await eventsService.getEvent(id, req.user.id)
   const { creator, participants } = await eventsService.getEventMembers(event)
   res.json({ event, creator, participants })
 }
@@ -53,7 +53,7 @@ export async function removeParticipant(req: Request, res: Response): Promise<vo
 
 export async function uploadEventImage(req: Request, res: Response): Promise<void> {
   const { id } = eventIdParamSchema.parse(req.params)
-  const event = await eventsService.getEvent(id)
+  const event = await eventsService.getEvent(id, req.user.id)
   if (event.creatorId !== req.user.id) {
     throw new AppError(403, 'EVENT_IMAGE_FORBIDDEN', 'Фото може змінювати лише автор події')
   }

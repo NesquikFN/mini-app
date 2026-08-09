@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Ban, Bell, CalendarDays, ClipboardList, History, LayoutDashboard, ShieldCheck, Sparkles, Users } from 'lucide-react'
+import { ArrowLeft, Ban, Bell, CalendarDays, ClipboardList, Crown, History, LayoutDashboard, ShieldCheck, Sparkles, Users } from 'lucide-react'
 import { fetchAdminRegistrations } from '../services/api'
 
 // "Ігри" (шаблони подій) переїхали в головну навігацію (BottomNavigation)
@@ -12,6 +12,7 @@ const TABS = [
   { to: '/admin/registrations', label: 'Заявки', icon: ClipboardList, end: false },
   { to: '/admin/admins', label: 'Адміни', icon: ShieldCheck, end: false },
   { to: '/admin/hosts', label: 'Хости', icon: Sparkles, end: false },
+  { to: '/admin/vips', label: 'VIP', icon: Crown, end: false },
   { to: '/admin/banned', label: 'ЧС', icon: Ban, end: false },
   { to: '/admin/notifications', label: 'Сповіщення', icon: Bell, end: false },
   { to: '/admin/notification-log', label: 'Журнал', icon: History, end: false },

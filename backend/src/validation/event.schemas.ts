@@ -47,6 +47,7 @@ export const createEventSchema = z.object({
   gameUrl: gameUrlSchema.optional(),
   deferNotification: z.boolean().optional(),
   isOnline: z.boolean().default(false),
+  vipOnly: z.boolean().default(false),
   maxParticipants: z
     .number('Максимальна кількість учасників має бути числом')
     .int('Має бути цілим числом')
@@ -83,6 +84,7 @@ export const eventTemplateIdParamSchema = z.object({
 })
 
 export const createEventFromTemplateSchema = z.object({
+  date: dateSchema,
   time: timeSchema,
   gameUrl: gameUrlSchema.nullable().optional(),
 })
@@ -91,7 +93,6 @@ export const eventTemplateSchema = z
   .object({
     title: z.string().trim().min(1, 'Назва обовʼязкова'),
     description: z.string().trim().default(''),
-    weekday: z.number().int().min(0).max(6),
     location: z.string().trim().min(1, 'Місце обовʼязкове'),
     isOnline: z.boolean().default(false),
     maxParticipants: z.number().int().positive(),

@@ -7,6 +7,7 @@ export interface Event {
   groupUrl?: string
   gameUrl?: string
   isOnline: boolean
+  vipOnly: boolean
   date: string
   time: string
   location: string

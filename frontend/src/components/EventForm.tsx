@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
-import { ImagePlus, MonitorPlay, X } from 'lucide-react'
+import { Crown, ImagePlus, MonitorPlay, X } from 'lucide-react'
 import { Button } from './Button'
 import type { CreateEventInput, DormEvent } from '../types/event'
 import { todayISODate } from '../utils/date'
@@ -10,6 +10,7 @@ interface EventFormProps {
   initialValues?: DormEvent
   submitLabel?: string
   submittingLabel?: string
+  canCreateVipOnly?: boolean
 }
 
 interface FormErrors {
@@ -20,6 +21,7 @@ interface FormErrors {
   maxParticipants?: string
   image?: string
   groupUrl?: string
+  gameUrl?: string
 }
 
 export function EventForm({
@@ -28,6 +30,7 @@ export function EventForm({
   initialValues,
   submitLabel = 'Створити подію',
   submittingLabel = 'Створюємо…',
+  canCreateVipOnly = false,
 }: EventFormProps) {
   const [title, setTitle] = useState(initialValues?.title ?? '')
   const [description, setDescription] = useState(initialValues?.description ?? '')
@@ -38,7 +41,9 @@ export function EventForm({
     initialValues ? String(initialValues.maxParticipants) : '',
   )
   const [groupUrl, setGroupUrl] = useState(initialValues?.groupUrl ?? '')
+  const [gameUrl, setGameUrl] = useState(initialValues?.gameUrl ?? '')
   const [isOnline, setIsOnline] = useState(initialValues?.isOnline ?? false)
+  const [vipOnly, setVipOnly] = useState(initialValues?.vipOnly ?? false)
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | undefined>(initialValues?.imageUrl)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -68,6 +73,16 @@ export function EventForm({
         } catch {
           nextErrors.groupUrl = 'Вкажіть @name або коректне посилання'
         }
+      }
+    }
+    if (gameUrl.trim()) {
+      try {
+        const url = new URL(gameUrl.trim())
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          nextErrors.gameUrl = 'Вкажіть коректне посилання на гру'
+        }
+      } catch {
+        nextErrors.gameUrl = 'Вкажіть коректне посилання на гру'
       }
     }
     return nextErrors
@@ -110,7 +125,9 @@ export function EventForm({
       location: isOnline ? 'Онлайн' : location.trim(),
       maxParticipants: Number(maxParticipants),
       groupUrl: groupUrl.trim() || undefined,
+      gameUrl: gameUrl.trim() || undefined,
       isOnline,
+      vipOnly: canCreateVipOnly ? vipOnly : false,
       imageFile,
     })
   }
@@ -212,6 +229,26 @@ export function EventForm({
         />
       </label>
 
+      {canCreateVipOnly && (
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <span className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/15 text-amber-400">
+              <Crown size={20} />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-[var(--text-primary)]">Тільки для VIP</span>
+              <span className="block text-xs text-[var(--text-secondary)]">Інші користувачі не побачать цю подію</span>
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={vipOnly}
+            onChange={(event) => setVipOnly(event.target.checked)}
+            className="h-5 w-5 accent-amber-400"
+          />
+        </label>
+      )}
+
       {!isOnline && (
         <Field label="Місце" error={errors.location}>
           <input
@@ -231,6 +268,16 @@ export function EventForm({
           onChange={(e) => setGroupUrl(e.target.value)}
           placeholder="@name або https://t.me/name"
           className={inputClass(!!errors.groupUrl)}
+        />
+      </Field>
+
+      <Field label="Посилання на гру" error={errors.gameUrl}>
+        <input
+          type="url"
+          value={gameUrl}
+          onChange={(event) => setGameUrl(event.target.value)}
+          placeholder="https://game.example/join"
+          className={inputClass(!!errors.gameUrl)}
         />
       </Field>
 

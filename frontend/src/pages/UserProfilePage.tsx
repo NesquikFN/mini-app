@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Cake, CalendarX, Home, ShieldCheck, UserRoundX } from 'lucide-react'
+import { Cake, CalendarX, Home, UserRoundX } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { EventCard } from '../components/EventCard'
@@ -9,6 +9,7 @@ import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/PageHeader'
 import { InstagramIcon } from '../components/InstagramIcon'
 import { isEventPast } from '../utils/date'
+import { RoleBadges } from '../components/RoleBadges'
 import { useDormitories } from '../hooks/useDormitories'
 import {
   fetchPublicUser,
@@ -86,11 +87,14 @@ export function UserProfilePage() {
                     @{profile.user.username}
                   </p>
                 )}
-                {profile.isAdmin && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft-bg)] px-2 py-1 text-xs font-semibold text-[var(--accent)]">
-                    <ShieldCheck size={13} /> Адмін
-                  </span>
-                )}
+              </div>
+              <div className="mt-2">
+                <RoleBadges
+                  isAdmin={profile.isAdmin}
+                  isHost={profile.isHost}
+                  isVip={profile.isVip}
+                  centered
+                />
               </div>
               <p className="mt-4 inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
                 <Home size={16} />

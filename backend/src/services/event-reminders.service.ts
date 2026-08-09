@@ -20,7 +20,7 @@ export async function sendDueReminders(): Promise<void> {
   const dueEvents = await eventsRepository.findDueForReminder(nowTs, windowEndTs)
 
   for (const event of dueEvents) {
-    const telegramIds = await eventsRepository.getParticipantTelegramIds(event.id)
+    const telegramIds = await eventsRepository.getParticipantTelegramIds(event.id, event.vipOnly)
     await Promise.all(
       telegramIds.map(async (telegramId) => {
         try {

@@ -77,6 +77,7 @@ export function EditEventPage() {
           submitting={submitting}
           submitLabel="Зберегти зміни"
           submittingLabel="Зберігаємо…"
+          canCreateVipOnly={Boolean(user.isVip)}
         />
       </div>
     </div>

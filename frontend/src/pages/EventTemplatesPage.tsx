@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Bell, BellOff, CalendarDays, CalendarPlus, Gamepad2, ImagePlus, Link2, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Bell, BellOff, CalendarPlus, Gamepad2, ImagePlus, Link2, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -18,18 +18,8 @@ import {
   updateEventTemplate,
   updateMyNotifyNewEvents,
 } from '../services/api'
-import { formatEventDate } from '../utils/date'
+import { formatEventDate, todayISODate } from '../utils/date'
 import type { EventTemplate, EventTemplateInput } from '../types/admin'
-
-const WEEKDAYS = [
-  { value: 1, label: 'Понеділок' },
-  { value: 2, label: 'Вівторок' },
-  { value: 3, label: 'Середа' },
-  { value: 4, label: 'Четвер' },
-  { value: 5, label: 'Пʼятниця' },
-  { value: 6, label: 'Субота' },
-  { value: 0, label: 'Неділя' },
-]
 
 type Status = 'loading' | 'success' | 'error'
 
@@ -52,6 +42,7 @@ export function EventTemplatesPage() {
   const [canManage, setCanManage] = useState(false)
   const [notifyToggling, setNotifyToggling] = useState(false)
   const [publishing, setPublishing] = useState<EventTemplate | null>(null)
+  const [publishDate, setPublishDate] = useState('')
   const [publishTime, setPublishTime] = useState('')
   const [publishGameUrl, setPublishGameUrl] = useState('')
   const [publishSaving, setPublishSaving] = useState(false)
@@ -112,6 +103,7 @@ export function EventTemplatesPage() {
 
   function openPublishDialog(template: EventTemplate) {
     setPublishing(template)
+    setPublishDate('')
     setPublishTime('')
     setPublishGameUrl(template.gameUrl ?? '')
     setErrorMessage(null)
@@ -124,6 +116,7 @@ export function EventTemplatesPage() {
     try {
       const event = await createEventFromTemplate(
         publishing.id,
+        publishDate,
         publishTime,
         publishGameUrl.trim() || null,
       )
@@ -238,7 +231,6 @@ export function EventTemplatesPage() {
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate font-semibold text-[var(--text-primary)]">{template.title}</h2>
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
-                    <span className="inline-flex items-center gap-1"><CalendarDays size={13} /> {weekdayLabel(template.weekday)}</span>
                     <span className="inline-flex items-center gap-1"><MapPin size={13} /> {template.isOnline ? 'Онлайн' : template.location}</span>
                     {(template.gameUrl || template.gameUrlRequired) && (
                       <span className="inline-flex items-center gap-1">
@@ -296,19 +288,29 @@ export function EventTemplatesPage() {
               }}
             >
               <p className="text-base font-semibold text-[var(--text-primary)]">
-                На який час створити «{publishing.title}»?
+                Коли провести «{publishing.title}»?
               </p>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Дата підбереться автоматично — найближчий {weekdayLabel(publishing.weekday).toLowerCase()}.
+                Оберіть дату та час для нової події.
               </p>
-              <input
-                required
-                type="time"
-                autoFocus
-                value={publishTime}
-                onChange={(event) => setPublishTime(event.target.value)}
-                className={`${inputClass} mt-4`}
-              />
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <input
+                  required
+                  type="date"
+                  min={todayISODate()}
+                  autoFocus
+                  value={publishDate}
+                  onChange={(event) => setPublishDate(event.target.value)}
+                  className={inputClass}
+                />
+                <input
+                  required
+                  type="time"
+                  value={publishTime}
+                  onChange={(event) => setPublishTime(event.target.value)}
+                  className={inputClass}
+                />
+              </div>
               <label className="mt-4 flex flex-col gap-1.5 text-sm text-[var(--text-primary)]">
                 Посилання на гру {publishing.gameUrlRequired ? '(обовʼязково)' : '(необовʼязково)'}
                 <input
@@ -328,7 +330,7 @@ export function EventTemplatesPage() {
                   type="submit"
                   fullWidth
                   loading={publishSaving}
-                  disabled={!publishTime || (publishing.gameUrlRequired && !publishGameUrl.trim())}
+                  disabled={!publishDate || !publishTime || (publishing.gameUrlRequired && !publishGameUrl.trim())}
                 >
                   Створити
                 </Button>
@@ -355,7 +357,6 @@ function TemplateForm({
   const { dormitories } = useDormitories()
   const [title, setTitle] = useState(template?.title ?? '')
   const [description, setDescription] = useState(template?.description ?? '')
-  const [weekday, setWeekday] = useState(template?.weekday ?? 5)
   const [isOnline, setIsOnline] = useState(template?.isOnline ?? false)
   const [location, setLocation] = useState(template?.isOnline ? '' : template?.location ?? '')
   const [maxParticipants, setMaxParticipants] = useState(String(template?.maxParticipants ?? 12))
@@ -388,7 +389,6 @@ function TemplateForm({
     onSubmit({
       title: title.trim(),
       description: description.trim(),
-      weekday,
       isOnline,
       location: isOnline ? 'Онлайн' : location.trim(),
       maxParticipants: Number(maxParticipants),
@@ -419,9 +419,6 @@ function TemplateForm({
         <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} className="sr-only" />
       </label>
       {imageError && <p className="-mt-2 text-xs text-red-400">{imageError}</p>}
-      <select value={weekday} onChange={(event) => setWeekday(Number(event.target.value))} className={inputClass}>
-        {WEEKDAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}
-      </select>
       <label className="flex items-center justify-between rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 py-3 text-sm text-[var(--text-primary)]">
         Онлайн-подія
         <input type="checkbox" checked={isOnline} onChange={(event) => setIsOnline(event.target.checked)} className="h-5 w-5 accent-[var(--accent)]" />
@@ -450,7 +447,3 @@ function TemplateForm({
 }
 
 const inputClass = 'w-full rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 py-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-disabled)] focus:border-[var(--accent)]'
-
-function weekdayLabel(value: number): string {
-  return WEEKDAYS.find((day) => day.value === value)?.label ?? ''
-}

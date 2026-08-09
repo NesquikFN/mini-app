@@ -190,12 +190,17 @@ export const usersRepository = {
    * події (окремо від групового чату) — для announceEvent у events.service.ts.
    * dormitoryId — фільтр для офлайн-подій (сповіщає лише підписників
    * свого гуртожитку); без нього (онлайн-подія) — усі підписники. */
-  async getSubscribedTelegramIds(dormitoryId?: string): Promise<number[]> {
+  async getSubscribedTelegramIds(dormitoryId?: string, vipOnly = false): Promise<number[]> {
+    const vipJoin = vipOnly ? 'join vip_users v on v.user_id = users.id' : ''
+    const conditions = ['notify_new_events = true']
+    const params: unknown[] = []
+    if (dormitoryId) {
+      params.push(dormitoryId)
+      conditions.push(`dormitory_id = $${params.length}`)
+    }
     const { rows } = await query<{ telegram_id: string }>(
-      dormitoryId
-        ? 'select telegram_id from users where notify_new_events = true and dormitory_id = $1'
-        : 'select telegram_id from users where notify_new_events = true',
-      dormitoryId ? [dormitoryId] : [],
+      `select telegram_id from users ${vipJoin} where ${conditions.join(' and ')}`,
+      params,
     )
     return rows.map((row) => Number(row.telegram_id))
   },

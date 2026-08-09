@@ -158,6 +158,22 @@ export async function removeHost(req: Request, res: Response): Promise<void> {
   res.json({ success: true })
 }
 
+export async function listVips(_req: Request, res: Response): Promise<void> {
+  res.json({ vips: await adminService.listVips() })
+}
+
+export async function addVip(req: Request, res: Response): Promise<void> {
+  const { telegramId } = addAdminSchema.parse(req.body)
+  const vip = await adminService.addVipByTelegramId(telegramId)
+  res.status(201).json({ vip })
+}
+
+export async function removeVip(req: Request, res: Response): Promise<void> {
+  const { userId } = adminUserIdParamSchema.parse(req.params)
+  await adminService.removeVip(userId)
+  res.json({ success: true })
+}
+
 export async function listNotificationLog(req: Request, res: Response): Promise<void> {
   const { page, limit } = notificationLogQuerySchema.parse(req.query)
   const { entries, total } = await notificationLogRepository.listPaginated(page, limit)

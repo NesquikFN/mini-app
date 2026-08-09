@@ -5,7 +5,7 @@ import * as registrationService from '../services/registration.service'
 import { updateMeSchema, submitRegistrationSchema } from '../validation/user.schemas'
 
 export async function getMe(req: Request, res: Response): Promise<void> {
-  res.json({ user: req.user })
+  res.json({ user: await usersService.withRoles(req.user) })
 }
 
 export async function updateMe(req: Request, res: Response): Promise<void> {
@@ -30,15 +30,15 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
       age: input.age,
     })
   }
-  res.json({ user })
+  res.json({ user: await usersService.withRoles(user) })
 }
 
 export async function getMyEvents(req: Request, res: Response): Promise<void> {
-  res.json(await eventsService.listEventsForUser(req.user.id))
+  res.json(await eventsService.listEventsForUser(req.user.id, req.user.id))
 }
 
 export async function submitRegistration(req: Request, res: Response): Promise<void> {
   const input = submitRegistrationSchema.parse(req.body)
   const user = await registrationService.submitRegistration(req.user.id, input)
-  res.json({ user })
+  res.json({ user: await usersService.withRoles(user) })
 }

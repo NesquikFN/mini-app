@@ -71,6 +71,10 @@ export interface HostListItem extends AdminUserView {
   hostSince: string
 }
 
+export interface VipListItem extends AdminUserView {
+  vipSince: string
+}
+
 export interface RegistrationListItem {
   id: string
   telegramId: number
@@ -101,7 +105,6 @@ export interface EventTemplate {
   id: string
   title: string
   description: string
-  weekday: number
   location: string
   isOnline: boolean
   maxParticipants: number

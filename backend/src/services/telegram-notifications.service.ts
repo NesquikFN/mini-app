@@ -389,3 +389,33 @@ export async function sendEventReminder(
     { id: event.id, title: event.title },
   )
 }
+
+/** Особисте підтвердження після успішного приєднання. Посилання
+ * надсилаються окремими Telegram-кнопками, якщо організатор їх указав. */
+export async function sendEventJoinConfirmation(
+  chatId: string,
+  event: Pick<EventResponse, 'id' | 'title' | 'gameUrl' | 'groupUrl'>,
+): Promise<void> {
+  const buttons: Array<Array<{ text: string; url: string }>> = []
+  if (event.gameUrl) buttons.push([{ text: '🎮 Відкрити гру', url: event.gameUrl }])
+  if (event.groupUrl) buttons.push([{ text: '💬 Відкрити чат', url: event.groupUrl }])
+
+  const text = [
+    `✅ Ви приєдналися до події «${event.title}»!`,
+    buttons.length > 0
+      ? 'Посилання від організатора доступні нижче.'
+      : 'Організатор поки не додав посилань.',
+  ].map(escapeMarkdownV2).join('\n')
+
+  await sendAndLog(
+    'join_confirmation',
+    chatId,
+    () => botApi('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'MarkdownV2',
+      ...(buttons.length > 0 ? { reply_markup: { inline_keyboard: buttons } } : {}),
+    }),
+    { id: event.id, title: event.title },
+  )
+}

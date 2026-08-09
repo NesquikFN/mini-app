@@ -16,6 +16,7 @@ const KIND_LABELS: Record<NotificationKind, string> = {
   group_announcement: 'Анонс у груповий чат',
   personal_announcement: 'Особисте сповіщення про подію',
   event_reminder: 'Нагадування за 30 хв',
+  join_confirmation: 'Підтвердження приєднання',
   start_greeting: 'Привітання /start',
   notifications_off_confirmation: 'Підтвердження /notifications_off',
   registration_approved: 'Схвалення реєстрації',

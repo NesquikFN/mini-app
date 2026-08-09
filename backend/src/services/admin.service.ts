@@ -1,5 +1,6 @@
 import { adminRepository } from '../repositories/admin.repository'
 import { hostsRepository } from '../repositories/hosts.repository'
+import { vipsRepository } from '../repositories/vips.repository'
 import { usersRepository } from '../repositories/users.repository'
 import { eventsRepository, type EventDateFilter } from '../repositories/events.repository'
 import * as eventsService from './events.service'
@@ -15,6 +16,7 @@ import type {
   AdminEventDetail,
   AdminListItem,
   HostListItem,
+  VipListItem,
   Pagination,
 } from '../types/admin'
 
@@ -55,7 +57,7 @@ export async function getUserDetail(id: string): Promise<AdminUserDetail> {
     throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
   }
 
-  const { created, participating } = await eventsService.listEventsForUser(id)
+  const { created, participating } = await eventsService.listEventsForUser(id, id, true)
 
   return {
     user,
@@ -339,5 +341,43 @@ export async function removeHost(userId: string): Promise<void> {
   const removed = await hostsRepository.removeHost(userId)
   if (!removed) {
     throw new AppError(404, 'HOST_NOT_FOUND', 'Цей користувач не є хостом')
+  }
+}
+
+export async function listVips(): Promise<VipListItem[]> {
+  const vipRows = await vipsRepository.listVips()
+  if (vipRows.length === 0) return []
+
+  const users = await usersRepository.getUsersByIds(vipRows.map((row) => row.userId))
+  const userById = new Map(users.map((user) => [user.id, user]))
+
+  return vipRows
+    .map((row) => {
+      const user = userById.get(row.userId)
+      return user ? { ...user, vipSince: row.vipSince } : null
+    })
+    .filter((item): item is VipListItem => item !== null)
+}
+
+export async function addVipByTelegramId(telegramId: number): Promise<VipListItem> {
+  const user = await usersRepository.getUserByTelegramId(telegramId)
+  if (!user) {
+    throw new AppError(
+      404,
+      'USER_NOT_FOUND',
+      'Користувача з таким Telegram ID ще немає в системі — попросіть спочатку відкрити застосунок',
+    )
+  }
+
+  const vipRow = await vipsRepository.addVip(user.id)
+  const vipView = await usersRepository.getAdminUserById(user.id)
+  if (!vipView) throw new Error('Не вдалося прочитати щойно доданого VIP')
+  return { ...vipView, vipSince: vipRow.vipSince }
+}
+
+export async function removeVip(userId: string): Promise<void> {
+  const removed = await vipsRepository.removeVip(userId)
+  if (!removed) {
+    throw new AppError(404, 'VIP_NOT_FOUND', 'Цей користувач не має VIP-ролі')
   }
 }

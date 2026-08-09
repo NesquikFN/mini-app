@@ -34,6 +34,10 @@ adminRouter.get('/hosts', adminController.listHosts)
 adminRouter.post('/hosts', adminController.addHost)
 adminRouter.delete('/hosts/:userId', adminController.removeHost)
 
+adminRouter.get('/vips', adminController.listVips)
+adminRouter.post('/vips', adminController.addVip)
+adminRouter.delete('/vips/:userId', adminController.removeVip)
+
 adminRouter.get('/registrations', adminRegistrationsController.list)
 adminRouter.get('/registrations/:userId', adminRegistrationsController.getDetail)
 adminRouter.post('/registrations/:userId/approve', adminRegistrationsController.approve)

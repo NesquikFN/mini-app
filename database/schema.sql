@@ -91,6 +91,7 @@ create table if not exists events (
   image_url text,
   group_url text,
   is_online boolean not null default false,
+  is_vip_only boolean not null default false,
   date date not null,
   time time not null,
   location text not null,
@@ -110,6 +111,7 @@ create table if not exists events (
 create index if not exists idx_events_creator_id on events (creator_id);
 create index if not exists idx_events_date on events (date);
 create index if not exists idx_events_dormitory_id on events (dormitory_id);
+create index if not exists idx_events_vip_only_date on events (date) where is_vip_only = true;
 create index if not exists idx_events_reminder_pending
   on events (date, time)
   where reminder_sent_at is null;
@@ -121,7 +123,6 @@ create table if not exists event_templates (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   description text,
-  weekday smallint not null check (weekday between 0 and 6),
   location text not null,
   is_online boolean not null default false,
   max_participants integer not null check (max_participants > 0),
@@ -134,7 +135,6 @@ create table if not exists event_templates (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists idx_event_templates_weekday on event_templates (weekday);
 create index if not exists idx_event_templates_dormitory_id on event_templates (dormitory_id);
 
 alter table events
@@ -189,6 +189,15 @@ create table if not exists hosts (
   constraint hosts_user_id_key unique (user_id)
 );
 
+create table if not exists vip_users (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint vip_users_user_id_key unique (user_id)
+);
+
+create index if not exists idx_vip_users_user_id on vip_users (user_id);
+
 create index if not exists idx_hosts_user_id on hosts (user_id);
 
 -- =========================================================
@@ -206,6 +215,7 @@ alter table events enable row level security;
 alter table event_participants enable row level security;
 alter table admin_users enable row level security;
 alter table hosts enable row level security;
+alter table vip_users enable row level security;
 alter table dormitories enable row level security;
 
 -- Глобальні налаштування застосунку (один singleton-рядок).
@@ -256,15 +266,22 @@ as $$
 declare
   v_max_participants integer;
   v_current_count integer;
+  v_is_vip_only boolean;
 begin
-  select max_participants
-  into v_max_participants
+  select max_participants, is_vip_only
+  into v_max_participants, v_is_vip_only
   from events
   where id = p_event_id
   for update;
 
   if not found then
     raise exception 'EVENT_NOT_FOUND';
+  end if;
+
+  if v_is_vip_only and not exists (
+    select 1 from vip_users where user_id = p_user_id
+  ) then
+    raise exception 'EVENT_VIP_REQUIRED';
   end if;
 
   if exists (

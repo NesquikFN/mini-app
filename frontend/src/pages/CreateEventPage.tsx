@@ -6,9 +6,11 @@ import { EventForm } from '../components/EventForm'
 import { useEvents } from '../hooks/useEvents'
 import { getErrorMessage } from '../services/api'
 import type { CreateEventInput } from '../types/event'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 
 export function CreateEventPage() {
   const { createEvent } = useEvents()
+  const { user } = useCurrentUser()
   const navigate = useNavigate()
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -50,7 +52,11 @@ export function CreateEventPage() {
             {submitError}
           </p>
         )}
-        <EventForm onSubmit={handleSubmit} submitting={submitting} />
+        <EventForm
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          canCreateVipOnly={Boolean(user?.isVip)}
+        />
       </div>
     </div>
   )

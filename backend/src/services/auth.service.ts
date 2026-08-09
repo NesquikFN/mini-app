@@ -6,6 +6,9 @@ import type { AuthUser } from '../types/user'
 import type { TelegramUser } from '../types/telegram'
 import { AppError } from '../utils/AppError'
 import { bannedMessage, isUserBanned } from '../utils/ban'
+import { adminRepository } from '../repositories/admin.repository'
+import { hostsRepository } from '../repositories/hosts.repository'
+import { vipsRepository } from '../repositories/vips.repository'
 
 /**
  * Local-dev-only stand-in profile. Only reachable when
@@ -38,9 +41,15 @@ export async function authenticateTelegramUser(initData: unknown): Promise<Teleg
     throw new AppError(403, 'USER_BANNED', bannedMessage(user))
   }
 
+  const [isAdmin, isHost, isVip] = await Promise.all([
+    adminRepository.isAdmin(user.id),
+    hostsRepository.isHost(user.id),
+    vipsRepository.isVip(user.id),
+  ])
+  const userWithRoles = { ...user, isAdmin, isHost, isVip }
   const token = signSession({ sub: user.id, telegramId: user.telegramId }, env.JWT_SECRET)
 
-  return { user, token }
+  return { user: userWithRoles, token }
 }
 
 function resolveTelegramUser(initData: unknown): TelegramUser {

@@ -5,7 +5,6 @@ interface EventTemplateRow {
   id: string
   title: string
   description: string | null
-  weekday: number
   location: string
   is_online: boolean
   max_participants: number
@@ -21,7 +20,6 @@ interface EventTemplateRow {
 export interface EventTemplateInput {
   title: string
   description: string
-  weekday: number
   location: string
   isOnline: boolean
   maxParticipants: number
@@ -36,7 +34,6 @@ function toTemplate(row: EventTemplateRow): EventTemplate {
     id: row.id,
     title: row.title,
     description: row.description ?? '',
-    weekday: row.weekday,
     location: row.location,
     isOnline: row.is_online,
     maxParticipants: row.max_participants,
@@ -53,7 +50,7 @@ function toTemplate(row: EventTemplateRow): EventTemplate {
 export const eventTemplatesRepository = {
   async findAll(): Promise<EventTemplate[]> {
     const { rows } = await query<EventTemplateRow>(
-      'select * from event_templates order by weekday asc, title asc',
+      'select * from event_templates order by title asc',
     )
     return rows.map(toTemplate)
   },
@@ -66,14 +63,13 @@ export const eventTemplatesRepository = {
   async insert(input: EventTemplateInput): Promise<EventTemplate> {
     const { rows } = await query<EventTemplateRow>(
       `insert into event_templates
-         (title, description, weekday, location, is_online,
+         (title, description, location, is_online,
           max_participants, group_url, game_url, game_url_required, dormitory_id, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
        returning *`,
       [
         input.title,
         input.description || null,
-        input.weekday,
         input.location,
         input.isOnline,
         input.maxParticipants,
@@ -89,9 +85,9 @@ export const eventTemplatesRepository = {
   async update(id: string, input: EventTemplateInput): Promise<EventTemplate | null> {
     const { rows } = await query<EventTemplateRow>(
       `update event_templates set
-         title = $2, description = $3, weekday = $4, location = $5,
-         is_online = $6, max_participants = $7, group_url = $8,
-         game_url = $9, game_url_required = $10, dormitory_id = $11,
+         title = $2, description = $3, location = $4,
+         is_online = $5, max_participants = $6, group_url = $7,
+         game_url = $8, game_url_required = $9, dormitory_id = $10,
          updated_at = now()
        where id = $1
        returning *`,
@@ -99,7 +95,6 @@ export const eventTemplatesRepository = {
         id,
         input.title,
         input.description || null,
-        input.weekday,
         input.location,
         input.isOnline,
         input.maxParticipants,

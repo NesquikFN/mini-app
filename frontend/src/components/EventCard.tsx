@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { Archive, CalendarDays, Clock, Home, MapPin, MonitorPlay, PartyPopper, Users } from 'lucide-react'
+import { Archive, CalendarDays, Clock, Crown, Home, MapPin, MonitorPlay, PartyPopper, Users } from 'lucide-react'
 import type { DormEvent } from '../types/event'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import { useDormitories } from '../hooks/useDormitories'
@@ -55,6 +55,11 @@ export function EventCard({ event }: { event: DormEvent }) {
           <h3 className="truncate text-base font-semibold text-[var(--text-primary)]">
             {event.title}
           </h3>
+          {event.vipOnly && (
+            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">
+              <Crown size={11} /> VIP
+            </span>
+          )}
           {!event.imageUrl && (
             <>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">

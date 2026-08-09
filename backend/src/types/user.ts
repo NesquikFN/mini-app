@@ -20,6 +20,9 @@ export interface AuthUser {
   bannedPermanently: boolean
   /** Особиста підписка на DM-сповіщення про нові події від бота. */
   notifyNewEvents: boolean
+  isAdmin?: boolean
+  isHost?: boolean
+  isVip?: boolean
 }
 
 /** Ширший погляд на users-рядок для адмін-панелі — включає поля, які

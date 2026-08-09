@@ -18,6 +18,9 @@ export interface AuthUser {
   dormitoryId?: string
   /** Особиста підписка на DM-сповіщення про нові події від бота. */
   notifyNewEvents: boolean
+  isAdmin: boolean
+  isHost: boolean
+  isVip: boolean
 }
 
 /** Публічний профіль організатора чи учасника події — те, що API
