@@ -1,4 +1,4 @@
-import type { PublicUser } from './user'
+import type { PublicUser, RegistrationStatus } from './user'
 import type { DormEvent } from './event'
 
 export interface AdminStats {
@@ -21,6 +21,7 @@ export type NotificationKind =
   | 'event_reminder'
   | 'start_greeting'
   | 'notifications_off_confirmation'
+  | 'registration_approved'
 
 export interface NotificationLogEntry {
   id: string
@@ -105,6 +106,32 @@ export interface AdminEventDetail {
   event: DormEvent
   creator: PublicUser
   participants: PublicUser[]
+}
+
+export interface RegistrationListItem {
+  id: string
+  telegramId: number
+  firstName: string
+  lastName?: string
+  username?: string
+  photoUrl?: string
+  age?: number
+  faculty?: string
+  registrationStatus: RegistrationStatus
+  registrationSubmittedAt?: string
+}
+
+export interface RegistrationDetail extends RegistrationListItem {
+  instagram?: string
+  bio?: string
+  registrationReviewedAt?: string
+  registrationReviewedBy?: string
+  registrationRejectionReason?: string
+}
+
+export interface RegistrationsResponse {
+  registrations: RegistrationListItem[]
+  pagination: Pagination
 }
 
 export interface EventTemplate {

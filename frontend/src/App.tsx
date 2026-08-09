@@ -6,6 +6,7 @@ import { UserProvider } from './context/UserProvider'
 import { DormitoriesProvider } from './context/DormitoriesProvider'
 import { AdminStatusProvider } from './context/AdminStatusProvider'
 import { AdminGuard } from './layouts/AdminGuard'
+import { RegistrationGate } from './layouts/RegistrationGate'
 import { DormitoryGate } from './layouts/DormitoryGate'
 import { MainLayout } from './layouts/MainLayout'
 import { AdminLayout } from './layouts/AdminLayout'
@@ -27,6 +28,8 @@ import { AdminHostsPage } from './pages/admin/AdminHostsPage'
 import { AdminBannedUsersPage } from './pages/admin/AdminBannedUsersPage'
 import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage'
 import { AdminNotificationLogPage } from './pages/admin/AdminNotificationLogPage'
+import { AdminRegistrationsPage } from './pages/admin/AdminRegistrationsPage'
+import { AdminRegistrationDetailPage } from './pages/admin/AdminRegistrationDetailPage'
 import { EventTemplatesPage } from './pages/EventTemplatesPage'
 import { getTelegramStartParam, getTelegramWebApp } from './services/telegram'
 
@@ -65,32 +68,36 @@ function App() {
               <BrowserRouter>
                 <StartAppRedirect />
                 <Routes>
-                  <Route element={<DormitoryGate />}>
-                    <Route element={<MainLayout />}>
-                      <Route path="/" element={<HomePage />} />
-                      <Route path="/events" element={<EventsPage />} />
-                      <Route path="/events/:id" element={<EventDetailPage />} />
-                      <Route path="/events/:id/edit" element={<EditEventPage />} />
-                      <Route path="/create" element={<CreateEventPage />} />
-                      <Route path="/templates" element={<EventTemplatesPage />} />
-                      <Route path="/profile" element={<ProfilePage />} />
-                      <Route path="/profile/edit" element={<EditProfilePage />} />
-                      <Route path="/users/:id" element={<UserProfilePage />} />
+                  <Route element={<RegistrationGate />}>
+                    <Route element={<DormitoryGate />}>
+                      <Route element={<MainLayout />}>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/events" element={<EventsPage />} />
+                        <Route path="/events/:id" element={<EventDetailPage />} />
+                        <Route path="/events/:id/edit" element={<EditEventPage />} />
+                        <Route path="/create" element={<CreateEventPage />} />
+                        <Route path="/templates" element={<EventTemplatesPage />} />
+                        <Route path="/profile" element={<ProfilePage />} />
+                        <Route path="/profile/edit" element={<EditProfilePage />} />
+                        <Route path="/users/:id" element={<UserProfilePage />} />
+                      </Route>
                     </Route>
-                  </Route>
 
-                  <Route element={<AdminGuard />}>
-                    <Route element={<AdminLayout />}>
-                      <Route path="/admin" element={<AdminOverviewPage />} />
-                      <Route path="/admin/users" element={<AdminUsersPage />} />
-                      <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
-                      <Route path="/admin/events" element={<AdminEventsPage />} />
-                      <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
-                      <Route path="/admin/admins" element={<AdminAdminsPage />} />
-                      <Route path="/admin/hosts" element={<AdminHostsPage />} />
-                      <Route path="/admin/banned" element={<AdminBannedUsersPage />} />
-                      <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
-                      <Route path="/admin/notification-log" element={<AdminNotificationLogPage />} />
+                    <Route element={<AdminGuard />}>
+                      <Route element={<AdminLayout />}>
+                        <Route path="/admin" element={<AdminOverviewPage />} />
+                        <Route path="/admin/users" element={<AdminUsersPage />} />
+                        <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
+                        <Route path="/admin/events" element={<AdminEventsPage />} />
+                        <Route path="/admin/events/:id" element={<AdminEventDetailPage />} />
+                        <Route path="/admin/admins" element={<AdminAdminsPage />} />
+                        <Route path="/admin/hosts" element={<AdminHostsPage />} />
+                        <Route path="/admin/banned" element={<AdminBannedUsersPage />} />
+                        <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+                        <Route path="/admin/notification-log" element={<AdminNotificationLogPage />} />
+                        <Route path="/admin/registrations" element={<AdminRegistrationsPage />} />
+                        <Route path="/admin/registrations/:userId" element={<AdminRegistrationDetailPage />} />
+                      </Route>
                     </Route>
                   </Route>
                 </Routes>

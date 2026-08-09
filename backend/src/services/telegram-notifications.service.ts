@@ -218,6 +218,27 @@ async function sendStartGreeting(chatId: string, firstName?: string): Promise<vo
     }))
 }
 
+/** DM після схвалення заявки на реєстрацію (registration.service.ts).
+ * Помилку відправки навмисно не ловить тут — sendAndLog і так пише її в
+ * notification_log, а сам виклик має пробросити помилку далі, щоб
+ * викликач (approveRegistration) явно вирішив не відкочувати схвалення
+ * через збій Telegram API. */
+export async function sendRegistrationApprovedMessage(chatId: string): Promise<void> {
+  const text = escapeMarkdownV2(
+    '✅ Вашу реєстрацію в DormHub схвалено. Тепер ви можете користуватися застосунком.',
+  )
+
+  await sendAndLog('registration_approved', chatId, () =>
+    botApi('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'MarkdownV2',
+      reply_markup: {
+        inline_keyboard: [[{ text: '🏠 Відкрити DormHub', web_app: { url: env.FRONTEND_URL } }]],
+      },
+    }))
+}
+
 /**
  * Chats come from our own registry (kept current by the webhook); the
  * requesting admin's membership is still checked live via getChatMember

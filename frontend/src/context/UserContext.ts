@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { AuthUser, UpdateProfileInput } from '../types/user'
+import type { AuthUser, SubmitRegistrationInput, UpdateProfileInput } from '../types/user'
 
 export type UserStatus = 'loading' | 'success' | 'error'
 
@@ -9,6 +9,7 @@ export interface UserContextValue {
   errorMessage: string | null
   reload: () => void
   updateProfile: (input: UpdateProfileInput) => Promise<AuthUser>
+  submitRegistration: (input: SubmitRegistrationInput) => Promise<AuthUser>
 }
 
 export const UserContext = createContext<UserContextValue | null>(null)

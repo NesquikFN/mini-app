@@ -46,6 +46,19 @@ create table if not exists users (
   instagram varchar(30),
   bio varchar(500),
   age smallint check (age between 13 and 120),
+  faculty varchar(100),
+  -- Ручна модерація реєстрації — новий користувач не бачить основний
+  -- застосунок, поки адмін не схвалить заявку (RegistrationGate на
+  -- frontend). Fresh install стартує прямо з 'not_submitted' за
+  -- замовчуванням; на живій production-базі цей default виставляється
+  -- лише ПІСЛЯ бекфілу існуючих рядків у 'approved' — див.
+  -- migrations/0019_registration_moderation.sql.
+  registration_status varchar(20) not null default 'not_submitted'
+    check (registration_status in ('not_submitted', 'pending', 'approved', 'rejected')),
+  registration_submitted_at timestamptz,
+  registration_reviewed_at timestamptz,
+  registration_reviewed_by uuid references users (id) on delete set null,
+  registration_rejection_reason varchar(500),
   banned_until timestamptz,
   banned_permanently boolean not null default false,
   -- Гуртожиток користувача. Nullable: новий користувач обирає його при
@@ -64,6 +77,8 @@ create table if not exists users (
 create index if not exists idx_users_telegram_id on users (telegram_id);
 create index if not exists idx_users_dormitory_id on users (dormitory_id);
 create index if not exists idx_users_active_ban on users (banned_permanently, banned_until);
+create index if not exists idx_users_registration_status_submitted_at
+  on users (registration_status, registration_submitted_at);
 
 -- =========================================================
 -- Таблиця events

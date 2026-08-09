@@ -32,6 +32,18 @@ export const eventsQuerySchema = paginationQuerySchema.extend({
 
 export const notificationLogQuerySchema = paginationQuerySchema
 
+export const registrationsQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(['pending', 'approved', 'rejected']).optional(),
+  search: z.string().trim().optional(),
+})
+
+export const rejectRegistrationSchema = z.object({
+  reason: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().trim().max(500, 'Причина має містити не більше 500 символів').optional(),
+  ),
+})
+
 export const userIdParamSchema = z.object({
   id: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
 })

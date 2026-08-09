@@ -1,4 +1,4 @@
-import type { AdminUserView, PublicUser } from './user'
+import type { AdminUserView, PublicUser, RegistrationStatus } from './user'
 import type { EventResponse } from '../services/events.service'
 
 export interface AdminStats {
@@ -69,6 +69,32 @@ export interface AdminListItem extends AdminUserView {
 export interface HostListItem extends AdminUserView {
   /** hosts.created_at — відколи цей users.id має права хоста. */
   hostSince: string
+}
+
+export interface RegistrationListItem {
+  id: string
+  telegramId: number
+  firstName: string
+  lastName?: string
+  username?: string
+  photoUrl?: string
+  age?: number
+  faculty?: string
+  registrationStatus: RegistrationStatus
+  registrationSubmittedAt?: string
+}
+
+export interface RegistrationDetail extends RegistrationListItem {
+  instagram?: string
+  bio?: string
+  registrationReviewedAt?: string
+  registrationReviewedBy?: string
+  registrationRejectionReason?: string
+}
+
+export interface RegistrationsResponse {
+  registrations: RegistrationListItem[]
+  pagination: Pagination
 }
 
 export interface EventTemplate {

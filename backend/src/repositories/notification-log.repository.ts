@@ -6,6 +6,7 @@ export type NotificationKind =
   | 'event_reminder'
   | 'start_greeting'
   | 'notifications_off_confirmation'
+  | 'registration_approved'
 
 export interface NewNotificationLogEntry {
   chatId: string

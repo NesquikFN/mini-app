@@ -10,7 +10,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "tsx --test \"src/services/*.test.ts\"",
+    "test:unit": "tsx --test \"src/services/*.test.ts\" \"src/validation/*.test.ts\"",
     "test:integration": "BOT_TOKEN=integration-test-bot-token-do-not-use-in-prod tsx --test \"src/__tests__/**/*.test.ts\""
   },
   "dependencies": {

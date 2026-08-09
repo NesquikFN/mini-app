@@ -1,5 +1,5 @@
 import type { CreateEventInput, DormEvent } from '../types/event'
-import type { AuthUser, PublicUser, UpdateProfileInput } from '../types/user'
+import type { AuthUser, PublicUser, SubmitRegistrationInput, UpdateProfileInput } from '../types/user'
 import type { Dormitory } from '../types/dormitory'
 import type { EventsScope } from '../context/EventsContext'
 import type {
@@ -15,6 +15,8 @@ import type {
   EventTemplateInput,
   HostListItem,
   NotificationLogResponse,
+  RegistrationDetail,
+  RegistrationsResponse,
 } from '../types/admin'
 import { getSessionToken, setSessionToken } from './session'
 import { getTelegramInitData } from './telegram'
@@ -341,6 +343,14 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<AuthUs
   return data.user
 }
 
+export async function submitMyRegistration(input: SubmitRegistrationInput): Promise<AuthUser> {
+  const data = await request<MeResponse>('/me/registration', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return data.user
+}
+
 export async function fetchDormitories(): Promise<Dormitory[]> {
   const data = await request<{ dormitories: Dormitory[] }>('/dormitories')
   return data.dormitories
@@ -401,6 +411,44 @@ export async function fetchAdminNotificationLog(
 
 export async function clearAdminNotificationLog(): Promise<void> {
   await request<{ success: boolean }>('/admin/notification-log', { method: 'DELETE' })
+}
+
+export type RegistrationStatusFilter = 'pending' | 'approved' | 'rejected'
+
+export async function fetchAdminRegistrations(
+  page: number,
+  limit: number,
+  status?: RegistrationStatusFilter,
+  search?: string,
+): Promise<RegistrationsResponse> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (status) params.set('status', status)
+  if (search) params.set('search', search)
+  return request<RegistrationsResponse>(`/admin/registrations?${params.toString()}`)
+}
+
+export async function fetchAdminRegistrationDetail(userId: string): Promise<RegistrationDetail> {
+  const data = await request<{ registration: RegistrationDetail }>(`/admin/registrations/${userId}`)
+  return data.registration
+}
+
+export async function approveAdminRegistration(userId: string): Promise<RegistrationDetail> {
+  const data = await request<{ registration: RegistrationDetail }>(
+    `/admin/registrations/${userId}/approve`,
+    { method: 'POST' },
+  )
+  return data.registration
+}
+
+export async function rejectAdminRegistration(
+  userId: string,
+  reason?: string,
+): Promise<RegistrationDetail> {
+  const data = await request<{ registration: RegistrationDetail }>(
+    `/admin/registrations/${userId}/reject`,
+    { method: 'POST', body: JSON.stringify({ reason }) },
+  )
+  return data.registration
 }
 
 export async function deleteAdminUser(id: string): Promise<void> {

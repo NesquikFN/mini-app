@@ -1,3 +1,5 @@
+export type RegistrationStatus = 'not_submitted' | 'pending' | 'approved' | 'rejected'
+
 export interface AuthUser {
   id: string
   telegramId: number
@@ -8,6 +10,10 @@ export interface AuthUser {
   instagram?: string
   bio?: string
   age?: number
+  faculty?: string
+  registrationStatus: RegistrationStatus
+  /** Лише коли registrationStatus === 'rejected' — чому саме. */
+  registrationRejectionReason?: string
   /** FK на dormitories.id. Ще не обраний користувачем — undefined. */
   dormitoryId?: string
   bannedUntil?: string
@@ -30,6 +36,8 @@ export interface AdminUserView {
   instagram?: string
   bio?: string
   age?: number
+  faculty?: string
+  registrationStatus: RegistrationStatus
   dormitoryId?: string
   createdAt: string
   bannedUntil?: string

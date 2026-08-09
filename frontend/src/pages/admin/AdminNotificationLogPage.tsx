@@ -18,6 +18,7 @@ const KIND_LABELS: Record<NotificationKind, string> = {
   event_reminder: 'Нагадування за 30 хв',
   start_greeting: 'Привітання /start',
   notifications_off_confirmation: 'Підтвердження /notifications_off',
+  registration_approved: 'Схвалення реєстрації',
 }
 
 export function AdminNotificationLogPage() {

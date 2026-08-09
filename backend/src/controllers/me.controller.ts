@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express'
 import * as eventsService from '../services/events.service'
 import * as usersService from '../services/users.service'
-import { updateMeSchema } from '../validation/user.schemas'
+import * as registrationService from '../services/registration.service'
+import { updateMeSchema, submitRegistrationSchema } from '../validation/user.schemas'
 
 export async function getMe(req: Request, res: Response): Promise<void> {
   res.json({ user: req.user })
@@ -34,4 +35,10 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
 
 export async function getMyEvents(req: Request, res: Response): Promise<void> {
   res.json(await eventsService.listEventsForUser(req.user.id))
+}
+
+export async function submitRegistration(req: Request, res: Response): Promise<void> {
+  const input = submitRegistrationSchema.parse(req.body)
+  const user = await registrationService.submitRegistration(req.user.id, input)
+  res.json({ user })
 }

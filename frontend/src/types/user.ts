@@ -1,3 +1,5 @@
+export type RegistrationStatus = 'not_submitted' | 'pending' | 'approved' | 'rejected'
+
 export interface AuthUser {
   id: string
   telegramId: number
@@ -8,6 +10,10 @@ export interface AuthUser {
   instagram?: string
   bio?: string
   age?: number
+  faculty?: string
+  registrationStatus: RegistrationStatus
+  /** Лише коли registrationStatus === 'rejected'. */
+  registrationRejectionReason?: string
   /** FK на dormitories.id, ще не обраний користувачем — undefined. */
   dormitoryId?: string
   /** Особиста підписка на DM-сповіщення про нові події від бота. */
@@ -33,4 +39,11 @@ export interface UpdateProfileInput {
   instagram: string | null
   bio: string | null
   age: number | null
+}
+
+export interface SubmitRegistrationInput {
+  age: number
+  faculty: string
+  instagram?: string
+  bio?: string
 }

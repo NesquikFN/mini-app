@@ -1,7 +1,7 @@
 import { query } from '../config/db'
-import type { AdminUserView, AuthUser, PublicUser } from '../types/user'
+import type { AdminUserView, AuthUser, PublicUser, RegistrationStatus } from '../types/user'
 
-interface UserRow {
+export interface UserRow {
   id: string
   telegram_id: string
   username: string | null
@@ -12,6 +12,12 @@ interface UserRow {
   instagram: string | null
   bio: string | null
   age: number | null
+  faculty: string | null
+  registration_status: RegistrationStatus
+  registration_submitted_at: string | null
+  registration_reviewed_at: string | null
+  registration_reviewed_by: string | null
+  registration_rejection_reason: string | null
   dormitory_id: string | null
   banned_until: string | null
   banned_permanently: boolean
@@ -19,7 +25,7 @@ interface UserRow {
   notify_new_events: boolean
 }
 
-function toAuthUser(row: UserRow): AuthUser {
+export function toAuthUser(row: UserRow): AuthUser {
   return {
     id: row.id,
     telegramId: Number(row.telegram_id),
@@ -30,6 +36,9 @@ function toAuthUser(row: UserRow): AuthUser {
     instagram: row.instagram ?? undefined,
     bio: row.bio ?? undefined,
     age: row.age ?? undefined,
+    faculty: row.faculty ?? undefined,
+    registrationStatus: row.registration_status,
+    registrationRejectionReason: row.registration_rejection_reason ?? undefined,
     dormitoryId: row.dormitory_id ?? undefined,
     bannedUntil: row.banned_until ?? undefined,
     bannedPermanently: row.banned_permanently,
@@ -49,6 +58,8 @@ function toAdminUserView(row: UserRow): AdminUserView {
     instagram: row.instagram ?? undefined,
     bio: row.bio ?? undefined,
     age: row.age ?? undefined,
+    faculty: row.faculty ?? undefined,
+    registrationStatus: row.registration_status,
     dormitoryId: row.dormitory_id ?? undefined,
     createdAt: row.created_at,
     bannedUntil: row.banned_until ?? undefined,

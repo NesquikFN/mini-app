@@ -56,6 +56,26 @@ export const updateMeSchema = z
     { message: 'Немає що оновлювати' },
   )
 
+// Не приймає registrationStatus взагалі — навіть якщо клієнт його
+// надішле, zod відкидає невідомі поля за замовчуванням, тож самостійно
+// виставити собі 'approved' структурно неможливо.
+export const submitRegistrationSchema = z.object({
+  age: z
+    .number('Вік має бути числом')
+    .int('Вік має бути цілим числом')
+    .min(13, 'Мінімальний вік — 13 років')
+    .max(120, 'Максимальний вік — 120 років'),
+  faculty: z
+    .string('Вкажіть факультет')
+    .trim()
+    .min(2, 'Назва факультету має містити щонайменше 2 символи')
+    .max(100, 'Назва факультету має містити не більше 100 символів'),
+  instagram: instagramSchema.optional(),
+  bio: bioSchema.optional(),
+})
+
+export type SubmitRegistrationInput = z.infer<typeof submitRegistrationSchema>
+
 export const publicUserIdParamSchema = z.object({
   id: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
 })

@@ -1,5 +1,7 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Ban, Bell, CalendarDays, History, LayoutDashboard, ShieldCheck, Sparkles, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Ban, Bell, CalendarDays, ClipboardList, History, LayoutDashboard, ShieldCheck, Sparkles, Users } from 'lucide-react'
+import { fetchAdminRegistrations } from '../services/api'
 
 // "Ігри" (шаблони подій) переїхали в головну навігацію (BottomNavigation)
 // — доступні всім юзерам, не лише адмінам.
@@ -7,6 +9,7 @@ const TABS = [
   { to: '/admin', label: 'Огляд', icon: LayoutDashboard, end: true },
   { to: '/admin/users', label: 'Користувачі', icon: Users, end: false },
   { to: '/admin/events', label: 'Події', icon: CalendarDays, end: false },
+  { to: '/admin/registrations', label: 'Заявки', icon: ClipboardList, end: false },
   { to: '/admin/admins', label: 'Адміни', icon: ShieldCheck, end: false },
   { to: '/admin/hosts', label: 'Хости', icon: Sparkles, end: false },
   { to: '/admin/banned', label: 'ЧС', icon: Ban, end: false },
@@ -16,6 +19,21 @@ const TABS = [
 
 export function AdminLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [pendingCount, setPendingCount] = useState(0)
+
+  // Найдешевший спосіб тримати бейдж свіжим без окремого контексту чи
+  // ручного "оновити лічильник" колбека: перезапитуємо кількість pending
+  // заявок при кожній зміні шляху всередині адмінки — і після
+  // approve/reject адмін звично тисне "назад" на список заявок, і при
+  // переході на будь-яку іншу вкладку теж.
+  useEffect(() => {
+    fetchAdminRegistrations(1, 1, 'pending')
+      .then((data) => setPendingCount(data.pagination.total))
+      .catch(() => {
+        // Бейдж — не критична інформація, тихо лишаємо попереднє значення.
+      })
+  }, [location.pathname])
 
   return (
     <div className="theme-dorm mx-auto flex min-h-screen w-full max-w-[720px] flex-col bg-[var(--surface-bg)] text-[var(--text-primary)]">
@@ -50,6 +68,11 @@ export function AdminLayout() {
               }
             >
               <tab.icon size={15} className="mr-1 inline-block align-[-2px]" /> {tab.label}
+              {tab.to === '/admin/registrations' && pendingCount > 0 && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {pendingCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
