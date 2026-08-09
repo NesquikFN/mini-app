@@ -53,6 +53,13 @@ interface TelegramWebApp {
   setHeaderColor(color: string): void
   setBackgroundColor(color: string): void
   openTelegramLink?(url: string): void
+  /** Diagnostic-only fields — not otherwise used by the app, temporary
+   * for chasing the "stuck after deep-link" bug (see DeepLinkDebugOverlay). */
+  viewportHeight?: number
+  viewportStableHeight?: number
+  isExpanded?: boolean
+  platform?: string
+  version?: string
   /** Bot API 7.7+. Stops an accidental swipe-down on page content from
    * collapsing/closing the Mini App. Older clients don't have it. */
   disableVerticalSwipes?(): void
