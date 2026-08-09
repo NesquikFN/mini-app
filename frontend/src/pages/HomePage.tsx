@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarX, MonitorPlay } from 'lucide-react'
+import { CalendarDays, CalendarX, MonitorPlay } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { EventCard } from '../components/EventCard'
@@ -47,8 +47,8 @@ export function HomePage() {
 
       <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">
-            Найближчі події
+          <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
+            <CalendarDays size={18} className="text-[var(--accent)]" /> Найближчі події
           </h2>
           <Link to="/events" className="text-sm font-medium text-[var(--accent)]">
             Переглянути всі
