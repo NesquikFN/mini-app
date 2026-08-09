@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { CalendarDays, Clock, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
@@ -233,12 +233,13 @@ export function EventDetailPage() {
 
         {isCreator && (
           <div className="grid grid-cols-2 gap-2">
-            <Link
-              to={`/events/${event.id}/edit`}
+            <button
+              type="button"
+              onClick={() => navigate(`/events/${event.id}/edit`)}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--surface-border)] text-sm font-semibold text-[var(--text-primary)] active:bg-[var(--surface-card-alt)]"
             >
               <Pencil size={16} /> Редагувати
-            </Link>
+            </button>
             <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
               <Trash2 size={16} /> Видалити
             </Button>
