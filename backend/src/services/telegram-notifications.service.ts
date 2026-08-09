@@ -114,6 +114,14 @@ export function buildMiniAppDeepLink(
   return `https://t.me/${botUsername}${appPath}?startapp=${encodeURIComponent(startParam)}`
 }
 
+/** Посилання, яким користувач може поділитися з будь-якого екрана події.
+ * Username беремо через Bot API, щоб не дублювати його в налаштуваннях
+ * frontend і не ризикувати створенням застарілих посилань після перейменування бота. */
+export async function buildEventDeepLink(eventId: string): Promise<string> {
+  const botUsername = await getBotUsername()
+  return buildMiniAppDeepLink(botUsername, `event_${eventId}`)
+}
+
 async function isActiveMember(chatId: string, userId: number): Promise<boolean> {
   try {
     const member = await botApi<{ status: string }>('getChatMember', {
@@ -337,11 +345,10 @@ export async function sendEventAnnouncement(
       // The bot username is resolved *inside* this callback (not
       // above, before sendAndLog) so a getMe failure is itself logged as
       // a failed send, instead of throwing past sendAndLog unnoticed.
-      const botUsername = await getBotUsername()
       const replyMarkup = {
         inline_keyboard: [[{
           text: '🎉 Приєднатися',
-          url: buildMiniAppDeepLink(botUsername, `event_${event.id}`),
+          url: await buildEventDeepLink(event.id),
         }]],
       }
 

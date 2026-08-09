@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Archive, CalendarDays, Clock, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
+import { Archive, CalendarDays, Clock, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, UserX } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -12,7 +12,7 @@ import { UserRow } from '../components/UserRow'
 import { ParticipantsModal } from '../components/ParticipantsModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
-import { fetchEventDetail, getErrorMessage, type EventDetailResponse } from '../services/api'
+import { fetchEventDetail, fetchEventShareLink, getErrorMessage, type EventDetailResponse } from '../services/api'
 
 type MembersStatus = 'loading' | 'success' | 'error'
 
@@ -40,6 +40,7 @@ export function EventDetailPage() {
   const { getDormitoryName } = useDormitories()
   const navigate = useNavigate()
   const [actionError, setActionError] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
 
   const [members, setMembers] = useState<EventDetailResponse | null>(null)
   const [membersStatus, setMembersStatus] = useState<MembersStatus>('loading')
@@ -135,6 +136,7 @@ export function EventDetailPage() {
   const isPending = pendingEventId === event.id
   const isCreator = event.creatorId === user.id
   const eventId = event.id
+  const eventTitle = event.title
   const dormitoryName = getDormitoryName(event.dormitoryId)
   const dormitoryNumber = dormitoryName?.match(/№?\s*(\d+)/)?.[1]
   const telegramGroupUrl = event.groupUrl
@@ -169,6 +171,28 @@ export function EventDetailPage() {
       setActionError(getErrorMessage(error))
       setDeleting(false)
       setConfirmingDelete(false)
+    }
+  }
+
+  async function handleShareEvent() {
+    setSharing(true)
+    setActionError(null)
+    try {
+      const eventUrl = await fetchEventShareLink(eventId)
+      const shareUrl = new URL('https://t.me/share/url')
+      shareUrl.searchParams.set('url', eventUrl)
+      shareUrl.searchParams.set('text', `🎉 ${eventTitle}\nПриєднуйся до події в DormHub!`)
+
+      const webApp = window.Telegram?.WebApp
+      if (webApp?.openTelegramLink) {
+        webApp.openTelegramLink(shareUrl.toString())
+      } else {
+        window.open(shareUrl.toString(), '_blank', 'noopener,noreferrer')
+      }
+    } catch (error) {
+      setActionError(getErrorMessage(error))
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -242,6 +266,10 @@ export function EventDetailPage() {
             {event.title}
           </h1>
         </div>
+
+        <Button variant="outline" fullWidth loading={sharing} onClick={handleShareEvent}>
+          <Share2 size={18} /> {sharing ? 'Готую посилання…' : 'Поділитися подією'}
+        </Button>
 
         {isCreator && (
           <div className="grid grid-cols-2 gap-2">

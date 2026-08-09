@@ -240,6 +240,11 @@ export async function fetchEventDetail(id: string): Promise<EventDetailResponse>
   return request<EventDetailResponse>(`/events/${id}`)
 }
 
+export async function fetchEventShareLink(id: string): Promise<string> {
+  const data = await request<{ url: string }>(`/events/${id}/share-link`)
+  return data.url
+}
+
 export async function createEventRequest(
   input: CreateEventInput,
 ): Promise<DormEvent> {

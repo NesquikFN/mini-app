@@ -22,6 +22,11 @@ export async function getEvent(req: Request, res: Response): Promise<void> {
   res.json({ event, creator, participants })
 }
 
+export async function getEventShareLink(req: Request, res: Response): Promise<void> {
+  const { id } = eventIdParamSchema.parse(req.params)
+  res.json({ url: await eventsService.getEventShareLink(id, req.user.id) })
+}
+
 export async function createEvent(req: Request, res: Response): Promise<void> {
   const input = createEventSchema.parse(req.body)
   // dormitoryId навмисно НЕ входить у createEventSchema — навіть якщо

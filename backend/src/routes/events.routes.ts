@@ -4,6 +4,7 @@ import * as eventsController from '../controllers/events.controller'
 export const eventsRouter = Router()
 
 eventsRouter.get('/', eventsController.listEvents)
+eventsRouter.get('/:id/share-link', eventsController.getEventShareLink)
 eventsRouter.get('/:id', eventsController.getEvent)
 eventsRouter.post('/', eventsController.createEvent)
 eventsRouter.patch('/:id', eventsController.updateEvent)

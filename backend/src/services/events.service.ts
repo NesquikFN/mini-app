@@ -11,7 +11,11 @@ import type { PublicUser } from '../types/user'
 import type { EventTemplate } from '../types/admin'
 import type { CreateEventInput, UpdateEventInput } from '../validation/event.schemas'
 import { settingsRepository } from '../repositories/settings.repository'
-import { sendEventAnnouncement, sendEventJoinConfirmation } from './telegram-notifications.service'
+import {
+  buildEventDeepLink,
+  sendEventAnnouncement,
+  sendEventJoinConfirmation,
+} from './telegram-notifications.service'
 import { vipsRepository } from '../repositories/vips.repository'
 
 export interface EventResponse {
@@ -127,6 +131,11 @@ export async function getEvent(id: string, viewerId?: string): Promise<EventResp
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
   return attachParticipantPreview(toEventResponse(event))
+}
+
+export async function getEventShareLink(id: string, viewerId: string): Promise<string> {
+  await getEvent(id, viewerId)
+  return buildEventDeepLink(id)
 }
 
 export interface EventMembers {
