@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { AtSign, Cake, CalendarX, Home, Pencil, Settings } from 'lucide-react'
+import { Cake, CalendarX, Home, Pencil, Settings } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { Avatar } from '../components/Avatar'
 import { EventCard } from '../components/EventCard'
+import { ArchivedEventsSection } from '../components/ArchivedEventsSection'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
+import { InstagramIcon } from '../components/InstagramIcon'
+import { isEventPast } from '../utils/date'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useAdminStatus } from '../hooks/useAdminStatus'
 import { useDormitories } from '../hooks/useDormitories'
@@ -51,6 +54,19 @@ export function ProfilePage() {
 
   const isLoading = userStatus === 'loading' || status === 'loading'
   const hasError = userStatus === 'error' || status === 'error'
+  const activeCreatedEvents = myEvents?.created.filter(
+    (event) => !isEventPast(event.date, event.time),
+  ) ?? []
+  const activeParticipatingEvents = myEvents?.participating.filter(
+    (event) => !isEventPast(event.date, event.time),
+  ) ?? []
+  const archivedEvents = myEvents
+    ? [...new Map(
+        [...myEvents.created, ...myEvents.participating]
+          .filter((event) => isEventPast(event.date, event.time))
+          .map((event) => [event.id, event]),
+      ).values()]
+    : []
 
   function handleRetry() {
     reloadUser()
@@ -116,7 +132,7 @@ export function ProfilePage() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft-bg)] px-3 py-1.5 text-sm font-medium text-[var(--accent)]"
                     >
-                      <AtSign size={15} /> {user.instagram}
+                      <InstagramIcon size={16} /> {user.instagram}
                     </a>
                   )}
                   {user.age && (
@@ -154,13 +170,13 @@ export function ProfilePage() {
               <h2 className="text-base font-semibold text-[var(--text-primary)]">
                 Мої створені події
               </h2>
-              {myEvents.created.length === 0 ? (
+              {activeCreatedEvents.length === 0 ? (
                 <EmptyState
                   icon={<CalendarX size={32} />}
-                  title="Ви ще не створювали подій"
+                  title="Немає активних створених подій"
                 />
               ) : (
-                myEvents.created.map((event) => (
+                activeCreatedEvents.map((event) => (
                   <EventCard key={event.id} event={event} />
                 ))
               )}
@@ -170,17 +186,19 @@ export function ProfilePage() {
               <h2 className="text-base font-semibold text-[var(--text-primary)]">
                 Події, у яких беру участь
               </h2>
-              {myEvents.participating.length === 0 ? (
+              {activeParticipatingEvents.length === 0 ? (
                 <EmptyState
                   icon={<CalendarX size={32} />}
-                  title="Ви ще не берете участі в подіях"
+                  title="Немає активних подій з вашою участю"
                 />
               ) : (
-                myEvents.participating.map((event) => (
+                activeParticipatingEvents.map((event) => (
                   <EventCard key={event.id} event={event} />
                 ))
               )}
             </section>
+
+            <ArchivedEventsSection events={archivedEvents} />
           </>
         )}
       </div>

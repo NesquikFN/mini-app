@@ -281,6 +281,11 @@ export async function removeOwnEventParticipant(
 }
 
 export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {
+  const event = await getEventOrThrow(eventId)
+  const now = kyivNow()
+  if (`${event.date}T${event.time.slice(0, 5)}` < `${now.date}T${now.time}`) {
+    throw new AppError(409, 'EVENT_ARCHIVED', 'Цю подію вже завершено')
+  }
   // Перевірка ліміту місць і повторного приєднання відбувається
   // атомарно всередині PostgreSQL-функції join_event (repository),
   // тому тут немає окремого "прочитати → перевірити → вставити".

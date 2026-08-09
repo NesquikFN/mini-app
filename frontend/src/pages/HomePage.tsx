@@ -9,7 +9,7 @@ import { LoadingState } from '../components/LoadingState'
 import { DormitorySelector } from '../components/DormitorySelector'
 import { SocialLinks } from '../components/SocialLinks'
 import { fetchAppSettings, type SocialLinks as SocialLinksType } from '../services/api'
-import { isPastDate } from '../utils/date'
+import { isEventPast } from '../utils/date'
 
 export function HomePage() {
   const { events, status, errorMessage, reload } = useEvents()
@@ -25,11 +25,11 @@ export function HomePage() {
   // Backend повертає фізичні події свого гуртожитку плюс глобальні
   // онлайн-події. На головній розділяємо їх на окремі секції.
   const upcoming = [...events]
-    .filter((event) => !event.isOnline && !isPastDate(event.date))
+    .filter((event) => !event.isOnline && !isEventPast(event.date, event.time))
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
     .slice(0, 3)
   const onlineEvents = [...events]
-    .filter((event) => event.isOnline && !isPastDate(event.date))
+    .filter((event) => event.isOnline && !isEventPast(event.date, event.time))
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
     .slice(0, 3)
 

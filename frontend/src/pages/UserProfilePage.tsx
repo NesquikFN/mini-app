@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AtSign, Cake, CalendarX, Home, ShieldCheck, UserRoundX } from 'lucide-react'
+import { Cake, CalendarX, Home, ShieldCheck, UserRoundX } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { EventCard } from '../components/EventCard'
+import { ArchivedEventsSection } from '../components/ArchivedEventsSection'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/PageHeader'
+import { InstagramIcon } from '../components/InstagramIcon'
+import { isEventPast } from '../utils/date'
 import { useDormitories } from '../hooks/useDormitories'
 import {
   fetchPublicUser,
@@ -44,6 +47,13 @@ export function UserProfilePage() {
     setErrorMessage(null)
     loadUser()
   }
+
+  const activeEvents = profile?.createdEvents.filter(
+    (event) => !isEventPast(event.date, event.time),
+  ) ?? []
+  const archivedEvents = profile?.createdEvents.filter(
+    (event) => isEventPast(event.date, event.time),
+  ) ?? []
 
   return (
     <div className="flex flex-col">
@@ -95,7 +105,7 @@ export function UserProfilePage() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft-bg)] px-3 py-1.5 text-sm font-medium text-[var(--accent)]"
                     >
-                      <AtSign size={15} /> {profile.user.instagram}
+                      <InstagramIcon size={16} /> {profile.user.instagram}
                     </a>
                   )}
                   {profile.user.age && (
@@ -114,19 +124,21 @@ export function UserProfilePage() {
 
             <section className="flex flex-col gap-3">
               <h2 className="text-base font-semibold text-[var(--text-primary)]">
-                Створені події · {profile.createdEvents.length}
+                Створені події · {activeEvents.length}
               </h2>
-              {profile.createdEvents.length === 0 ? (
+              {activeEvents.length === 0 ? (
                 <EmptyState
                   icon={<CalendarX size={32} />}
-                  title="Користувач ще не створював подій"
+                  title="У користувача немає активних подій"
                 />
               ) : (
-                profile.createdEvents.map((event) => (
+                activeEvents.map((event) => (
                   <EventCard key={event.id} event={event} />
                 ))
               )}
             </section>
+
+            <ArchivedEventsSection events={archivedEvents} />
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CalendarDays, Clock, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
+import { Archive, CalendarDays, Clock, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Trash2, UserX } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -11,7 +11,7 @@ import { LoadingState } from '../components/LoadingState'
 import { UserRow } from '../components/UserRow'
 import { ParticipantsModal } from '../components/ParticipantsModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { formatEventDate, formatEventTime } from '../utils/date'
+import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import { fetchEventDetail, getErrorMessage, type EventDetailResponse } from '../services/api'
 
 type MembersStatus = 'loading' | 'success' | 'error'
@@ -140,6 +140,7 @@ export function EventDetailPage() {
   const telegramGroupUrl = event.groupUrl
     ? normalizeTelegramGroupUrl(event.groupUrl)
     : undefined
+  const isArchived = isEventPast(event.date, event.time)
 
   const handleToggleParticipation = async () => {
     setActionError(null)
@@ -194,6 +195,12 @@ export function EventDetailPage() {
       <PageHeader title={event.title} showBack />
 
       <div className="flex flex-col gap-5 px-4 py-4 pb-8">
+        {isArchived && (
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)]">
+            <Archive size={18} className="text-[var(--accent)]" />
+            Подію завершено та перенесено в архів
+          </div>
+        )}
         {event.imageUrl && (
           <div className="relative overflow-hidden rounded-2xl">
             <img
@@ -359,7 +366,7 @@ export function EventDetailPage() {
 
         {actionError && <p className="text-sm text-red-400">{actionError}</p>}
 
-        {telegramGroupUrl && (
+        {telegramGroupUrl && !isArchived && (
           <a
             href={telegramGroupUrl}
             target="_blank"
@@ -377,7 +384,11 @@ export function EventDetailPage() {
           </a>
         )}
 
-        {isFull && !isJoined ? (
+        {isArchived ? (
+          <Button variant="secondary" fullWidth disabled>
+            Подія завершена
+          </Button>
+        ) : isFull && !isJoined ? (
           <Button variant="secondary" fullWidth disabled>
             Місць більше немає
           </Button>

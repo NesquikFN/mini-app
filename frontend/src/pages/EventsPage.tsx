@@ -8,15 +8,16 @@ import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { FilterTabs } from '../components/FilterTabs'
 import type { EventsScope } from '../context/EventsContext'
-import { isSameDay, isWithinNextDays } from '../utils/date'
+import { isEventPast, isSameDay, isWithinNextDays } from '../utils/date'
 
-type FilterValue = 'all' | 'today' | 'week' | 'online'
+type FilterValue = 'all' | 'today' | 'week' | 'online' | 'archive'
 
 const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
   { value: 'all', label: 'Усі' },
   { value: 'today', label: 'Сьогодні' },
   { value: 'week', label: 'Цього тижня' },
   { value: 'online', label: 'Онлайн' },
+  { value: 'archive', label: 'Архів' },
 ]
 
 const DORM_FILTER_OPTIONS: { value: EventsScope; label: string }[] = [
@@ -44,12 +45,19 @@ export function EventsPage() {
   // лише фільтр за датою, той самий client-side предикат, що й раніше.
   const filtered = events
     .filter((event) => {
+      const isArchived = isEventPast(event.date, event.time)
+      if (filter === 'archive') return isArchived
+      if (isArchived) return false
       if (filter === 'today') return isSameDay(event.date, new Date())
       if (filter === 'week') return isWithinNextDays(event.date, 7)
       if (filter === 'online') return event.isOnline
       return true
     })
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+    .sort((a, b) =>
+      filter === 'archive'
+        ? (b.date + b.time).localeCompare(a.date + a.time)
+        : (a.date + a.time).localeCompare(b.date + b.time),
+    )
 
   return (
     <div className="flex flex-col">

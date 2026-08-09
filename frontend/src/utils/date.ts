@@ -56,3 +56,25 @@ export function isPastDate(isoDate: string): boolean {
   const target = new Date(`${isoDate}T00:00:00`)
   return target < start
 }
+
+const KYIV_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Kyiv',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+/** Події зберігаються як київський локальний час без timezone. Тому
+ * порівнюємо їх із поточним київським часом, незалежно від timezone
+ * пристрою користувача. */
+export function isEventPast(isoDate: string, time: string, now = new Date()): boolean {
+  const parts = KYIV_DATE_TIME_FORMATTER.formatToParts(now)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  const current = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+  const eventDateTime = `${isoDate}T${time.slice(0, 5)}`
+  return eventDateTime < current
+}

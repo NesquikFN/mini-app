@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { AtSign, Cake, Camera, Save, UserRoundPen } from 'lucide-react'
+import { AtSign, Cake, Save, UserRoundPen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { PageHeader } from '../components/PageHeader'
+import { InstagramIcon } from '../components/InstagramIcon'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { getErrorMessage } from '../services/api'
 
@@ -82,7 +83,7 @@ export function EditProfilePage() {
           <input value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={40} placeholder="Як тебе називати" className={inputClass(Boolean(errors.nickname))} />
         </ProfileField>
 
-        <ProfileField icon={<Camera size={18} />} label="Instagram" error={errors.instagram}>
+        <ProfileField icon={<InstagramIcon size={18} />} label="Instagram" error={errors.instagram}>
           <div className="relative">
             <AtSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-disabled)]" />
             <input value={instagram} onChange={(event) => setInstagram(event.target.value)} placeholder="username" className={`${inputClass(Boolean(errors.instagram))} pl-9`} />

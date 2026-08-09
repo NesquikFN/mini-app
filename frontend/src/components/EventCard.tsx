@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { CalendarDays, Clock, Home, MapPin, MonitorPlay, PartyPopper, Users } from 'lucide-react'
+import { Archive, CalendarDays, Clock, Home, MapPin, MonitorPlay, PartyPopper, Users } from 'lucide-react'
 import type { DormEvent } from '../types/event'
-import { formatEventDate, formatEventTime } from '../utils/date'
+import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import { useDormitories } from '../hooks/useDormitories'
 import { ParticipantAvatarStack } from './ParticipantAvatarStack'
 
@@ -11,11 +11,12 @@ export function EventCard({ event }: { event: DormEvent }) {
   const isFull = event.participants.length >= event.maxParticipants
   const dormitoryName = getDormitoryName(event.dormitoryId)
   const dormitoryNumber = dormitoryName?.match(/№?\s*(\d+)/)?.[1]
+  const isArchived = isEventPast(event.date, event.time)
 
   return (
     <Link
       to={`/events/${event.id}`}
-      className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 transition-transform active:scale-[0.98] active:bg-[var(--surface-card-alt)]"
+      className={`flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 transition-transform active:scale-[0.98] active:bg-[var(--surface-card-alt)] ${isArchived ? 'opacity-75' : ''}`}
     >
       {event.imageUrl && (
         <div className="relative overflow-hidden rounded-xl">
@@ -91,7 +92,11 @@ export function EventCard({ event }: { event: DormEvent }) {
             {event.participants.length} / {event.maxParticipants} учасників
           </span>
         </span>
-        {isFull ? (
+        {isArchived ? (
+          <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[var(--surface-card-alt)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
+            <Archive size={12} /> Завершено
+          </span>
+        ) : isFull ? (
           <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--surface-card-alt)] px-3 py-1 text-xs font-medium text-[var(--text-disabled)]">
             Місць немає
           </span>
