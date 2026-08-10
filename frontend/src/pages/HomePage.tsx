@@ -34,6 +34,7 @@ export function HomePage() {
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
     .slice(0, 3)
   const onlineOnly = user?.dormitoryId === NO_DORMITORY_ID
+  const offlineCollapsed = status === 'success' && upcoming.length === 0
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-8">
@@ -57,10 +58,15 @@ export function HomePage() {
         <DormitorySelector />
       </div>
 
-      {!onlineOnly && <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
+      {!onlineOnly && <section className={`flex flex-col border-t border-[var(--surface-border)] pt-5 ${offlineCollapsed ? 'gap-0' : 'gap-3'}`}>
         <div className="flex items-center justify-between">
           <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
             <CalendarDays size={18} className="text-[var(--accent)]" /> Найближчі події
+            {offlineCollapsed && (
+              <span className="rounded-full bg-[var(--surface-card-alt)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-disabled)]">
+                Немає
+              </span>
+            )}
           </h2>
           <Link to="/events" className="text-sm font-medium text-[var(--accent)]">
             Переглянути всі
@@ -76,14 +82,6 @@ export function HomePage() {
             description={errorMessage ?? undefined}
             actionLabel="Спробувати ще раз"
             onAction={reload}
-          />
-        )}
-
-        {status === 'success' && upcoming.length === 0 && (
-          <EmptyState
-            icon={<CalendarX size={40} />}
-            title="Поки що немає подій"
-            description="Створи першу подію для свого гуртожитку."
           />
         )}
 
