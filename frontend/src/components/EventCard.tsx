@@ -1,6 +1,16 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { Archive, CalendarDays, Clock, Crown, Home, MapPin, MonitorPlay, PartyPopper, Users } from 'lucide-react'
+import {
+  Archive,
+  CalendarDays,
+  Clock,
+  Crown,
+  Home,
+  MapPin,
+  MonitorPlay,
+  PartyPopper,
+  Users,
+} from 'lucide-react'
 import type { DormEvent } from '../types/event'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import { useDormitories } from '../hooks/useDormitories'
@@ -9,129 +19,117 @@ import { ParticipantAvatarStack } from './ParticipantAvatarStack'
 export function EventCard({ event }: { event: DormEvent }) {
   const { getDormitoryName } = useDormitories()
   const isFull = event.participants.length >= event.maxParticipants
-  const dormitoryName = getDormitoryName(event.dormitoryId)
-  const dormitoryNumber = dormitoryName?.match(/№?\s*(\d+)/)?.[1]
   const isArchived = isEventPast(event.date, event.time)
+  const dormitoryName = getDormitoryName(event.dormitoryId)
+  const participantCount = event.participantCount ?? event.participants.length
 
   return (
     <Link
       to={`/events/${event.id}`}
-      className={`flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 transition-transform active:scale-[0.98] active:bg-[var(--surface-card-alt)] ${isArchived ? 'opacity-75' : ''}`}
+      className={`group block overflow-hidden rounded-[26px] border border-[var(--surface-border)] bg-[var(--surface-card)] shadow-[0_18px_45px_rgba(0,0,0,0.28)] transition-transform active:scale-[0.985] ${isArchived ? 'opacity-75' : ''}`}
     >
-      {event.imageUrl && (
-        <div className="relative overflow-hidden rounded-xl">
+      <div
+        className={`relative overflow-hidden ${event.imageUrl ? 'min-h-[320px]' : 'min-h-[250px]'}`}
+        style={event.imageUrl ? { aspectRatio: '1.08' } : undefined}
+      >
+        {event.imageUrl ? (
           <img
             src={event.imageUrl}
-            alt=""
-            className="h-48 w-full object-cover"
+            alt={`Фото події «${event.title}»`}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-active:scale-[1.02]"
             loading="lazy"
           />
-          <div className="absolute inset-x-0 top-0 flex flex-nowrap items-center gap-1 bg-gradient-to-b from-black/80 via-black/35 to-transparent px-2 pb-9 pt-2">
-            <CardMetaBadge icon={<CalendarDays size={13} />}>
-              {formatEventDate(event.date)}
-            </CardMetaBadge>
-            <CardMetaBadge icon={<Clock size={13} />}>
-              {formatEventTime(event.time)}
-            </CardMetaBadge>
-            <CardMetaBadge
-              icon={event.isOnline ? <MonitorPlay size={13} /> : <MapPin size={13} />}
-              flexible
-            >
-              {event.isOnline ? 'Онлайн' : event.location}
-            </CardMetaBadge>
-            {!event.isOnline && dormitoryNumber && (
-              <CardMetaBadge icon={<Home size={13} />}>
-                №{dormitoryNumber}
-              </CardMetaBadge>
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(255,122,0,0.28),transparent_34%),linear-gradient(145deg,#24170d_0%,#111_48%,#080808_100%)]">
+            <PartyPopper
+              size={150}
+              strokeWidth={1.1}
+              className="absolute -bottom-7 -right-5 rotate-[-12deg] text-orange-500/15"
+            />
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/5 to-black/95" />
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start gap-2 p-3.5">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/65 px-3 py-2 text-[12px] font-semibold text-white backdrop-blur-md">
+            <CalendarDays size={14} className="text-orange-400" />
+            {formatEventDate(event.date)}
+            <span className="h-4 w-px bg-white/25" />
+            <Clock size={14} className="text-orange-400" />
+            {formatEventTime(event.time)}
+          </span>
+          {event.vipOnly && (
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-black/65 px-3 py-2 text-[11px] font-bold text-amber-300 backdrop-blur-md">
+              <Crown size={13} /> VIP
+            </span>
+          )}
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 p-4">
+          <h3 className="text-[24px] font-bold leading-tight tracking-[-0.02em] text-white drop-shadow-lg">
+            {event.title}
+          </h3>
+          <p className="mt-2 flex min-w-0 items-center gap-1.5 text-sm font-medium text-white/75">
+            {event.isOnline ? (
+              <MonitorPlay size={15} className="shrink-0 text-orange-400" />
+            ) : (
+              <MapPin size={15} className="shrink-0 text-orange-400" />
+            )}
+            <span className="truncate">{event.isOnline ? 'Онлайн' : event.location}</span>
+            {!event.isOnline && dormitoryName && (
+              <>
+                <span className="text-white/35">·</span>
+                <Home size={14} className="shrink-0 text-orange-400" />
+                <span className="shrink-0">{dormitoryName}</span>
+              </>
+            )}
+          </p>
+
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-white/15 bg-black/65 py-1.5 pl-2 pr-3 text-xs font-semibold text-white/80 backdrop-blur-md">
+              <ParticipantAvatarStack
+                participants={event.participantPreview ?? []}
+                totalCount={participantCount}
+                size={30}
+              />
+              <span className="inline-flex shrink-0 items-center gap-1">
+                <Users size={14} className="text-orange-400" />
+                {event.participants.length}/{event.maxParticipants}
+              </span>
+            </span>
+
+            {isArchived ? (
+              <StatusBadge muted icon={<Archive size={13} />}>Завершено</StatusBadge>
+            ) : isFull ? (
+              <StatusBadge muted>Місць немає</StatusBadge>
+            ) : (
+              <StatusBadge>Є місця</StatusBadge>
             )}
           </div>
         </div>
-      )}
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
-          <PartyPopper size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-[var(--text-primary)]">
-            {event.title}
-          </h3>
-          {event.vipOnly && (
-            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400">
-              <Crown size={11} /> VIP
-            </span>
-          )}
-          {!event.imageUrl && (
-            <>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">
-                <span className="inline-flex items-center gap-1">
-                  <CalendarDays size={14} /> {formatEventDate(event.date)}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Clock size={14} /> {formatEventTime(event.time)}
-                </span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="inline-flex items-center gap-1 text-sm text-[var(--text-secondary)]">
-                  {event.isOnline ? <MonitorPlay size={14} /> : <MapPin size={14} />}
-                  {event.isOnline ? 'Онлайн' : event.location}
-                </span>
-                {!event.isOnline && dormitoryName && (
-                  <span className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-                    <Home size={13} /> {dormitoryName}
-                  </span>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex min-w-0 items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <ParticipantAvatarStack
-            participants={event.participantPreview ?? []}
-            totalCount={event.participantCount ?? event.participants.length}
-          />
-          <span className="inline-flex shrink-0 items-center gap-1">
-            <Users size={14} />
-            {event.participants.length} / {event.maxParticipants} учасників
-          </span>
-        </span>
-        {isArchived ? (
-          <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[var(--surface-card-alt)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
-            <Archive size={12} /> Завершено
-          </span>
-        ) : isFull ? (
-          <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--surface-card-alt)] px-3 py-1 text-xs font-medium text-[var(--text-disabled)]">
-            Місць немає
-          </span>
-        ) : (
-          <span className="shrink-0 whitespace-nowrap rounded-full bg-[var(--accent-soft-bg)] px-3 py-1 text-xs font-medium text-[var(--accent)]">
-            Є місця
-          </span>
-        )}
       </div>
     </Link>
   )
 }
 
-function CardMetaBadge({
-  icon,
+function StatusBadge({
   children,
-  flexible = false,
+  icon,
+  muted = false,
 }: {
-  icon: ReactNode
-  children: ReactNode
-  flexible?: boolean
+  children: string
+  icon?: ReactNode
+  muted?: boolean
 }) {
   return (
     <span
-      className={`inline-flex min-w-0 items-center gap-1 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-sm ${
-        flexible ? 'max-w-[40%] shrink' : 'shrink-0'
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-2 text-xs font-bold backdrop-blur-md ${
+        muted
+          ? 'border-white/10 bg-black/65 text-white/55'
+          : 'border-orange-400/35 bg-orange-500/20 text-orange-300'
       }`}
     >
-      <span className="shrink-0 text-orange-400">{icon}</span>
-      <span className="truncate">{children}</span>
+      {icon}{children}
     </span>
   )
 }
