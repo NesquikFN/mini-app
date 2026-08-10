@@ -10,35 +10,70 @@ export function SocialLinks({ links }: { links: SocialLinksType | undefined }) {
   if (!links?.discordUrl && !links?.telegramUrl) return null
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      {links.telegramUrl && (
-        <a
-          href={links.telegramUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Наш Telegram"
-          className={ICON_BUTTON_CLASS}
-          onClick={(event) => {
-            const openTelegramLink = window.Telegram?.WebApp?.openTelegramLink
-            if (!openTelegramLink) return
-            event.preventDefault()
-            openTelegramLink.call(window.Telegram?.WebApp, links.telegramUrl as string)
-          }}
+    <div className="relative w-[142px] shrink-0 pt-8">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0 top-0 flex items-start text-[var(--accent)]"
+      >
+        <span
+          className="-rotate-6 whitespace-nowrap text-[15px] font-bold italic tracking-wide drop-shadow-[0_0_8px_rgba(255,122,0,0.25)]"
+          style={{ fontFamily: "'Bradley Hand', 'Comic Sans MS', cursive" }}
         >
-          <TelegramIcon />
-        </a>
-      )}
-      {links.discordUrl && (
-        <a
-          href={links.discordUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Наш Discord"
-          className={ICON_BUTTON_CLASS}
+          Граємо тут
+        </span>
+        <svg
+          width="48"
+          height="31"
+          viewBox="0 0 48 31"
+          fill="none"
+          className="ml-1 mt-0.5 overflow-visible drop-shadow-[0_0_5px_rgba(255,122,0,0.3)]"
         >
-          <DiscordIcon />
-        </a>
-      )}
+          <path
+            d="M2 3C23 1 15 23 40 24"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M34.5 18.5 41 24l-7 4"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        {links.telegramUrl && (
+          <a
+            href={links.telegramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Наш Telegram"
+            className={ICON_BUTTON_CLASS}
+            onClick={(event) => {
+              const openTelegramLink = window.Telegram?.WebApp?.openTelegramLink
+              if (!openTelegramLink) return
+              event.preventDefault()
+              openTelegramLink.call(window.Telegram?.WebApp, links.telegramUrl as string)
+            }}
+          >
+            <TelegramIcon />
+          </a>
+        )}
+        {links.discordUrl && (
+          <a
+            href={links.discordUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Наш Discord"
+            className={ICON_BUTTON_CLASS}
+          >
+            <DiscordIcon />
+          </a>
+        )}
+      </div>
     </div>
   )
 }
