@@ -127,7 +127,7 @@ create table if not exists event_templates (
   description text,
   location text not null,
   is_online boolean not null default false,
-  max_participants integer not null check (max_participants > 0),
+  max_participants integer not null default 12 check (max_participants > 0),
   group_url text,
   game_url text,
   game_url_required boolean not null default false,

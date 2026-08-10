@@ -22,7 +22,6 @@ export interface EventTemplateInput {
   description: string
   location: string
   isOnline: boolean
-  maxParticipants: number
   groupUrl?: string
   gameUrl?: string
   gameUrlRequired: boolean
@@ -36,7 +35,6 @@ function toTemplate(row: EventTemplateRow): EventTemplate {
     description: row.description ?? '',
     location: row.location,
     isOnline: row.is_online,
-    maxParticipants: row.max_participants,
     groupUrl: row.group_url ?? undefined,
     gameUrl: row.game_url ?? undefined,
     gameUrlRequired: row.game_url_required,
@@ -64,15 +62,14 @@ export const eventTemplatesRepository = {
     const { rows } = await query<EventTemplateRow>(
       `insert into event_templates
          (title, description, location, is_online,
-          max_participants, group_url, game_url, game_url_required, dormitory_id, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+          group_url, game_url, game_url_required, dormitory_id, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8, now())
        returning *`,
       [
         input.title,
         input.description || null,
         input.location,
         input.isOnline,
-        input.maxParticipants,
         input.groupUrl || null,
         input.gameUrl || null,
         input.gameUrlRequired,
@@ -86,8 +83,8 @@ export const eventTemplatesRepository = {
     const { rows } = await query<EventTemplateRow>(
       `update event_templates set
          title = $2, description = $3, location = $4,
-         is_online = $5, max_participants = $6, group_url = $7,
-         game_url = $8, game_url_required = $9, dormitory_id = $10,
+         is_online = $5, group_url = $6,
+         game_url = $7, game_url_required = $8, dormitory_id = $9,
          updated_at = now()
        where id = $1
        returning *`,
@@ -97,7 +94,6 @@ export const eventTemplatesRepository = {
         input.description || null,
         input.location,
         input.isOnline,
-        input.maxParticipants,
         input.groupUrl || null,
         input.gameUrl || null,
         input.gameUrlRequired,

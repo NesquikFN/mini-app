@@ -425,6 +425,7 @@ export async function createEventFromTemplate(
    * для якого використовуємо значення шаблону. */
   date: string,
   time: string,
+  maxParticipants: number,
   overrideGameUrl?: string | null,
 ): Promise<EventResponse> {
   const template = await eventTemplatesRepository.findById(templateId)
@@ -449,7 +450,7 @@ export async function createEventFromTemplate(
         location: template.isOnline ? 'Онлайн' : template.location,
         isOnline: template.isOnline,
         vipOnly: false,
-        maxParticipants: template.maxParticipants,
+        maxParticipants,
         groupUrl: template.groupUrl,
         gameUrl,
         deferNotification: Boolean(template.imageUrl),

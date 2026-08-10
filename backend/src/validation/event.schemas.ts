@@ -86,6 +86,10 @@ export const eventTemplateIdParamSchema = z.object({
 export const createEventFromTemplateSchema = z.object({
   date: dateSchema,
   time: timeSchema,
+  maxParticipants: z
+    .number('Кількість учасників має бути числом')
+    .int('Має бути цілим числом')
+    .positive('Має бути більше 0'),
   gameUrl: gameUrlSchema.nullable().optional(),
 })
 
@@ -95,7 +99,6 @@ export const eventTemplateSchema = z
     description: z.string().trim().default(''),
     location: z.string().trim().min(1, 'Місце обовʼязкове'),
     isOnline: z.boolean().default(false),
-    maxParticipants: z.number().int().positive(),
     groupUrl: telegramGroupUrlSchema.optional(),
     gameUrl: gameUrlSchema.optional(),
     gameUrlRequired: z.boolean().default(false),

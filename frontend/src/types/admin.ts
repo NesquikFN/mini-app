@@ -145,7 +145,6 @@ export interface EventTemplate {
   description: string
   location: string
   isOnline: boolean
-  maxParticipants: number
   groupUrl?: string
   gameUrl?: string
   gameUrlRequired: boolean
@@ -160,7 +159,6 @@ export interface EventTemplateInput {
   description: string
   location: string
   isOnline: boolean
-  maxParticipants: number
   groupUrl?: string
   gameUrl?: string
   gameUrlRequired: boolean

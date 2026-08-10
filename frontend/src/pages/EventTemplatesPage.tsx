@@ -44,6 +44,7 @@ export function EventTemplatesPage() {
   const [publishing, setPublishing] = useState<EventTemplate | null>(null)
   const [publishDate, setPublishDate] = useState('')
   const [publishTime, setPublishTime] = useState('')
+  const [publishMaxParticipants, setPublishMaxParticipants] = useState('12')
   const [publishGameUrl, setPublishGameUrl] = useState('')
   const [publishSaving, setPublishSaving] = useState(false)
 
@@ -105,6 +106,7 @@ export function EventTemplatesPage() {
     setPublishing(template)
     setPublishDate('')
     setPublishTime('')
+    setPublishMaxParticipants('12')
     setPublishGameUrl(template.gameUrl ?? '')
     setErrorMessage(null)
   }
@@ -118,6 +120,7 @@ export function EventTemplatesPage() {
         publishing.id,
         publishDate,
         publishTime,
+        Number(publishMaxParticipants),
         publishGameUrl.trim() || null,
       )
       reloadEvents()
@@ -317,7 +320,7 @@ export function EventTemplatesPage() {
                 Коли провести «{publishing.title}»?
               </p>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Оберіть дату та час для нової події.
+                Оберіть дату, час і кількість учасників для нової події.
               </p>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <input
@@ -338,6 +341,19 @@ export function EventTemplatesPage() {
                 />
               </div>
               <label className="mt-4 flex flex-col gap-1.5 text-sm text-[var(--text-primary)]">
+                Максимальна кількість учасників
+                <input
+                  required
+                  min={1}
+                  type="number"
+                  inputMode="numeric"
+                  value={publishMaxParticipants}
+                  onChange={(event) => setPublishMaxParticipants(event.target.value)}
+                  placeholder="Наприклад, 12"
+                  className={inputClass}
+                />
+              </label>
+              <label className="mt-4 flex flex-col gap-1.5 text-sm text-[var(--text-primary)]">
                 Посилання на гру {publishing.gameUrlRequired ? '(обовʼязково)' : '(необовʼязково)'}
                 <input
                   required={publishing.gameUrlRequired}
@@ -356,7 +372,7 @@ export function EventTemplatesPage() {
                   type="submit"
                   fullWidth
                   loading={publishSaving}
-                  disabled={!publishDate || !publishTime || (publishing.gameUrlRequired && !publishGameUrl.trim())}
+                  disabled={!publishDate || !publishTime || Number(publishMaxParticipants) < 1 || (publishing.gameUrlRequired && !publishGameUrl.trim())}
                 >
                   Створити
                 </Button>
@@ -385,7 +401,6 @@ function TemplateForm({
   const [description, setDescription] = useState(template?.description ?? '')
   const [isOnline, setIsOnline] = useState(template?.isOnline ?? false)
   const [location, setLocation] = useState(template?.isOnline ? '' : template?.location ?? '')
-  const [maxParticipants, setMaxParticipants] = useState(String(template?.maxParticipants ?? 12))
   const [groupUrl, setGroupUrl] = useState(template?.groupUrl ?? '')
   const [gameUrl, setGameUrl] = useState(template?.gameUrl ?? '')
   const [gameUrlRequired, setGameUrlRequired] = useState(template?.gameUrlRequired ?? false)
@@ -417,7 +432,6 @@ function TemplateForm({
       description: description.trim(),
       isOnline,
       location: isOnline ? 'Онлайн' : location.trim(),
-      maxParticipants: Number(maxParticipants),
       groupUrl: groupUrl.trim() || undefined,
       gameUrl: gameUrl.trim() || undefined,
       gameUrlRequired,
@@ -457,7 +471,6 @@ function TemplateForm({
           <input required value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Місце" className={inputClass} />
         </>
       )}
-      <input required min={1} type="number" value={maxParticipants} onChange={(event) => setMaxParticipants(event.target.value)} placeholder="Максимум учасників" className={inputClass} />
       <input value={groupUrl} onChange={(event) => setGroupUrl(event.target.value)} placeholder="@group або https://t.me/group" className={inputClass} />
       <input type="url" value={gameUrl} onChange={(event) => setGameUrl(event.target.value)} placeholder="Посилання на гру (необовʼязково)" className={inputClass} />
       <label className="flex items-center justify-between rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-3 py-3 text-sm text-[var(--text-primary)]">

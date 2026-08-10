@@ -11,7 +11,6 @@ const templateInput = {
   description: '',
   location: 'Онлайн',
   isOnline: true,
-  maxParticipants: 12,
   gameUrlRequired: true,
 }
 
@@ -26,8 +25,12 @@ describe('event template launch schema', () => {
   it('requires a date and time when the template is launched', () => {
     assert.equal(createEventFromTemplateSchema.safeParse({ gameUrl: null }).success, false)
     assert.equal(
-      createEventFromTemplateSchema.safeParse({ date: '2099-09-10', time: '19:30', gameUrl: null }).success,
+      createEventFromTemplateSchema.safeParse({ date: '2099-09-10', time: '19:30', maxParticipants: 12, gameUrl: null }).success,
       true,
+    )
+    assert.equal(
+      createEventFromTemplateSchema.safeParse({ date: '2099-09-10', time: '19:30', gameUrl: null }).success,
+      false,
     )
   })
 
@@ -36,12 +39,13 @@ describe('event template launch schema', () => {
       createEventFromTemplateSchema.safeParse({
         date: '2099-09-10',
         time: '19:30',
+        maxParticipants: 12,
         gameUrl: 'https://example.com/join',
       }).success,
       true,
     )
     assert.equal(
-      createEventFromTemplateSchema.safeParse({ date: '2099-09-10', time: '19:30', gameUrl: 'javascript:alert(1)' }).success,
+      createEventFromTemplateSchema.safeParse({ date: '2099-09-10', time: '19:30', maxParticipants: 12, gameUrl: 'javascript:alert(1)' }).success,
       false,
     )
   })

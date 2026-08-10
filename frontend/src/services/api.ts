@@ -610,11 +610,12 @@ export async function createEventFromTemplate(
   id: string,
   date: string,
   time: string,
+  maxParticipants: number,
   gameUrl: string | null,
 ): Promise<DormEvent> {
   const data = await request<{ event: DormEvent }>(
     `/event-templates/${id}/create-event`,
-    { method: 'POST', body: JSON.stringify({ date, time, gameUrl }) },
+    { method: 'POST', body: JSON.stringify({ date, time, maxParticipants, gameUrl }) },
   )
   return data.event
 }
