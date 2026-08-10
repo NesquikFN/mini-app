@@ -1,18 +1,34 @@
-import { useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
-import { Crown, ImagePlus, MonitorPlay, X } from 'lucide-react'
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
+import { Crown, Eraser, ImagePlus, MonitorPlay, X } from 'lucide-react'
 import { Button } from './Button'
 import type { CreateEventInput, DormEvent } from '../types/event'
 import { todayISODate } from '../utils/date'
 
 interface EventFormProps {
-  onSubmit: (input: CreateEventInput) => Promise<void> | void
+  onSubmit: (input: CreateEventInput) => Promise<boolean | void> | boolean | void
   submitting: boolean
   initialValues?: DormEvent
   submitLabel?: string
   submittingLabel?: string
   canCreateVipOnly?: boolean
   onlineOnly?: boolean
+  draftStorageKey?: string
 }
+
+interface EventFormDraft {
+  title: string
+  description: string
+  date: string
+  time: string
+  location: string
+  maxParticipants: string
+  groupUrl: string
+  gameUrl: string
+  isOnline: boolean
+  vipOnly: boolean
+}
+
+const draftImages = new Map<string, { file: File; previewUrl: string }>()
 
 interface FormErrors {
   title?: string
@@ -33,22 +49,62 @@ export function EventForm({
   submittingLabel = 'Створюємо…',
   canCreateVipOnly = false,
   onlineOnly = false,
+  draftStorageKey,
 }: EventFormProps) {
-  const [title, setTitle] = useState(initialValues?.title ?? '')
-  const [description, setDescription] = useState(initialValues?.description ?? '')
-  const [date, setDate] = useState(initialValues?.date ?? '')
-  const [time, setTime] = useState(initialValues?.time?.slice(0, 5) ?? '')
-  const [location, setLocation] = useState(initialValues?.isOnline ? '' : initialValues?.location ?? '')
-  const [maxParticipants, setMaxParticipants] = useState(
-    initialValues ? String(initialValues.maxParticipants) : '',
+  const [savedDraft] = useState<EventFormDraft | null>(() =>
+    initialValues ? null : readDraft(draftStorageKey),
   )
-  const [groupUrl, setGroupUrl] = useState(initialValues?.groupUrl ?? '')
-  const [gameUrl, setGameUrl] = useState(initialValues?.gameUrl ?? '')
-  const [isOnline, setIsOnline] = useState(onlineOnly || initialValues?.isOnline || false)
-  const [vipOnly, setVipOnly] = useState(initialValues?.vipOnly ?? false)
-  const [imageFile, setImageFile] = useState<File | undefined>()
-  const [imagePreview, setImagePreview] = useState<string | undefined>(initialValues?.imageUrl)
+  const savedImage = draftStorageKey ? draftImages.get(draftStorageKey) : undefined
+  const [title, setTitle] = useState(initialValues?.title ?? savedDraft?.title ?? '')
+  const [description, setDescription] = useState(initialValues?.description ?? savedDraft?.description ?? '')
+  const [date, setDate] = useState(initialValues?.date ?? savedDraft?.date ?? '')
+  const [time, setTime] = useState(initialValues?.time?.slice(0, 5) ?? savedDraft?.time ?? '')
+  const [location, setLocation] = useState(
+    initialValues?.isOnline ? '' : initialValues?.location ?? savedDraft?.location ?? '',
+  )
+  const [maxParticipants, setMaxParticipants] = useState(
+    initialValues ? String(initialValues.maxParticipants) : savedDraft?.maxParticipants ?? '',
+  )
+  const [groupUrl, setGroupUrl] = useState(initialValues?.groupUrl ?? savedDraft?.groupUrl ?? '')
+  const [gameUrl, setGameUrl] = useState(initialValues?.gameUrl ?? savedDraft?.gameUrl ?? '')
+  const [isOnline, setIsOnline] = useState(
+    onlineOnly || initialValues?.isOnline || savedDraft?.isOnline || false,
+  )
+  const [vipOnly, setVipOnly] = useState(initialValues?.vipOnly ?? savedDraft?.vipOnly ?? false)
+  const [imageFile, setImageFile] = useState<File | undefined>(savedImage?.file)
+  const [imagePreview, setImagePreview] = useState<string | undefined>(
+    initialValues?.imageUrl ?? savedImage?.previewUrl,
+  )
   const [errors, setErrors] = useState<FormErrors>({})
+
+  useEffect(() => {
+    if (!draftStorageKey || initialValues) return
+    writeDraft(draftStorageKey, {
+      title,
+      description,
+      date,
+      time,
+      location,
+      maxParticipants,
+      groupUrl,
+      gameUrl,
+      isOnline,
+      vipOnly,
+    })
+  }, [
+    date,
+    description,
+    draftStorageKey,
+    gameUrl,
+    groupUrl,
+    initialValues,
+    isOnline,
+    location,
+    maxParticipants,
+    time,
+    title,
+    vipOnly,
+  ])
 
   function validate(): FormErrors {
     const nextErrors: FormErrors = {}
@@ -102,8 +158,12 @@ export function EventForm({
       return
     }
     if (imagePreview) URL.revokeObjectURL(imagePreview)
+    const previewUrl = URL.createObjectURL(file)
     setImageFile(file)
-    setImagePreview(URL.createObjectURL(file))
+    setImagePreview(previewUrl)
+    if (draftStorageKey && !initialValues) {
+      draftImages.set(draftStorageKey, { file, previewUrl })
+    }
     setErrors((current) => ({ ...current, image: undefined }))
   }
 
@@ -111,6 +171,28 @@ export function EventForm({
     if (imagePreview) URL.revokeObjectURL(imagePreview)
     setImageFile(undefined)
     setImagePreview(initialValues?.imageUrl)
+    if (draftStorageKey) draftImages.delete(draftStorageKey)
+  }
+
+  function clearForm() {
+    if (imagePreview && imageFile) URL.revokeObjectURL(imagePreview)
+    setTitle('')
+    setDescription('')
+    setDate('')
+    setTime('')
+    setLocation('')
+    setMaxParticipants('')
+    setGroupUrl('')
+    setGameUrl('')
+    setIsOnline(onlineOnly)
+    setVipOnly(false)
+    setImageFile(undefined)
+    setImagePreview(initialValues?.imageUrl)
+    setErrors({})
+    if (draftStorageKey) {
+      draftImages.delete(draftStorageKey)
+      removeDraft(draftStorageKey)
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -119,7 +201,7 @@ export function EventForm({
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    await onSubmit({
+    const submitted = await onSubmit({
       title: title.trim(),
       description: description.trim(),
       date,
@@ -132,6 +214,7 @@ export function EventForm({
       vipOnly: canCreateVipOnly ? vipOnly : false,
       imageFile,
     })
+    if (draftStorageKey && submitted !== false) clearForm()
   }
 
   return (
@@ -299,16 +382,55 @@ export function EventForm({
         />
       </Field>
 
-      <Button
-        type="submit"
-        fullWidth
-        loading={submitting}
-        disabled={submitting}
-      >
-        {submitting ? submittingLabel : submitLabel}
-      </Button>
+      <div className={`grid gap-3 ${draftStorageKey ? 'grid-cols-[auto_1fr]' : 'grid-cols-1'}`}>
+        {draftStorageKey && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={submitting}
+            onClick={clearForm}
+            className="px-4"
+          >
+            <Eraser size={18} /> Очистити
+          </Button>
+        )}
+        <Button
+          type="submit"
+          fullWidth
+          loading={submitting}
+          disabled={submitting}
+        >
+          {submitting ? submittingLabel : submitLabel}
+        </Button>
+      </div>
     </form>
   )
+}
+
+function readDraft(key?: string): EventFormDraft | null {
+  if (!key) return null
+  try {
+    const value = window.sessionStorage.getItem(key)
+    return value ? JSON.parse(value) as EventFormDraft : null
+  } catch {
+    return null
+  }
+}
+
+function writeDraft(key: string, draft: EventFormDraft) {
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(draft))
+  } catch {
+    // The form remains usable even when storage is unavailable.
+  }
+}
+
+function removeDraft(key: string) {
+  try {
+    window.sessionStorage.removeItem(key)
+  } catch {
+    // Nothing else to clear when storage is unavailable.
+  }
 }
 
 function inputClass(hasError: boolean): string {

@@ -16,7 +16,7 @@ export function CreateEventPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  async function handleSubmit(input: CreateEventInput) {
+  async function handleSubmit(input: CreateEventInput): Promise<boolean> {
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -24,8 +24,10 @@ export function CreateEventPage() {
       navigate('/events', {
         state: { successMessage: 'Подію успішно створено!' },
       })
+      return true
     } catch (error) {
       setSubmitError(getErrorMessage(error))
+      return false
     } finally {
       setSubmitting(false)
     }
@@ -58,6 +60,7 @@ export function CreateEventPage() {
           submitting={submitting}
           canCreateVipOnly={Boolean(user?.isVip)}
           onlineOnly={user?.dormitoryId === NO_DORMITORY_ID}
+          draftStorageKey="dormhub:create-event-draft:v1"
         />
       </div>
     </div>
