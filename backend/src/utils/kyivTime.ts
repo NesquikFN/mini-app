@@ -56,6 +56,19 @@ export function kyivTimestamp(offsetMinutes = 0): string {
   return `${date}T${time}:00`
 }
 
+/**
+ * Чи настав уже момент `date`+`time` за київським «стінним» часом.
+ * Єдине джерело правди для «дата в минулому / подія вже завершилась»:
+ * і валідація при створенні події, і гейт архіву при вступі мають
+ * відповідати однаково, інакше можна створити подію, до якої одразу
+ * неможливо приєднатись. Порівняння лексикографічне — обидва боки в
+ * фіксованому форматі YYYY-MM-DDTHH:MM.
+ */
+export function isKyivDateTimeInPast(date: string, time: string): boolean {
+  const now = kyivNow()
+  return `${date}T${time.slice(0, 5)}` < `${now.date}T${now.time}`
+}
+
 /** Adds `days` to an ISO date string, done entirely in UTC-anchored Date
  * arithmetic so it never depends on (and is never skewed by) the host's
  * own local timezone. */

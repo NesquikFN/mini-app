@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { uuidParam } from './common.schemas'
 
 export const notificationSettingsSchema = z.object({
   chatId: z.string().regex(/^-?\d+$/, 'Некоректний Telegram chat_id').nullable(),
@@ -45,15 +46,22 @@ export const rejectRegistrationSchema = z.object({
 })
 
 export const userIdParamSchema = z.object({
-  id: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
+  id: uuidParam('Некоректний ідентифікатор користувача'),
 })
 
 export const addAdminSchema = z.object({
-  telegramId: z.number('Telegram ID має бути числом').int().positive(),
+  // Telegram ID лишається number (у БД bigint, читається через Number) —
+  // верхня межа на рівні MAX_SAFE_INTEGER лише щоб не приймати значення,
+  // яке вже втратило точність під час JSON.parse.
+  telegramId: z
+    .number('Telegram ID має бути числом')
+    .int()
+    .positive()
+    .max(Number.MAX_SAFE_INTEGER, 'Некоректний Telegram ID'),
 })
 
 export const adminUserIdParamSchema = z.object({
-  userId: z.string().min(1, 'Ідентифікатор користувача обовʼязковий'),
+  userId: uuidParam('Некоректний ідентифікатор користувача'),
 })
 
 export const banUserSchema = z

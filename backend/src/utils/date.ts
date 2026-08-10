@@ -1,3 +1,5 @@
+import { addDaysToISODate, kyivNow } from './kyivTime'
+
 export function toISODate(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -11,8 +13,19 @@ export function addDays(date: Date, days: number): Date {
   return result
 }
 
+/**
+ * «Сьогодні» завжди за київським часом, а не за таймзоною процесу.
+ * Контейнер на Railway живе в UTC, тож між 00:00 і 03:00 за Києвом
+ * локальна дата хоста ще вчорашня — і валідація «дата не в минулому»
+ * розходилась би з архівацією події, яка рахується за Києвом.
+ */
 export function todayISODate(): string {
-  return toISODate(new Date())
+  return kyivNow().date
+}
+
+/** `days` днів від київського «сьогодні», у тому ж форматі YYYY-MM-DD. */
+export function daysFromTodayISODate(days: number): string {
+  return addDaysToISODate(todayISODate(), days)
 }
 
 export function isValidCalendarDate(value: string): boolean {

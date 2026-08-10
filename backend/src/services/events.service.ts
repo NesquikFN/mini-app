@@ -5,11 +5,16 @@ import {
   type EventTemplateInput,
 } from '../repositories/event-templates.repository'
 import { AppError } from '../utils/AppError'
-import { kyivNow } from '../utils/kyivTime'
 import type { Event } from '../types/event'
 import type { PublicUser } from '../types/user'
 import type { EventTemplate } from '../types/admin'
-import type { CreateEventInput, UpdateEventInput } from '../validation/event.schemas'
+import type {
+  CreateEventInput,
+  InternalEventPatch,
+  UpdateEventInput,
+} from '../validation/event.schemas'
+import { assertEventEditable, assertEventInvariants } from './event-invariants'
+import { isKyivDateTimeInPast } from '../utils/kyivTime'
 import { settingsRepository } from '../repositories/settings.repository'
 import {
   buildEventDeepLink,
@@ -198,13 +203,16 @@ export async function createEvent(
       'Спочатку оберіть гуртожиток у профілі',
     )
   }
-  if (creatorDormitoryId === NO_DORMITORY_ID && !input.isOnline) {
-    throw new AppError(
-      400,
-      'ONLINE_EVENT_REQUIRED',
-      'Без гуртожитку можна створювати лише онлайн-події',
-    )
-  }
+  // Ті самі інваріанти, що й у updateOwnEvent — спільна функція, щоб
+  // два шляхи запису не розійшлись знову.
+  assertEventInvariants({
+    dormitoryId: creatorDormitoryId,
+    isOnline: input.isOnline,
+    location: input.location,
+    date: input.date,
+    time: input.time,
+    maxParticipants: input.maxParticipants,
+  })
   if (input.vipOnly && !(await vipsRepository.isVip(creatorId))) {
     throw new AppError(403, 'VIP_ACCESS_REQUIRED', 'Недостатньо прав для VIP-події')
   }
@@ -267,13 +275,17 @@ export async function announceEvent(event: EventResponse): Promise<void> {
   })
 }
 
-/** Лише адмін-панель — звичайний Mini App редагування подій не пропонує. */
+/**
+ * Внутрішнє оновлення полів, які виставляє сам сервер (зараз — лише
+ * обкладинка після успішної обробки завантаженого файлу). Недосяжне з
+ * тіла HTTP-запиту: InternalEventPatch не входить у жодну Zod-схему.
+ */
 export async function updateEvent(
   id: string,
-  input: UpdateEventInput,
+  patch: InternalEventPatch,
 ): Promise<EventResponse> {
   await getEventOrThrow(id)
-  return attachParticipantPreview(toEventResponse(await eventsRepository.update(id, input)))
+  return attachParticipantPreview(toEventResponse(await eventsRepository.update(id, patch)))
 }
 
 export async function updateOwnEvent(
@@ -288,16 +300,21 @@ export async function updateOwnEvent(
   if ((event.vipOnly || input.vipOnly) && !(await vipsRepository.isVip(creatorId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
-  if (
-    input.maxParticipants !== undefined &&
-    input.maxParticipants < event.participantIds.length
-  ) {
-    throw new AppError(
-      400,
-      'MAX_PARTICIPANTS_TOO_SMALL',
-      'Ліміт не може бути меншим за поточну кількість учасників',
-    )
-  }
+
+  assertEventEditable(event)
+  // Перевіряємо підсумковий стан події (поточні значення + патч), а не
+  // сам патч: інакше, наприклад, зміна лише isOnline проскочила б повз
+  // перевірку гуртожитку, бо в тілі запиту немає ні дати, ні місця.
+  assertEventInvariants({
+    dormitoryId: event.dormitoryId,
+    isOnline: input.isOnline ?? event.isOnline,
+    location: input.location ?? event.location,
+    date: input.date ?? event.date,
+    time: input.time ?? event.time,
+    maxParticipants: input.maxParticipants ?? event.maxParticipants,
+    currentParticipantCount: event.participantIds.length,
+  })
+
   return attachParticipantPreview(toEventResponse(await eventsRepository.update(id, input)))
 }
 
@@ -352,8 +369,7 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
   if (event.vipOnly && !(await vipsRepository.isVip(userId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
-  const now = kyivNow()
-  if (`${event.date}T${event.time.slice(0, 5)}` < `${now.date}T${now.time}`) {
+  if (isKyivDateTimeInPast(event.date, event.time)) {
     throw new AppError(409, 'EVENT_ARCHIVED', 'Цю подію вже завершено')
   }
   // Перевірка ліміту місць і повторного приєднання відбувається
