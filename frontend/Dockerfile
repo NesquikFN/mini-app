@@ -22,9 +22,16 @@ RUN npm run build --workspace=frontend
 # --- runtime stage: serve the static SPA build ---
 FROM node:22-alpine
 WORKDIR /app
-RUN npm install -g serve
+# Версія зафіксована: формат serve.json (заголовки безпеки нижче)
+# перевірявся саме на 14.x, і мовчазний мажорний апгрейд під час
+# збірки не повинен ламати роздачу.
+RUN npm install -g serve@14
 
 COPY --from=build /app/frontend/dist ./dist
+# Заголовки безпеки для статики. Лежить ПОЗА ./dist навмисно — інакше
+# serve роздавав би сам конфіг за /serve.json. Шлях у --config
+# резолвиться відносно теки, що роздається, тому він абсолютний.
+COPY frontend/serve.json ./serve.json
 
 EXPOSE 3000
-CMD sh -c "serve -s dist -l ${PORT:-3000}"
+CMD sh -c "serve -s dist -l ${PORT:-3000} --config /app/serve.json"

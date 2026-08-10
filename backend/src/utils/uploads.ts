@@ -164,4 +164,3 @@ async function removeLegacyCovers(relativeDir: string, keepRelativePath: string)
     }),
   )
 }
-

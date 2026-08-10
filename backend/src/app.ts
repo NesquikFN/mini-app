@@ -5,6 +5,7 @@ import { apiRouter } from './routes'
 import { requestLogger } from './middleware/requestLogger'
 import { notFoundHandler } from './middleware/notFoundHandler'
 import { errorHandler } from './middleware/errorHandler'
+import { securityHeaders, noStore, uploadsHeaders } from './middleware/securityHeaders'
 import { globalRateLimiter } from './middleware/rateLimit'
 
 export const app = express()
@@ -20,18 +21,14 @@ app.set('trust proxy', 1)
 app.use(cors({ origin: env.FRONTEND_URL }))
 app.use(express.json({ limit: '100kb' }))
 
-app.use((_req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.setHeader('X-Frame-Options', 'DENY')
-  next()
-})
+app.use(securityHeaders)
 
 if (env.NODE_ENV === 'development') {
   app.use(requestLogger)
 }
 
-app.use('/uploads', express.static(env.UPLOADS_DIR))
-app.use('/api', globalRateLimiter, apiRouter)
+app.use('/uploads', uploadsHeaders, express.static(env.UPLOADS_DIR))
+app.use('/api', globalRateLimiter, noStore, apiRouter)
 
 app.use(notFoundHandler)
 app.use(errorHandler)
