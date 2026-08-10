@@ -10,7 +10,7 @@ export function SocialLinks({ links }: { links: SocialLinksType | undefined }) {
   if (!links?.discordUrl && !links?.telegramUrl) return null
 
   return (
-    <div className="w-[142px] shrink-0">
+    <div className="relative w-[142px] shrink-0">
       <div className="flex items-center justify-end gap-2">
         {links.telegramUrl && (
           <a
@@ -44,35 +44,32 @@ export function SocialLinks({ links }: { links: SocialLinksType | undefined }) {
 
       <div
         aria-hidden="true"
-        className="pointer-events-none relative mt-1 h-10 text-[var(--accent)]"
+        className="pointer-events-none absolute right-0 top-[34px] h-11 w-full text-[var(--accent)]"
       >
-        <span
-          className="absolute bottom-0 left-0 -rotate-3 whitespace-nowrap text-[15px] font-bold italic tracking-wide drop-shadow-[0_0_8px_rgba(255,122,0,0.25)]"
-          style={{ fontFamily: "'Bradley Hand', 'Comic Sans MS', cursive" }}
-        >
-          Граємо тут
-        </span>
         <svg
-          width="52"
-          height="39"
-          viewBox="0 0 52 39"
+          width="142"
+          height="44"
+          viewBox="0 0 142 44"
           fill="none"
-          className="absolute -top-1 right-0 overflow-visible drop-shadow-[0_0_5px_rgba(255,122,0,0.3)]"
+          className="absolute inset-0 overflow-visible drop-shadow-[0_0_5px_rgba(255,122,0,0.35)]"
         >
           <path
-            d="M2 35C42 39 51 12 31 2"
+            d="M48 38C8 39 24 8 79 2"
             stroke="currentColor"
-            strokeWidth="2.4"
+            strokeWidth="2.7"
             strokeLinecap="round"
           />
           <path
-            d="M31 2 31.5 10M31 2l7 3.5"
+            d="M79 2 70.5 6.5M79 2l1 9"
             stroke="currentColor"
-            strokeWidth="2.4"
+            strokeWidth="2.7"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>
+        <span className="absolute bottom-0 right-0 whitespace-nowrap rounded-full bg-orange-500/10 px-2 py-0.5 text-[14px] font-extrabold italic tracking-normal drop-shadow-[0_0_8px_rgba(255,122,0,0.3)]">
+          Граємо тут
+        </span>
       </div>
     </div>
   )
