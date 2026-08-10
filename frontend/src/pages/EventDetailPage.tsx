@@ -234,7 +234,7 @@ export function EventDetailPage() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[var(--surface-bg)] to-transparent" />
       </div>
 
-      <main className="flex flex-col gap-6 px-4 pb-44">
+      <main className="relative z-[1] flex flex-col gap-6 px-4 pt-4 pb-44">
         {isArchived && (
           <div className="inline-flex items-center gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)]">
             <Archive size={18} className="text-[var(--accent)]" />
@@ -247,7 +247,7 @@ export function EventDetailPage() {
           </div>
         )}
 
-        <section className="-mt-5 flex items-center gap-3">
+        <section className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             {membersStatus === 'loading' && (
               <div className="h-12 animate-pulse rounded-xl bg-[var(--surface-card-alt)]" />
