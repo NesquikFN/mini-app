@@ -10,40 +10,7 @@ export function SocialLinks({ links }: { links: SocialLinksType | undefined }) {
   if (!links?.discordUrl && !links?.telegramUrl) return null
 
   return (
-    <div className="relative w-[142px] shrink-0 pt-8">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-0 flex items-start text-[var(--accent)]"
-      >
-        <span
-          className="-rotate-6 whitespace-nowrap text-[15px] font-bold italic tracking-wide drop-shadow-[0_0_8px_rgba(255,122,0,0.25)]"
-          style={{ fontFamily: "'Bradley Hand', 'Comic Sans MS', cursive" }}
-        >
-          Граємо тут
-        </span>
-        <svg
-          width="48"
-          height="31"
-          viewBox="0 0 48 31"
-          fill="none"
-          className="ml-1 mt-0.5 overflow-visible drop-shadow-[0_0_5px_rgba(255,122,0,0.3)]"
-        >
-          <path
-            d="M2 3C23 1 15 23 40 24"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
-          <path
-            d="M34.5 18.5 41 24l-7 4"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-
+    <div className="w-[142px] shrink-0">
       <div className="flex items-center justify-end gap-2">
         {links.telegramUrl && (
           <a
@@ -73,6 +40,39 @@ export function SocialLinks({ links }: { links: SocialLinksType | undefined }) {
             <DiscordIcon />
           </a>
         )}
+      </div>
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none relative mt-1 h-10 text-[var(--accent)]"
+      >
+        <span
+          className="absolute bottom-0 left-0 -rotate-3 whitespace-nowrap text-[15px] font-bold italic tracking-wide drop-shadow-[0_0_8px_rgba(255,122,0,0.25)]"
+          style={{ fontFamily: "'Bradley Hand', 'Comic Sans MS', cursive" }}
+        >
+          Граємо тут
+        </span>
+        <svg
+          width="52"
+          height="39"
+          viewBox="0 0 52 39"
+          fill="none"
+          className="absolute -top-1 right-0 overflow-visible drop-shadow-[0_0_5px_rgba(255,122,0,0.3)]"
+        >
+          <path
+            d="M2 35C42 39 51 12 31 2"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M31 2 31.5 10M31 2l7 3.5"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
     </div>
   )
