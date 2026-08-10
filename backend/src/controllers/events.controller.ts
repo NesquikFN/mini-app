@@ -7,7 +7,7 @@ import {
   updateEventSchema,
   userIdParamSchema,
 } from '../validation/event.schemas'
-import { IMAGE_EXTENSIONS_BY_CONTENT_TYPE, saveUpload } from '../utils/uploads'
+import { processAndStoreImage } from '../utils/uploads'
 import { AppError } from '../utils/AppError'
 
 export async function listEvents(req: Request, res: Response): Promise<void> {
@@ -66,13 +66,10 @@ export async function uploadEventImage(req: Request, res: Response): Promise<voi
     throw new AppError(400, 'IMAGE_REQUIRED', 'Оберіть фотографію')
   }
 
-  const contentType = req.headers['content-type'] ?? ''
-  const extension = IMAGE_EXTENSIONS_BY_CONTENT_TYPE[contentType]
-  if (!extension) {
-    throw new AppError(415, 'IMAGE_TYPE_UNSUPPORTED', 'Підтримуються JPG, PNG або WebP')
-  }
-
-  const imageUrl = await saveUpload(`${id}/cover.${extension}`, req.body)
+  // Перевірка сигнатури, нормалізація й видалення EXIF — усередині
+  // processAndStoreImage. Ім'я файлу повністю серверне (id події вже
+  // провалідований як UUID), клієнт на шлях не впливає.
+  const imageUrl = await processAndStoreImage(id, req.body, req.headers['content-type'] ?? '')
   const updated = await eventsService.updateEvent(id, { imageUrl })
   if (req.query.announce === 'true') {
     await eventsService.announceEvent(updated)

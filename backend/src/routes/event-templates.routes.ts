@@ -2,12 +2,13 @@ import { Router, raw } from 'express'
 import * as eventTemplatesController from '../controllers/event-templates.controller'
 import { requireTemplateManager } from '../middleware/requireTemplateManager'
 import { imageUploadRateLimiter, templateLaunchRateLimiter } from '../middleware/rateLimit'
+import { MAX_IMAGE_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '../utils/uploads'
 
 /**
- * Mounted at /api/event-templates with only requireTelegramAuth (see
- * routes/index.ts) — every authenticated user can browse and launch a
- * template. Creating/editing/deleting one additionally requires
- * requireTemplateManager (admin or host).
+ * Змонтований із requireTelegramAuth + requireApprovedUser (див.
+ * routes/index.ts) — переглядати й запускати шаблони може будь-який
+ * схвалений користувач. Створення/редагування/видалення додатково
+ * вимагає requireTemplateManager (admin або host).
  */
 export const eventTemplatesRouter = Router()
 
@@ -23,7 +24,7 @@ eventTemplatesRouter.put(
   '/:templateId/image',
   requireTemplateManager,
   imageUploadRateLimiter,
-  raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
+  raw({ type: UPLOAD_CONTENT_TYPES, limit: MAX_IMAGE_UPLOAD_BYTES }),
   eventTemplatesController.uploadEventTemplateImage,
 )
 eventTemplatesRouter.delete(

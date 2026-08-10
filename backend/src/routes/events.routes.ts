@@ -1,6 +1,7 @@
 import { Router, raw } from 'express'
 import * as eventsController from '../controllers/events.controller'
 import { createEventRateLimiter, imageUploadRateLimiter } from '../middleware/rateLimit'
+import { MAX_IMAGE_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '../utils/uploads'
 
 export const eventsRouter = Router()
 
@@ -15,7 +16,7 @@ eventsRouter.delete('/:id', eventsController.deleteEvent)
 eventsRouter.put(
   '/:id/image',
   imageUploadRateLimiter,
-  raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
+  raw({ type: UPLOAD_CONTENT_TYPES, limit: MAX_IMAGE_UPLOAD_BYTES }),
   eventsController.uploadEventImage,
 )
 eventsRouter.post('/:id/join', eventsController.joinEvent)

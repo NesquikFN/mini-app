@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import * as eventsService from '../services/events.service'
-import { IMAGE_EXTENSIONS_BY_CONTENT_TYPE, saveUpload } from '../utils/uploads'
+import { processAndStoreImage } from '../utils/uploads'
 import { AppError } from '../utils/AppError'
 import {
   createEventFromTemplateSchema,
@@ -47,13 +47,11 @@ export async function uploadEventTemplateImage(req: Request, res: Response): Pro
     throw new AppError(400, 'IMAGE_REQUIRED', 'Оберіть фотографію')
   }
 
-  const contentType = req.headers['content-type'] ?? ''
-  const extension = IMAGE_EXTENSIONS_BY_CONTENT_TYPE[contentType]
-  if (!extension) {
-    throw new AppError(415, 'IMAGE_TYPE_UNSUPPORTED', 'Підтримуються JPG, PNG або WebP')
-  }
-
-  const imageUrl = await saveUpload(`templates/${templateId}/cover.${extension}`, req.body)
+  const imageUrl = await processAndStoreImage(
+    `templates/${templateId}`,
+    req.body,
+    req.headers['content-type'] ?? '',
+  )
   const template = await eventsService.updateEventTemplateImage(templateId, imageUrl)
   res.json({ template })
 }
