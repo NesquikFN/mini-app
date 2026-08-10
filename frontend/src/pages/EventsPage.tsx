@@ -10,6 +10,7 @@ import { FilterTabs } from '../components/FilterTabs'
 import type { EventsScope } from '../context/EventsContext'
 import { isEventPast, isSameDay, isWithinNextDays } from '../utils/date'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { NO_DORMITORY_ID } from '../types/dormitory'
 
 type FilterValue = 'all' | 'today' | 'week' | 'online' | 'vip' | 'archive'
 
@@ -34,6 +35,7 @@ export function EventsPage() {
   const navigate = useNavigate()
   const successMessage = (location.state as { successMessage?: string } | null)
     ?.successMessage
+  const onlineOnly = user?.dormitoryId === NO_DORMITORY_ID
 
   useEffect(() => {
     if (!successMessage) return
@@ -72,7 +74,9 @@ export function EventsPage() {
         </div>
       )}
 
-      <FilterTabs options={DORM_FILTER_OPTIONS} value={scope} onChange={setScope} />
+      {!onlineOnly && (
+        <FilterTabs options={DORM_FILTER_OPTIONS} value={scope} onChange={setScope} />
+      )}
       <FilterTabs
         options={user?.isVip ? [...FILTER_OPTIONS.slice(0, 4), { value: 'vip', label: 'VIP' }, FILTER_OPTIONS[4]] : FILTER_OPTIONS}
         value={filter}

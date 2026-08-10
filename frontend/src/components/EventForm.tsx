@@ -11,6 +11,7 @@ interface EventFormProps {
   submitLabel?: string
   submittingLabel?: string
   canCreateVipOnly?: boolean
+  onlineOnly?: boolean
 }
 
 interface FormErrors {
@@ -31,6 +32,7 @@ export function EventForm({
   submitLabel = 'Створити подію',
   submittingLabel = 'Створюємо…',
   canCreateVipOnly = false,
+  onlineOnly = false,
 }: EventFormProps) {
   const [title, setTitle] = useState(initialValues?.title ?? '')
   const [description, setDescription] = useState(initialValues?.description ?? '')
@@ -42,7 +44,7 @@ export function EventForm({
   )
   const [groupUrl, setGroupUrl] = useState(initialValues?.groupUrl ?? '')
   const [gameUrl, setGameUrl] = useState(initialValues?.gameUrl ?? '')
-  const [isOnline, setIsOnline] = useState(initialValues?.isOnline ?? false)
+  const [isOnline, setIsOnline] = useState(onlineOnly || initialValues?.isOnline || false)
   const [vipOnly, setVipOnly] = useState(initialValues?.vipOnly ?? false)
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | undefined>(initialValues?.imageUrl)
@@ -211,7 +213,7 @@ export function EventForm({
         </Field>
       </div>
 
-      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] p-4">
+      <label className={`flex items-center justify-between gap-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] p-4 ${onlineOnly ? 'cursor-default' : 'cursor-pointer'}`}>
         <span className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
             <MonitorPlay size={20} />
@@ -224,6 +226,7 @@ export function EventForm({
         <input
           type="checkbox"
           checked={isOnline}
+          disabled={onlineOnly}
           onChange={(event) => setIsOnline(event.target.checked)}
           className="h-5 w-5 accent-[var(--accent)]"
         />

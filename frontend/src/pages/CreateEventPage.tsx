@@ -7,6 +7,7 @@ import { useEvents } from '../hooks/useEvents'
 import { getErrorMessage } from '../services/api'
 import type { CreateEventInput } from '../types/event'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { NO_DORMITORY_ID } from '../types/dormitory'
 
 export function CreateEventPage() {
   const { createEvent } = useEvents()
@@ -56,6 +57,7 @@ export function CreateEventPage() {
           onSubmit={handleSubmit}
           submitting={submitting}
           canCreateVipOnly={Boolean(user?.isVip)}
+          onlineOnly={user?.dormitoryId === NO_DORMITORY_ID}
         />
       </div>
     </div>

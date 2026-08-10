@@ -17,6 +17,7 @@ import {
   sendEventJoinConfirmation,
 } from './telegram-notifications.service'
 import { vipsRepository } from '../repositories/vips.repository'
+import { NO_DORMITORY_ID } from '../types/dormitory'
 
 export interface EventResponse {
   id: string
@@ -115,6 +116,10 @@ export async function listEvents(
   userId: string,
 ): Promise<EventResponse[]> {
   const includeVip = await vipsRepository.isVip(userId)
+  if (userDormitoryId === NO_DORMITORY_ID) {
+    const events = await eventsRepository.findAll(undefined, includeVip, true)
+    return attachParticipantPreviews(events.map(toEventResponse))
+  }
   if (scope === 'mine') {
     if (!userDormitoryId) return []
     const events = await eventsRepository.findAll(userDormitoryId, includeVip)
@@ -127,8 +132,17 @@ export async function listEvents(
 
 export async function getEvent(id: string, viewerId?: string): Promise<EventResponse> {
   const event = await getEventOrThrow(id)
-  if (event.vipOnly && viewerId && !(await vipsRepository.isVip(viewerId))) {
-    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  if (viewerId) {
+    const [viewerIsVip, viewer] = await Promise.all([
+      vipsRepository.isVip(viewerId),
+      usersRepository.getUserById(viewerId),
+    ])
+    if (
+      (event.vipOnly && !viewerIsVip) ||
+      (!event.isOnline && viewer?.dormitoryId === NO_DORMITORY_ID)
+    ) {
+      throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+    }
   }
   return attachParticipantPreview(toEventResponse(event))
 }
@@ -180,6 +194,13 @@ export async function createEvent(
       400,
       'DORMITORY_REQUIRED',
       'Спочатку оберіть гуртожиток у профілі',
+    )
+  }
+  if (creatorDormitoryId === NO_DORMITORY_ID && !input.isOnline) {
+    throw new AppError(
+      400,
+      'ONLINE_EVENT_REQUIRED',
+      'Без гуртожитку можна створювати лише онлайн-події',
     )
   }
   if (input.vipOnly && !(await vipsRepository.isVip(creatorId))) {
@@ -317,6 +338,10 @@ export async function removeOwnEventParticipant(
 
 export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {
   const event = await getEventOrThrow(eventId)
+  const participant = await usersRepository.getUserById(userId)
+  if (!event.isOnline && participant?.dormitoryId === NO_DORMITORY_ID) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   if (event.vipOnly && !(await vipsRepository.isVip(userId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
@@ -332,7 +357,6 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
   // avatar-стек на картці, підмінивши лише цю подію в списку — без
   // повторного GET /api/events для всіх подій одразу.
   const response = await attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
-  const participant = await usersRepository.getUserById(userId)
   if (participant) {
     await sendEventJoinConfirmation(String(participant.telegramId), response).catch((error) => {
       console.error(`Не вдалося надіслати підтвердження приєднання користувачу ${userId}:`, error)
@@ -367,8 +391,14 @@ export async function listEventsForUser(
     eventsRepository.getUserParticipatingEvents(userId),
   ])
 
-  const includeVip = privileged || await vipsRepository.isVip(viewerId)
-  const visible = (event: Event): boolean => includeVip || !event.vipOnly
+  const [viewerIsVip, viewer] = await Promise.all([
+    vipsRepository.isVip(viewerId),
+    usersRepository.getUserById(viewerId),
+  ])
+  const includeVip = privileged || viewerIsVip
+  const viewerOnlineOnly = !privileged && viewer?.dormitoryId === NO_DORMITORY_ID
+  const visible = (event: Event): boolean =>
+    (!viewerOnlineOnly || event.isOnline) && (includeVip || !event.vipOnly)
   const createdResponses = created.filter(visible).map(toEventResponse)
   const participatingResponses = participating.filter(visible).map(toEventResponse)
   const previews = await eventsRepository.findParticipantPreviews([
@@ -430,6 +460,13 @@ export async function createEventFromTemplate(
 ): Promise<EventResponse> {
   const template = await eventTemplatesRepository.findById(templateId)
   if (!template) throw new AppError(404, 'TEMPLATE_NOT_FOUND', 'Шаблон не знайдено')
+  if (creatorDormitoryId === NO_DORMITORY_ID && !template.isOnline) {
+    throw new AppError(
+      400,
+      'ONLINE_EVENT_REQUIRED',
+      'Без гуртожитку можна запускати лише онлайн-шаблони',
+    )
+  }
 
   const gameUrl = overrideGameUrl === undefined
     ? template.gameUrl

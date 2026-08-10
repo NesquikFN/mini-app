@@ -98,7 +98,11 @@ export const eventsRepository = {
   /** dormitoryId — необов'язковий server-side фільтр (звідки саме він
    * узятий і чи довіряти йому, вирішує events.service, не тут). Без
    * нього — усі гуртожитки. */
-  async findAll(dormitoryId?: string, includeVip = false): Promise<Event[]> {
+  async findAll(
+    dormitoryId?: string,
+    includeVip = false,
+    onlineOnly = false,
+  ): Promise<Event[]> {
     // Physical events stay scoped to the selected dormitory, while
     // online events are global and must be visible to everyone.
     const conditions: string[] = []
@@ -107,6 +111,7 @@ export const eventsRepository = {
       params.push(dormitoryId)
       conditions.push(`(e.dormitory_id = $${params.length} or e.is_online = true)`)
     }
+    if (onlineOnly) conditions.push('e.is_online = true')
     if (!includeVip) conditions.push('e.is_vip_only = false')
     const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : ''
     const { rows } = await query<EventRow>(

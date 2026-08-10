@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, CalendarX, MonitorPlay } from 'lucide-react'
+import { CalendarDays, CalendarX, House, MonitorPlay } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import { EventCard } from '../components/EventCard'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
@@ -9,9 +10,11 @@ import { DormitorySelector } from '../components/DormitorySelector'
 import { SocialLinks } from '../components/SocialLinks'
 import { fetchAppSettings, type SocialLinks as SocialLinksType } from '../services/api'
 import { isEventPast } from '../utils/date'
+import { NO_DORMITORY_ID } from '../types/dormitory'
 
 export function HomePage() {
   const { events, status, errorMessage, reload } = useEvents()
+  const { user } = useCurrentUser()
   const [socialLinks, setSocialLinks] = useState<SocialLinksType>()
 
   useEffect(() => {
@@ -30,17 +33,31 @@ export function HomePage() {
     .filter((event) => event.isOnline && !isEventPast(event.date, event.time))
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
     .slice(0, 3)
+  const onlineOnly = user?.dormitoryId === NO_DORMITORY_ID
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-8">
-      <div className="flex items-start justify-between gap-3">
-        <div className="pt-10">
-          <DormitorySelector />
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3 pt-0.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
+              <House size={21} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-base font-extrabold tracking-wide text-[var(--text-primary)]">
+                DormHub
+              </p>
+              <p className="truncate text-[11px] text-[var(--text-secondary)]">
+                Події · ігри · свої люди
+              </p>
+            </div>
+          </div>
+          <SocialLinks links={socialLinks} />
         </div>
-        <SocialLinks links={socialLinks} />
+        <DormitorySelector />
       </div>
 
-      <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
+      {!onlineOnly && <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">
           <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
             <CalendarDays size={18} className="text-[var(--accent)]" /> Найближчі події
@@ -77,7 +94,7 @@ export function HomePage() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
       <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">
