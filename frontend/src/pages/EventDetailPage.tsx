@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Archive, CalendarDays, Clock, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, UserX } from 'lucide-react'
+import { Archive, CalendarDays, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, Users, UserX } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -217,9 +217,24 @@ export function EventDetailPage() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title={event.title} showBack />
+      <PageHeader title="Подія" showBack />
 
-      <div className="flex flex-col gap-5 px-4 py-4 pb-8">
+      <div className="relative overflow-hidden bg-[var(--surface-card-alt)]">
+        {event.imageUrl ? (
+          <img
+            src={event.imageUrl}
+            alt={`Фотографія події «${event.title}»`}
+            className="h-[min(72vw,390px)] min-h-64 w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-64 items-center justify-center bg-[radial-gradient(circle_at_50%_35%,rgba(255,122,0,0.24),transparent_55%),linear-gradient(145deg,#24170d,#0b0b0b)]">
+            <PartyPopper size={76} strokeWidth={1.4} className="text-[var(--accent)]" />
+          </div>
+        )}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[var(--surface-bg)] to-transparent" />
+      </div>
+
+      <main className="flex flex-col gap-6 px-4 pb-44">
         {isArchived && (
           <div className="inline-flex items-center gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card-alt)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)]">
             <Archive size={18} className="text-[var(--accent)]" />
@@ -231,46 +246,33 @@ export function EventDetailPage() {
             <Crown size={18} /> Подія тільки для VIP
           </div>
         )}
-        {event.imageUrl && (
-          <div className="relative overflow-hidden rounded-2xl">
-            <img
-              src={event.imageUrl}
-              alt={`Фотографія події «${event.title}»`}
-              className="h-56 w-full object-cover"
-            />
-            <div className="absolute inset-x-0 top-0 flex flex-nowrap items-center gap-1 bg-gradient-to-b from-black/80 via-black/35 to-transparent px-2 pb-10 pt-2">
-              <MetaBadge icon={<CalendarDays size={15} />}>
-                {formatEventDate(event.date)}
-              </MetaBadge>
-              <MetaBadge icon={<Clock size={15} />}>
-                {formatEventTime(event.time)}
-              </MetaBadge>
-              <MetaBadge
-                icon={event.isOnline ? <MonitorPlay size={15} /> : <MapPin size={15} />}
-                flexible
-              >
-                {event.isOnline ? 'Онлайн' : event.location}
-              </MetaBadge>
-              {!event.isOnline && dormitoryNumber && (
-                <MetaBadge icon={<Home size={15} />}>
-                  №{dormitoryNumber}
-                </MetaBadge>
-              )}
-            </div>
+
+        <section className="-mt-5 flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            {membersStatus === 'loading' && (
+              <div className="h-12 animate-pulse rounded-xl bg-[var(--surface-card-alt)]" />
+            )}
+            {membersStatus === 'error' && (
+              <p className="text-sm text-[var(--text-secondary)]">Організатор події</p>
+            )}
+            {membersStatus === 'success' && members && <UserRow user={members.creator} />}
           </div>
-        )}
-        <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
-            <PartyPopper size={24} />
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--accent)]/35 bg-[var(--accent-soft-bg)] px-3 py-1.5 text-xs font-bold tracking-wide text-[var(--accent)]">
+            <Crown size={14} /> ОРГАНІЗАТОР
           </span>
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]">
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h1 className="text-[clamp(1.8rem,7vw,2.5rem)] font-black leading-[1.08] tracking-tight text-[var(--text-primary)]">
             {event.title}
           </h1>
-        </div>
-
-        <Button variant="outline" fullWidth loading={sharing} onClick={handleShareEvent}>
-          <Share2 size={18} /> {sharing ? 'Готую посилання…' : 'Поділитися подією'}
-        </Button>
+          {event.description && (
+            <FormattedText
+              text={event.description}
+              className="text-base leading-relaxed text-[var(--text-secondary)]"
+            />
+          )}
+        </section>
 
         {isCreator && (
           <div className="grid grid-cols-2 gap-2">
@@ -287,62 +289,68 @@ export function EventDetailPage() {
           </div>
         )}
 
-        {!event.imageUrl && (
-          <div className="flex flex-col gap-2 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-primary)]">
-            <span className="inline-flex items-center gap-2">
-              <CalendarDays size={16} className="text-[var(--text-secondary)]" />{' '}
-              {formatEventDate(event.date)}
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <Clock size={16} className="text-[var(--text-secondary)]" />{' '}
-              {formatEventTime(event.time)}
-            </span>
-            <span className="inline-flex items-center gap-2">
-              {event.isOnline ? (
-                <MonitorPlay size={16} className="text-[var(--accent)]" />
-              ) : (
-                <MapPin size={16} className="text-[var(--text-secondary)]" />
-              )}
-              {event.isOnline ? 'Онлайн' : event.location}
-            </span>
+        {telegramGroupUrl && !isArchived && (
+          <a
+            href={telegramGroupUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(clickEvent) => {
+              const openTelegramLink = window.Telegram?.WebApp?.openTelegramLink
+              if (!openTelegramLink) return
+              clickEvent.preventDefault()
+              openTelegramLink.call(window.Telegram?.WebApp, telegramGroupUrl)
+            }}
+            className="inline-flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft-bg)] px-5 text-base font-bold text-[var(--text-primary)] transition-transform active:scale-[0.98]"
+          >
+            <MessageCircle size={22} className="text-[var(--accent)]" />
+            Чат події
+          </a>
+        )}
+
+        {event.gameUrl && (
+          <a
+            href={event.gameUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-14 w-full items-center justify-center gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] px-5 text-base font-bold text-[var(--text-primary)] transition-transform active:scale-[0.98]"
+          >
+            <ExternalLink size={21} className="text-[var(--accent)]" />
+            Відкрити гру
+          </a>
+        )}
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">Про подію</h2>
+          <div className="overflow-hidden rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-card)]">
+            <InfoRow
+              icon={event.isOnline ? <MonitorPlay size={22} /> : <MapPin size={22} />}
+              title={event.isOnline ? 'Онлайн-подія' : event.location}
+              description={event.isOnline ? 'Можна приєднатися з будь-якого місця' : dormitoryName ?? 'Місце проведення'}
+            />
+            <InfoRow
+              icon={<Users size={22} />}
+              title={`${event.participants.length} з ${event.maxParticipants} учасників`}
+              description={isFull ? 'Усі місця зайняті' : `Вільних місць: ${event.maxParticipants - event.participants.length}`}
+            />
+            <InfoRow
+              icon={<CalendarDays size={22} />}
+              title={`${formatEventDate(event.date)}, ${formatEventTime(event.time)}`}
+              description="Дата і час початку"
+              last={event.isOnline || !dormitoryName}
+            />
             {!event.isOnline && dormitoryName && (
-              <span className="inline-flex items-center gap-2">
-                <Home size={16} className="text-[var(--text-secondary)]" />{' '}
-                {dormitoryName}
-              </span>
+              <InfoRow
+                icon={<Home size={22} />}
+                title={dormitoryName}
+                description={dormitoryNumber ? `Гуртожиток №${dormitoryNumber}` : 'Гуртожиток'}
+                last
+              />
             )}
           </div>
-        )}
-
-        {event.description && (
-          <section>
-            <h2 className="mb-1 text-sm font-semibold text-[var(--text-primary)]">
-              Опис
-            </h2>
-            <FormattedText
-              text={event.description}
-              className="text-sm leading-relaxed text-[var(--text-secondary)]"
-            />
-          </section>
-        )}
-
-        <section className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Організатор</h2>
-          {membersStatus === 'loading' && (
-            <div className="h-10 animate-pulse rounded-xl bg-[var(--surface-card-alt)]" />
-          )}
-          {membersStatus === 'error' && (
-            <p className="text-sm text-[var(--text-secondary)]">
-              Не вдалося завантажити організатора.
-            </p>
-          )}
-          {membersStatus === 'success' && members && (
-            <UserRow user={members.creator} />
-          )}
         </section>
 
-        <section className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+        <section className="flex flex-col gap-3 rounded-3xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">
             Учасники · {event.participants.length}/{event.maxParticipants}
           </h2>
 
@@ -400,62 +408,39 @@ export function EventDetailPage() {
         </section>
 
         {actionError && <p className="text-sm text-red-400">{actionError}</p>}
+      </main>
 
-        {event.gameUrl && (
-          <a
-            href={event.gameUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-5 text-[15px] font-semibold text-white transition-transform active:scale-[0.97]"
-          >
-            <ExternalLink size={19} />
-            Відкрити гру
-          </a>
-        )}
-
-        {telegramGroupUrl && !isArchived && (
-          <a
-            href={telegramGroupUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(clickEvent) => {
-              const openTelegramLink = window.Telegram?.WebApp?.openTelegramLink
-              if (!openTelegramLink) return
-              clickEvent.preventDefault()
-              openTelegramLink.call(window.Telegram?.WebApp, telegramGroupUrl)
-            }}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-soft-bg)] px-5 text-[15px] font-semibold text-[var(--accent)] transition-transform active:scale-[0.97]"
-          >
-            <MessageCircle size={19} />
-            Приєднатися до групи
-          </a>
-        )}
-
-        {isArchived ? (
-          <Button variant="secondary" fullWidth disabled>
-            Подія завершена
+      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-20 w-full max-w-[560px] -translate-x-1/2 border-t border-[var(--surface-border)] bg-[var(--surface-bg)]/95 p-3 backdrop-blur-xl">
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" fullWidth loading={sharing} onClick={handleShareEvent}>
+            <Share2 size={19} /> {sharing ? 'Готую…' : 'Запросити'}
           </Button>
-        ) : isFull && !isJoined ? (
-          <Button variant="secondary" fullWidth disabled>
-            Місць більше немає
-          </Button>
-        ) : (
-          <Button
-            variant={isJoined ? 'outline' : 'primary'}
-            fullWidth
-            loading={isPending}
-            disabled={isPending}
-            onClick={handleToggleParticipation}
-          >
-            {isPending
-              ? isJoined
-                ? 'Скасовую…'
-                : 'Приєднуюсь…'
-              : isJoined
-                ? 'Скасувати участь'
-                : 'Взяти участь'}
-          </Button>
-        )}
+          {isArchived ? (
+            <Button variant="secondary" fullWidth disabled>
+              Завершено
+            </Button>
+          ) : isFull && !isJoined ? (
+            <Button variant="secondary" fullWidth disabled>
+              Немає місць
+            </Button>
+          ) : (
+            <Button
+              variant={isJoined ? 'outline' : 'primary'}
+              fullWidth
+              loading={isPending}
+              disabled={isPending}
+              onClick={handleToggleParticipation}
+            >
+              {isPending
+                ? isJoined
+                  ? 'Скасовую…'
+                  : 'Приєднуюсь…'
+                : isJoined
+                  ? 'Не піду'
+                  : 'Я піду!'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {showAllParticipants && members && (
@@ -498,23 +483,26 @@ function normalizeTelegramGroupUrl(value: string): string {
   return value.startsWith('@') ? `https://t.me/${value.slice(1)}` : value
 }
 
-function MetaBadge({
+function InfoRow({
   icon,
-  children,
-  flexible = false,
+  title,
+  description,
+  last = false,
 }: {
   icon: ReactNode
-  children: ReactNode
-  flexible?: boolean
+  title: string
+  description: string
+  last?: boolean
 }) {
   return (
-    <span
-      className={`inline-flex min-w-0 items-center gap-1 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[11px] font-medium text-white backdrop-blur-sm ${
-        flexible ? 'max-w-[40%] shrink' : 'shrink-0'
-      }`}
-    >
-      <span className="shrink-0 text-orange-400">{icon}</span>
-      <span className="truncate">{children}</span>
-    </span>
+    <div className={`flex items-center gap-4 px-4 py-4 ${last ? '' : 'border-b border-[var(--surface-border)]'}`}>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-semibold leading-snug text-[var(--text-primary)]">{title}</span>
+        <span className="mt-0.5 block text-sm leading-snug text-[var(--text-secondary)]">{description}</span>
+      </span>
+    </div>
   )
 }
