@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, CalendarX, House, MonitorPlay } from 'lucide-react'
+import { CalendarDays, CalendarX, MonitorPlay } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { EventCard } from '../components/EventCard'
@@ -38,35 +38,31 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-8">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3 pt-0.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft-bg)] text-[var(--accent)]">
-              <House size={21} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-base font-extrabold tracking-wide text-[var(--text-primary)]">
-                DormHub
-              </p>
-              <p className="truncate text-[11px] text-[var(--text-secondary)]">
-                Події · ігри · свої люди
-              </p>
-            </div>
+      <div className="relative rounded-[28px] border border-orange-500/20 bg-[linear-gradient(135deg,rgba(255,122,0,0.13),rgba(255,122,0,0.035)_48%,rgba(255,255,255,0.025))] p-4 shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
+        <div className="pointer-events-none absolute -left-8 -top-12 h-28 w-28 rounded-full bg-orange-500/10 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0 pt-0.5">
+            <p className="flex items-center text-xl font-black tracking-[-0.04em] text-[var(--text-primary)]">
+              <span className="lowercase">dorm</span>
+              <span className="ml-1 rounded-lg bg-[var(--accent)] px-1.5 py-0.5 lowercase text-black">
+                hub
+              </span>
+            </p>
+            <p className="mt-1 truncate text-[11px] font-medium tracking-wide text-[var(--text-secondary)]">
+              Збирайся · грай · знайомся
+            </p>
           </div>
           <SocialLinks links={socialLinks} />
         </div>
-        <DormitorySelector />
+        <div className="relative mt-4">
+          <DormitorySelector />
+        </div>
       </div>
 
-      {!onlineOnly && <section className={`flex flex-col border-t border-[var(--surface-border)] pt-5 ${offlineCollapsed ? 'gap-0' : 'gap-3'}`}>
+      {!onlineOnly && !offlineCollapsed && <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">
           <h2 className="inline-flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
             <CalendarDays size={18} className="text-[var(--accent)]" /> Найближчі події
-            {offlineCollapsed && (
-              <span className="rounded-full bg-[var(--surface-card-alt)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-disabled)]">
-                Немає
-              </span>
-            )}
           </h2>
           <Link to="/events" className="text-sm font-medium text-[var(--accent)]">
             Переглянути всі
