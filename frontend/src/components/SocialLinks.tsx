@@ -67,7 +67,10 @@ export function SocialLinks({ links }: { links: SocialLinksType | undefined }) {
             strokeLinejoin="round"
           />
         </svg>
-        <span className="absolute bottom-0 right-0 whitespace-nowrap rounded-full bg-orange-500/10 px-2 py-0.5 text-[14px] font-extrabold italic tracking-normal drop-shadow-[0_0_8px_rgba(255,122,0,0.3)]">
+        <span
+          className="absolute bottom-0 right-0 -rotate-3 whitespace-nowrap text-[15px] font-bold italic tracking-wide drop-shadow-[0_0_8px_rgba(255,122,0,0.3)]"
+          style={{ fontFamily: "'Bradley Hand', 'Comic Sans MS', cursive" }}
+        >
           Граємо тут
         </span>
       </div>

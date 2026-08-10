@@ -35,7 +35,7 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-6 px-4 pt-6 pb-8">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         <div className="flex items-start justify-between gap-3">
           <p className="text-xl font-semibold text-[var(--text-primary)]">
             👋 Привіт{user ? `, ${user.nickname ?? user.firstName}` : ''}!
