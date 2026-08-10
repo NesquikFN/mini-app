@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Bell, BellOff, CalendarPlus, Gamepad2, ImagePlus, Link2, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Bell, BellOff, CalendarPlus, ExternalLink, Gamepad2, ImagePlus, Link2, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -148,6 +148,32 @@ export function EventTemplatesPage() {
     <div className="flex flex-col">
       <PageHeader title="Ігри" />
       <div className="flex flex-col gap-4 px-4 py-4">
+        <a
+          href="https://pidval-bgames.com.ua"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => {
+            const openLink = window.Telegram?.WebApp?.openLink
+            if (!openLink) return
+            event.preventDefault()
+            openLink.call(window.Telegram?.WebApp, 'https://pidval-bgames.com.ua')
+          }}
+          className="flex items-center gap-3 rounded-2xl border border-orange-500/30 bg-gradient-to-r from-orange-500/15 to-[var(--surface-card)] px-4 py-3.5 transition-transform active:scale-[0.98]"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)] text-white">
+            <Gamepad2 size={22} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-medium text-[var(--text-secondary)]">
+              Сайт, де проходять ігри
+            </span>
+            <span className="block truncate text-[15px] font-semibold text-[var(--text-primary)]">
+              pidval-bgames.com.ua
+            </span>
+          </span>
+          <ExternalLink size={19} className="shrink-0 text-[var(--accent)]" />
+        </a>
+
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">Регулярні події в один клік — доступно всім.</p>
           {canManage && (
