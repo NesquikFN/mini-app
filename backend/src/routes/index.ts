@@ -11,16 +11,34 @@ import { adminRouter } from './admin.routes'
 import { appSettingsRouter } from './app-settings.routes'
 import { requireTelegramAuth } from '../middleware/requireTelegramAuth'
 import { requireAdmin } from '../middleware/requireAdmin'
+import { requireApprovedUser } from '../middleware/requireApprovedUser'
 
 export const apiRouter = Router()
 
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRouter)
 apiRouter.post('/telegram/webhook', telegramWebhookController.receiveUpdate)
-apiRouter.use('/events', requireTelegramAuth, eventsRouter)
-apiRouter.use('/event-templates', requireTelegramAuth, eventTemplatesRouter)
+
+// --- Доступні одразу після Telegram-автентифікації, ДО схвалення заявки ---
+// /me — статус власного профілю й подача (чи повторна подача) заявки:
+// саме цим живе RegistrationGate, тож гейтити його не можна, інакше
+// несхвалений користувач не побачить навіть екран "очікуйте".
+// Підмаршрути /me, не потрібні для реєстрації, закриті всередині
+// me.routes.ts.
 apiRouter.use('/me', requireTelegramAuth, meRouter)
+// Довідник гуртожитків — лише публічні назви й id, без персональних
+// даних; DormitoriesProvider у frontend завантажує його один раз при
+// старті застосунку, ще до того, як стане відомий статус заявки.
 apiRouter.use('/dormitories', requireTelegramAuth, dormitoriesRouter)
-apiRouter.use('/users', requireTelegramAuth, usersRouter)
-apiRouter.use('/app-settings', requireTelegramAuth, appSettingsRouter)
+
+// --- Потребують схваленої заявки ---
+apiRouter.use('/events', requireTelegramAuth, requireApprovedUser, eventsRouter)
+apiRouter.use('/event-templates', requireTelegramAuth, requireApprovedUser, eventTemplatesRouter)
+apiRouter.use('/users', requireTelegramAuth, requireApprovedUser, usersRouter)
+apiRouter.use('/app-settings', requireTelegramAuth, requireApprovedUser, appSettingsRouter)
+
+// Адмінка навмисно без requireApprovedUser: право визначає лише
+// admin_users, і адміністратор має лишатись працездатним незалежно від
+// стану власної заявки (наприклад, якщо бекфіл 0019 колись не зачепив
+// його рядок).
 apiRouter.use('/admin', requireTelegramAuth, requireAdmin, adminRouter)

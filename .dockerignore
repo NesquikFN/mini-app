@@ -8,4 +8,5 @@ node_modules
 .git
 backend/src/**/*.test.ts
 backend/src/__tests__
+backend/src/__security__
 backend/src/test-utils

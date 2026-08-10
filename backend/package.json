@@ -9,15 +9,18 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:unit && npm run test:integration",
+    "test": "npm run test:unit && npm run test:security && npm run test:integration",
     "test:unit": "tsx --test \"src/services/*.test.ts\" \"src/validation/*.test.ts\"",
+    "test:security": "tsx --test \"src/__security__/*.test.ts\"",
     "test:integration": "BOT_TOKEN=integration-test-bot-token-do-not-use-in-prod tsx --test \"src/__tests__/**/*.test.ts\""
   },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
     "pg": "^8.22.0",
+    "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
