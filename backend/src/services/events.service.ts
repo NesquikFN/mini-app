@@ -15,7 +15,9 @@ import {
   buildEventDeepLink,
   sendEventAnnouncement,
   sendEventJoinConfirmation,
+  NOTIFICATION_CONCURRENCY,
 } from './telegram-notifications.service'
+import { mapWithConcurrency } from '../utils/concurrency'
 import { vipsRepository } from '../repositories/vips.repository'
 import { NO_DORMITORY_ID } from '../types/dormitory'
 
@@ -249,15 +251,20 @@ export async function announceEvent(event: EventResponse): Promise<void> {
     event.isOnline ? undefined : event.dormitoryId,
     event.vipOnly,
   )
-  await Promise.all(
-    subscriberIds.map(async (telegramId) => {
-      try {
-        await sendEventAnnouncement(String(telegramId), event, creatorInfo, undefined, true)
-      } catch (error) {
-        console.error(`Не вдалося надіслати особисте сповіщення про подію користувачу ${telegramId}:`, error)
-      }
-    }),
-  )
+  // Обмежена паралельність замість Promise.all по всьому списку: інакше
+  // одна створена подія відкриває стільки одночасних запитів до Telegram,
+  // скільки є підписників, і впирається в ліміти Bot API.
+  await mapWithConcurrency(subscriberIds, NOTIFICATION_CONCURRENCY, async (telegramId) => {
+    try {
+      await sendEventAnnouncement(String(telegramId), event, creatorInfo, undefined, true)
+    } catch (error) {
+      // Невдача для одного отримувача не повинна ламати створення події.
+      console.error(
+        `Не вдалося надіслати особисте сповіщення про подію користувачу ${telegramId}:`,
+        error,
+      )
+    }
+  })
 }
 
 /** Лише адмін-панель — звичайний Mini App редагування подій не пропонує. */

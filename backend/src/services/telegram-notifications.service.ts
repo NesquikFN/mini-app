@@ -8,6 +8,8 @@ import {
 } from '../repositories/notification-log.repository'
 import type { EventResponse } from './events.service'
 import type { Event } from '../types/event'
+import { sleep } from '../utils/concurrency'
+import { isUserBanned } from '../utils/ban'
 
 export interface TelegramChatOption {
   id: string
@@ -43,16 +45,61 @@ export interface TelegramWebhookUpdate {
   my_chat_member?: { chat: TelegramChat; new_chat_member: { status: string } }
 }
 
-async function botApi<T>(method: string, body?: Record<string, unknown>): Promise<T> {
-  if (!env.BOT_TOKEN) {
-    throw new AppError(503, 'BOT_TOKEN_NOT_CONFIGURED', 'Telegram-бот ще не налаштований')
-  }
+/** Скільки повідомлень одночасно віддаємо в Telegram при масовій
+ * розсилці. Bot API дозволяє ~30 повідомлень за секунду сумарно, тож
+ * невелика паралельність тут корисніша за сотні одночасних запитів. */
+export const NOTIFICATION_CONCURRENCY = 5
+
+/** Стеля для очікування, яке просить Telegram у 429. Довші паузи не
+ * чекаємо — краще визнати відправку невдалою і записати це в журнал,
+ * ніж тримати HTTP-запит користувача чи планувальник кілька хвилин. */
+const MAX_RETRY_AFTER_SECONDS = 5
+
+interface TelegramApiResponse<T> {
+  ok: boolean
+  result?: T
+  description?: string
+  parameters?: { retry_after?: number }
+}
+
+async function callBotApi<T>(
+  method: string,
+  body?: Record<string, unknown>,
+): Promise<{ response: Response; payload: TelegramApiResponse<T> }> {
   const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   })
-  const payload = (await response.json()) as { ok: boolean; result?: T; description?: string }
+  const payload = (await response.json()) as TelegramApiResponse<T>
+  return { response, payload }
+}
+
+/**
+ * Один повтор при 429 з урахуванням retry_after — рівно один, без
+ * циклу: якщо Telegram просить чекати й після повтору, відправка
+ * вважається невдалою і потрапляє в notification_log. Нескінченних
+ * ретраїв тут свідомо немає, інакше зайнятий чат заблокував би
+ * планувальник нагадувань назавжди.
+ *
+ * У повідомленнях про помилку — лише description від Telegram; URL із
+ * токеном у логи ніколи не потрапляє.
+ */
+async function botApi<T>(method: string, body?: Record<string, unknown>): Promise<T> {
+  if (!env.BOT_TOKEN) {
+    throw new AppError(503, 'BOT_TOKEN_NOT_CONFIGURED', 'Telegram-бот ще не налаштований')
+  }
+
+  let { response, payload } = await callBotApi<T>(method, body)
+
+  if (response.status === 429) {
+    const retryAfter = payload.parameters?.retry_after
+    if (typeof retryAfter === 'number' && retryAfter > 0 && retryAfter <= MAX_RETRY_AFTER_SECONDS) {
+      await sleep(retryAfter * 1000)
+      ;({ response, payload } = await callBotApi<T>(method, body))
+    }
+  }
+
   if (!response.ok || !payload.ok || payload.result === undefined) {
     throw new AppError(502, 'TELEGRAM_API_ERROR', payload.description ?? 'Помилка Telegram API')
   }
@@ -176,10 +223,24 @@ export async function handleTelegramWebhookUpdate(update: TelegramWebhookUpdate)
   const privateMessage = update.message
   if (privateMessage?.chat.type === 'private') {
     const text = privateMessage.text?.trim()
-    if (text?.startsWith('/start')) {
-      await sendStartGreeting(String(privateMessage.chat.id), privateMessage.from?.first_name)
-    } else if (text?.startsWith('/notifications_off')) {
-      await handleNotificationsOffCommand(String(privateMessage.chat.id))
+    if (!text?.startsWith('/')) return
+
+    // Забанений користувач не отримує від бота нічого й нічого ним не
+    // запускає — інакше блокування обходилось би через чат із ботом.
+    // Перевірка тут, а не в кожній команді, щоб нову команду не можна
+    // було додати повз неї.
+    const chatId = String(privateMessage.chat.id)
+    const sender = await usersRepository.getUserByTelegramId(Number(chatId))
+    if (sender && isUserBanned(sender)) return
+
+    if (text.startsWith('/start')) {
+      // /start лишається доступним і несхваленому користувачу: це вхід у
+      // Mini App, де він саме й подає заявку на реєстрацію.
+      await sendStartGreeting(chatId, privateMessage.from?.first_name)
+    } else if (text.startsWith('/notifications_off')) {
+      // Команда лише вимикає розсилку й нічого не розкриває, тож
+      // доступна незалежно від статусу заявки.
+      await handleNotificationsOffCommand(chatId)
     }
   }
 }

@@ -1,6 +1,7 @@
 import { eventsRepository } from '../repositories/events.repository'
-import { sendEventReminder } from './telegram-notifications.service'
+import { NOTIFICATION_CONCURRENCY, sendEventReminder } from './telegram-notifications.service'
 import { kyivTimestamp } from '../utils/kyivTime'
+import { mapWithConcurrency } from '../utils/concurrency'
 
 const REMINDER_WINDOW_MINUTES = 30
 const POLL_INTERVAL_MS = 5 * 60 * 1000
@@ -21,15 +22,16 @@ export async function sendDueReminders(): Promise<void> {
 
   for (const event of dueEvents) {
     const telegramIds = await eventsRepository.getParticipantTelegramIds(event.id, event.vipOnly)
-    await Promise.all(
-      telegramIds.map(async (telegramId) => {
-        try {
-          await sendEventReminder(String(telegramId), event)
-        } catch (error) {
-          console.error(`Не вдалося надіслати нагадування про подію ${event.id} користувачу ${telegramId}:`, error)
-        }
-      }),
-    )
+    await mapWithConcurrency(telegramIds, NOTIFICATION_CONCURRENCY, async (telegramId) => {
+      try {
+        await sendEventReminder(String(telegramId), event)
+      } catch (error) {
+        console.error(
+          `Не вдалося надіслати нагадування про подію ${event.id} користувачу ${telegramId}:`,
+          error,
+        )
+      }
+    })
     // Marked sent even if every individual DM above failed (e.g. bot
     // blocked) — this is a best-effort reminder, not a guaranteed
     // delivery; retrying the same event on every future poll forever

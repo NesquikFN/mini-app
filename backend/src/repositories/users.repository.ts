@@ -189,10 +189,20 @@ export const usersRepository = {
   /** telegram_id тих, хто підписався на особисті DM-сповіщення про нові
    * події (окремо від групового чату) — для announceEvent у events.service.ts.
    * dormitoryId — фільтр для офлайн-подій (сповіщає лише підписників
-   * свого гуртожитку); без нього (онлайн-подія) — усі підписники. */
+   * свого гуртожитку); без нього (онлайн-подія) — усі підписники.
+   *
+   * Забанені й несхвалені отримувачі відсіюються тут, у джерелі списку:
+   * анонс події — це вміст застосунку, доступ до якого вони саме й не
+   * мають. Тимчасовий бан із простроченим banned_until знову пропускає
+   * користувача, бо порівняння йде з now() на боці Postgres. */
   async getSubscribedTelegramIds(dormitoryId?: string, vipOnly = false): Promise<number[]> {
     const vipJoin = vipOnly ? 'join vip_users v on v.user_id = users.id' : ''
-    const conditions = ['notify_new_events = true']
+    const conditions = [
+      'notify_new_events = true',
+      `registration_status = 'approved'`,
+      'banned_permanently = false',
+      '(banned_until is null or banned_until <= now())',
+    ]
     const params: unknown[] = []
     if (dormitoryId) {
       params.push(dormitoryId)

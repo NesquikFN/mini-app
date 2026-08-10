@@ -272,12 +272,18 @@ export const eventsRepository = {
     return rows.map((row) => row.user_id)
   },
 
+  /** Отримувачі нагадування про подію. Забанені й несхвалені
+   * відсіюються так само, як у getSubscribedTelegramIds — бот не пише
+   * тим, кому доступ до застосунку закрито. */
   async getParticipantTelegramIds(eventId: string, vipOnly = false): Promise<number[]> {
     const { rows } = await query<{ telegram_id: string }>(
       `select u.telegram_id from event_participants ep
        join users u on u.id = ep.user_id
        ${vipOnly ? 'join vip_users v on v.user_id = u.id' : ''}
-       where ep.event_id = $1`,
+       where ep.event_id = $1
+         and u.registration_status = 'approved'
+         and u.banned_permanently = false
+         and (u.banned_until is null or u.banned_until <= now())`,
       [eventId],
     )
     return rows.map((row) => Number(row.telegram_id))

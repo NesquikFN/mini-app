@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import * as adminController from '../controllers/admin.controller'
 import * as adminRegistrationsController from '../controllers/admin-registrations.controller'
+import { telegramProbeRateLimiter } from '../middleware/rateLimit'
 
 export const adminRouter = Router()
 
@@ -8,8 +9,11 @@ adminRouter.get('/check', adminController.check)
 adminRouter.get('/stats', adminController.getStats)
 adminRouter.get('/notification-settings', adminController.getNotificationSettings)
 adminRouter.put('/notification-settings', adminController.updateNotificationSettings)
-adminRouter.get('/notification-chats', adminController.listNotificationChats)
-adminRouter.get('/notification-topics', adminController.listNotificationTopics)
+// Ці два самі ходять у Telegram Bot API (getChatMember на кожен відомий
+// чат) — окремий ліміт, щоб адмінська сторінка не могла впертись у
+// ліміти Telegram і тимчасово вимкнути бота для всіх.
+adminRouter.get('/notification-chats', telegramProbeRateLimiter, adminController.listNotificationChats)
+adminRouter.get('/notification-topics', telegramProbeRateLimiter, adminController.listNotificationTopics)
 adminRouter.get('/notification-log', adminController.listNotificationLog)
 adminRouter.delete('/notification-log', adminController.clearNotificationLog)
 

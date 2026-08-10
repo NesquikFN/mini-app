@@ -1,6 +1,7 @@
 import { Router, raw } from 'express'
 import * as eventTemplatesController from '../controllers/event-templates.controller'
 import { requireTemplateManager } from '../middleware/requireTemplateManager'
+import { imageUploadRateLimiter, templateLaunchRateLimiter } from '../middleware/rateLimit'
 
 /**
  * Mounted at /api/event-templates with only requireTelegramAuth (see
@@ -21,6 +22,7 @@ eventTemplatesRouter.put(
 eventTemplatesRouter.put(
   '/:templateId/image',
   requireTemplateManager,
+  imageUploadRateLimiter,
   raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
   eventTemplatesController.uploadEventTemplateImage,
 )
@@ -29,4 +31,10 @@ eventTemplatesRouter.delete(
   requireTemplateManager,
   eventTemplatesController.deleteEventTemplate,
 )
-eventTemplatesRouter.post('/:templateId/create-event', eventTemplatesController.createFromEventTemplate)
+// Запуск шаблону створює подію з тією ж розсилкою — той самий рівень
+// обмеження, що й у POST /api/events.
+eventTemplatesRouter.post(
+  '/:templateId/create-event',
+  templateLaunchRateLimiter,
+  eventTemplatesController.createFromEventTemplate,
+)
