@@ -25,14 +25,15 @@ function buildPagination(page: number, limit: number, total: number): Pagination
 }
 
 export async function getStats(): Promise<AdminStats> {
-  const [users, events, activeEvents, participants] = await Promise.all([
+  const [users, registeredUsers, events, activeEvents, participants] = await Promise.all([
     adminRepository.countUsers(),
+    adminRepository.countRegisteredUsers(),
     adminRepository.countEvents(),
     adminRepository.countUpcomingEvents(),
     adminRepository.countParticipations(),
   ])
 
-  return { users, events, activeEvents, participants }
+  return { users, registeredUsers, events, activeEvents, participants }
 }
 
 export async function listUsers(

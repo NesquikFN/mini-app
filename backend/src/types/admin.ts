@@ -3,6 +3,7 @@ import type { EventResponse } from '../services/events.service'
 
 export interface AdminStats {
   users: number
+  registeredUsers: number
   events: number
   activeEvents: number
   participants: number

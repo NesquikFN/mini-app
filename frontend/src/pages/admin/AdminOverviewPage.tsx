@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Users, CalendarDays, CalendarCheck, Ticket } from 'lucide-react'
+import { Users, UserCheck, CalendarDays, CalendarCheck, Ticket } from 'lucide-react'
 import { LoadingState } from '../../components/LoadingState'
 import { EmptyState } from '../../components/EmptyState'
 import { fetchAdminStats, getErrorMessage } from '../../services/api'
@@ -52,6 +52,7 @@ export function AdminOverviewPage() {
       {status === 'success' && stats && (
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Користувачі" value={stats.users} icon={<Users size={20} />} />
+          <StatCard label="Зареєстровані" value={stats.registeredUsers} icon={<UserCheck size={20} />} />
           <StatCard label="Події" value={stats.events} icon={<CalendarDays size={20} />} />
           <StatCard label="Активні" value={stats.activeEvents} icon={<CalendarCheck size={20} />} />
           <StatCard label="Участі" value={stats.participants} icon={<Ticket size={20} />} />

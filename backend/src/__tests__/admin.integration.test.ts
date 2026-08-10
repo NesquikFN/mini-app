@@ -121,7 +121,7 @@ describe('admin API', () => {
   it('GET /api/admin/stats returns real, non-hardcoded counts', async () => {
     const res = await request(app).get('/api/admin/stats').set('Authorization', `Bearer ${adminToken}`)
     assert.equal(res.status, 200)
-    for (const key of ['users', 'events', 'activeEvents', 'participants']) {
+    for (const key of ['users', 'registeredUsers', 'events', 'activeEvents', 'participants']) {
       assert.equal(typeof res.body[key], 'number', `${key} should be a number`)
       assert.ok(res.body[key] >= 0)
     }

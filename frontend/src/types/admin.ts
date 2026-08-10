@@ -3,6 +3,7 @@ import type { DormEvent } from './event'
 
 export interface AdminStats {
   users: number
+  registeredUsers: number
   events: number
   activeEvents: number
   participants: number

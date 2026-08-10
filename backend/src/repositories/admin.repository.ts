@@ -56,6 +56,14 @@ export const adminRepository = {
   },
 
   countUsers: () => countRows('users'),
+
+  async countRegisteredUsers(): Promise<number> {
+    const { rows } = await query<{ count: string }>(
+      `select count(*) from users where registration_status = 'approved'`,
+    )
+    return Number(rows[0].count)
+  },
+
   countEvents: () => countRows('events'),
   countParticipations: () => countRows('event_participants'),
 
