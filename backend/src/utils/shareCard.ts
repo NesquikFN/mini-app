@@ -79,7 +79,10 @@ const CARD_FONT_FILES = [
   require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf'),
   require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf'),
   require.resolve(
-    '@expo-google-fonts/unbounded/800ExtraBold/Unbounded_800ExtraBold.ttf',
+    '@expo-google-fonts/unbounded/400Regular/Unbounded_400Regular.ttf',
+  ),
+  require.resolve(
+    '@expo-google-fonts/unbounded/600SemiBold/Unbounded_600SemiBold.ttf',
   ),
 ]
 
@@ -339,24 +342,24 @@ function badge(input: ShareCardInput): { label: string; color: string } | null {
   return null
 }
 
-/** Логотип DormHub — той самий вигляд, що й на головній: «dorm» плюс
- * «hub» у помаранчевому прямокутнику. Малюється вручну, щоб не тягнути
- * зовнішній файл шрифта чи картинки. */
-function logoSvg(x: number, y: number, scale = 1): string {
-  const fontSize = 34 * scale
-  const boxWidth = 78 * scale
-  const boxHeight = 48 * scale
-  const radius = 12 * scale
-  const boxX = x + 102 * scale
-  const boxY = y - 36 * scale
-  return `
-    <text x="${x}" y="${y}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}"
-          font-weight="800" fill="#ffffff" letter-spacing="-1">dorm</text>
-    <rect x="${boxX}" y="${boxY}" width="${boxWidth}" height="${boxHeight}"
-          rx="${radius}" fill="${ACCENT}"/>
-    <text x="${boxX + boxWidth / 2}" y="${y}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}"
-          font-weight="800" fill="#000000" letter-spacing="-1" text-anchor="middle">hub</text>
-  `
+/** Точна геометрія статичного логотипа із SplashVisual/geometry.ts:
+ * будинок-D + orm + Hub plate. Тут лише інший масштаб для картки. */
+function logoSvg(x: number, y: number, width: number): string {
+  const scale = width / 813
+  return `<g transform="translate(${x} ${y}) scale(${scale})">
+    <g fill="none" stroke="${ACCENT}" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M76 20 C147 20 199 60 199 112 C199 174 151 204 76 207"/>
+      <path d="M20 95 L72 51 L137 99"/>
+      <path d="M20 123 L20 190"/>
+      <path d="M62 183 L62 149 Q62 142 69 142 L91 142 Q98 142 98 149 L98 180"/>
+    </g>
+    <text x="213" y="176" fill="#ffffff" font-family="DejaVu Sans, sans-serif"
+          font-size="145" font-weight="700">orm</text>
+    <rect x="515" y="51" width="288" height="151" rx="21" fill="${ACCENT}"/>
+    <text x="539" y="169" fill="#000000" stroke="#000000" stroke-width="1.5"
+          paint-order="stroke fill" font-family="DejaVu Sans, sans-serif"
+          font-size="118" font-weight="700" letter-spacing="-5">Hub</text>
+  </g>`
 }
 
 /** Кружки з ініціалами — щонайбільше 3, далі «+N». */
@@ -378,8 +381,8 @@ function avatarsSvg(
          <image href="${participant.avatarDataUri}" x="${cx - radius}" y="${y - radius}"
                 width="${radius * 2}" height="${radius * 2}" preserveAspectRatio="xMidYMid slice"
                 clip-path="url(#avatar-${index})"/>`
-      : `<text x="${cx}" y="${y + fontSize * 0.35}" font-family="DejaVu Sans, sans-serif"
-            font-size="${fontSize}" font-weight="700" fill="#ffffff" text-anchor="middle">${escapeXml(
+      : `<text x="${cx}" y="${y + fontSize * 0.35}" font-family="${POSTER_FONT_FAMILY}"
+            font-size="${fontSize * 0.82}" font-weight="600" fill="#ffffff" text-anchor="middle">${escapeXml(
               initialOf(participant.displayName),
             )}</text>`
     return `
@@ -392,8 +395,8 @@ function avatarsSvg(
     const cx = x + radius + visible.length * step
     circles.push(`
       <circle cx="${cx}" cy="${y}" r="${radius}" fill="#262626" stroke="#3f3f3f" stroke-width="3"/>
-      <text x="${cx}" y="${y + fontSize * 0.35}" font-family="DejaVu Sans, sans-serif"
-            font-size="${fontSize}" font-weight="700" fill="#a3a3a3" text-anchor="middle">+${overflow}</text>
+      <text x="${cx}" y="${y + fontSize * 0.35}" font-family="${POSTER_FONT_FAMILY}"
+            font-size="${fontSize * 0.72}" font-weight="600" fill="#a3a3a3" text-anchor="middle">+${overflow}</text>
     `)
   }
 
@@ -422,12 +425,12 @@ export interface ChatTitleLayout {
 
 export function layoutChatTitle(title: string): ChatTitleLayout {
   const candidates = [
-    { maxLines: 1, fontSize: 170, maxChars: 9 },
-    { maxLines: 2, fontSize: 108, maxChars: 15 },
-    { maxLines: 3, fontSize: 76, maxChars: 21 },
-    { maxLines: 4, fontSize: 58, maxChars: 27 },
-    { maxLines: 5, fontSize: 44, maxChars: 36 },
-    { maxLines: 6, fontSize: 36, maxChars: 46 },
+    { maxLines: 1, fontSize: 145, maxChars: 9 },
+    { maxLines: 2, fontSize: 90, maxChars: 15 },
+    { maxLines: 3, fontSize: 64, maxChars: 21 },
+    { maxLines: 4, fontSize: 50, maxChars: 27 },
+    { maxLines: 5, fontSize: 39, maxChars: 36 },
+    { maxLines: 6, fontSize: 32, maxChars: 46 },
   ]
 
   let selected = candidates[candidates.length - 1]
@@ -441,13 +444,9 @@ export function layoutChatTitle(title: string): ChatTitleLayout {
     }
   }
 
-  const lineHeight = Math.round(selected.fontSize * 1.08)
-  const visualHeight = selected.fontSize + (lines.length - 1) * lineHeight
+  const lineHeight = Math.round(selected.fontSize * 1.1)
   const zoneTop = 145
-  const zoneHeight = 270
-  const firstBaseline = Math.round(
-    zoneTop + Math.max(0, (zoneHeight - visualHeight) / 2) + selected.fontSize * 0.82,
-  )
+  const firstBaseline = Math.round(zoneTop + selected.fontSize * 0.82)
 
   return { lines, fontSize: selected.fontSize, firstBaseline, lineHeight }
 }
@@ -494,14 +493,14 @@ function chatCardSvg(input: ShareCardInput): string {
   <rect width="${width}" height="${height}" fill="url(#scrim)"/>
   <circle cx="${width - 60}" cy="40" r="340" fill="url(#accentGlow)"/>
 
-  ${logoSvg(72, 108)}
+  ${logoSvg(72, 52, 260)}
 
   ${
     roleBadge
       ? `<rect x="${width - 236}" y="66" width="164" height="58" rx="29"
               fill="rgba(0,0,0,0.6)" stroke="${roleBadge.color}" stroke-width="3"/>
-         <text x="${width - 154}" y="105" font-family="DejaVu Sans, sans-serif" font-size="30"
-               font-weight="800" fill="${roleBadge.color}" text-anchor="middle">${escapeXml(roleBadge.label)}</text>`
+         <text x="${width - 154}" y="105" font-family="${POSTER_FONT_FAMILY}" font-size="25"
+               font-weight="600" fill="${roleBadge.color}" text-anchor="middle">${escapeXml(roleBadge.label)}</text>`
       : ''
   }
 
@@ -509,16 +508,16 @@ function chatCardSvg(input: ShareCardInput): string {
     .map(
       (line, index) =>
         `<text x="72" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="${POSTER_FONT_FAMILY}"
-               font-size="${titleLayout.fontSize}" font-weight="800" fill="#ffffff"
-               letter-spacing="-4">${escapeXml(line)}</text>`,
+               font-size="${titleLayout.fontSize}" font-weight="600" fill="#ffffff"
+               letter-spacing="-2">${escapeXml(line)}</text>`,
     )
     .join('')}
 
   ${meta
     .map(
       (line, index) =>
-        `<text x="72" y="${META_TOP + index * 52}" font-family="DejaVu Sans, sans-serif"
-               font-size="40" fill="#e5e5e5">${escapeXml(line)}</text>`,
+        `<text x="72" y="${META_TOP + index * 52}" font-family="${POSTER_FONT_FAMILY}"
+               font-size="32" font-weight="400" letter-spacing="-0.5" fill="#e5e5e5">${escapeXml(line)}</text>`,
     )
     .join('')}
 
@@ -528,13 +527,13 @@ function chatCardSvg(input: ShareCardInput): string {
       : `<g transform="translate(72, ${BOTTOM_ROW_Y})">
            ${avatarsSvg(input, 0, 0, 30, 30)}
            <text x="${Math.min(input.participants.length, 3) * 48 + (input.participantCount > 3 ? 48 : 0) + 24}" y="12"
-                 font-family="DejaVu Sans, sans-serif" font-size="38" font-weight="700"
+                 font-family="${POSTER_FONT_FAMILY}" font-size="31" font-weight="600"
                  fill="#ffffff">${input.participantCount} / ${input.maxParticipants}</text>
          </g>`
   }
 
-  <text x="${width - 72}" y="${BOTTOM_ROW_Y + 12}" font-family="DejaVu Sans, sans-serif" font-size="34"
-        font-weight="700" fill="${ACCENT}" text-anchor="end">Приєднуйся в DormHub</text>
+  <text x="${width - 72}" y="${BOTTOM_ROW_Y + 12}" font-family="${POSTER_FONT_FAMILY}" font-size="28"
+        font-weight="600" letter-spacing="-0.5" fill="${ACCENT}" text-anchor="end">Приєднуйся в DormHub</text>
 </svg>`
 }
 
@@ -580,14 +579,14 @@ function storyCardSvg(input: ShareCardInput): string {
   <rect width="${width}" height="${height}" fill="url(#scrim)"/>
   <circle cx="${width / 2}" cy="180" r="620" fill="url(#accentGlow)"/>
 
-  ${logoSvg(width / 2 - 86, 220, 1.05)}
+  ${logoSvg(width / 2 - 205, 150, 410)}
 
   ${
     roleBadge
       ? `<rect x="${width / 2 - 92}" y="286" width="184" height="66" rx="33"
               fill="rgba(0,0,0,0.6)" stroke="${roleBadge.color}" stroke-width="3"/>
-         <text x="${width / 2}" y="330" font-family="DejaVu Sans, sans-serif" font-size="34"
-               font-weight="800" fill="${roleBadge.color}" text-anchor="middle">${escapeXml(roleBadge.label)}</text>`
+         <text x="${width / 2}" y="330" font-family="${POSTER_FONT_FAMILY}" font-size="30"
+               font-weight="600" fill="${roleBadge.color}" text-anchor="middle">${escapeXml(roleBadge.label)}</text>`
       : ''
   }
 
@@ -595,8 +594,8 @@ function storyCardSvg(input: ShareCardInput): string {
     .map(
       (line, index) =>
         `<text x="${width / 2}" y="${titleTop + index * (titleSize + 16)}"
-               font-family="${POSTER_FONT_FAMILY}" font-size="${titleSize}" font-weight="800"
-               fill="#ffffff" text-anchor="middle" letter-spacing="-3">${escapeXml(line)}</text>`,
+               font-family="${POSTER_FONT_FAMILY}" font-size="${titleSize}" font-weight="600"
+               fill="#ffffff" text-anchor="middle" letter-spacing="-2">${escapeXml(line)}</text>`,
     )
     .join('')}
 
@@ -605,7 +604,7 @@ function storyCardSvg(input: ShareCardInput): string {
       (line, index) =>
         `<text x="${width / 2}" y="${
           titleTop + 70 + titleLines.length * (titleSize + 16) + index * 68
-        }" font-family="DejaVu Sans, sans-serif" font-size="52" fill="#e5e5e5"
+        }" font-family="${POSTER_FONT_FAMILY}" font-size="45" font-weight="400" fill="#e5e5e5"
                text-anchor="middle">${escapeXml(line)}</text>`,
     )
     .join('')}
@@ -613,17 +612,17 @@ function storyCardSvg(input: ShareCardInput): string {
   ${
     input.hideDetails
       ? ''
-      : `<text x="${width / 2}" y="${height - 420}" font-family="DejaVu Sans, sans-serif"
-               font-size="56" font-weight="700" fill="#ffffff"
+      : `<text x="${width / 2}" y="${height - 420}" font-family="${POSTER_FONT_FAMILY}"
+               font-size="50" font-weight="600" fill="#ffffff"
                text-anchor="middle">${input.participantCount} / ${input.maxParticipants}</text>`
   }
 
   <rect x="${width / 2 - 260}" y="${height - 330}" width="520" height="120" rx="60" fill="${ACCENT}"/>
-  <text x="${width / 2}" y="${height - 252}" font-family="DejaVu Sans, sans-serif" font-size="52"
-        font-weight="800" fill="#000000" text-anchor="middle">Приєднуйся</text>
+  <text x="${width / 2}" y="${height - 252}" font-family="${POSTER_FONT_FAMILY}" font-size="45"
+        font-weight="600" fill="#000000" text-anchor="middle">Приєднуйся</text>
 
-  <text x="${width / 2}" y="${height - 150}" font-family="DejaVu Sans, sans-serif" font-size="38"
-        fill="#a3a3a3" text-anchor="middle">DormHub</text>
+  <text x="${width / 2}" y="${height - 150}" font-family="${POSTER_FONT_FAMILY}" font-size="34"
+        font-weight="400" fill="#a3a3a3" text-anchor="middle">DormHub</text>
 </svg>`
 }
 
