@@ -78,7 +78,12 @@ const GPU_BLUE = '#3b82f6'
 const CARD_FONT_FILES = [
   require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf'),
   require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf'),
+  require.resolve(
+    '@expo-google-fonts/unbounded/800ExtraBold/Unbounded_800ExtraBold.ttf',
+  ),
 ]
+
+const POSTER_FONT_FAMILY = 'Unbounded, DejaVu Sans, sans-serif'
 
 /**
  * XML-екранування для всього, що вставляється в SVG. Без нього назва
@@ -503,9 +508,9 @@ function chatCardSvg(input: ShareCardInput): string {
   ${titleLayout.lines
     .map(
       (line, index) =>
-        `<text x="72" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="DejaVu Sans, sans-serif"
+        `<text x="72" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="${POSTER_FONT_FAMILY}"
                font-size="${titleLayout.fontSize}" font-weight="800" fill="#ffffff"
-               letter-spacing="-2">${escapeXml(line)}</text>`,
+               letter-spacing="-4">${escapeXml(line)}</text>`,
     )
     .join('')}
 
@@ -590,8 +595,8 @@ function storyCardSvg(input: ShareCardInput): string {
     .map(
       (line, index) =>
         `<text x="${width / 2}" y="${titleTop + index * (titleSize + 16)}"
-               font-family="DejaVu Sans, sans-serif" font-size="${titleSize}" font-weight="800"
-               fill="#ffffff" text-anchor="middle" letter-spacing="-2">${escapeXml(line)}</text>`,
+               font-family="${POSTER_FONT_FAMILY}" font-size="${titleSize}" font-weight="800"
+               fill="#ffffff" text-anchor="middle" letter-spacing="-3">${escapeXml(line)}</text>`,
     )
     .join('')}
 
