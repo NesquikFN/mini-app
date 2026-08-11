@@ -405,25 +405,57 @@ function backgroundSvg(width: number, height: number, hasCover: boolean): string
   return hasCover ? '' : brandGradient
 }
 
-/**
- * Фіксована вертикальна сітка chat-картки. Позиції задані явними
- * константами, а не «від попереднього блока»: інакше зайвий рядок назви
- * зсував би все нижче й наїжджав на ряд з аватарками (саме це й ловив
- * візуальний прогін). Тепер довжина назви на решту макета не впливає.
- */
-const TITLE_TOP = 286
+/** Назва займає весь вільний простір між логотипом і метаданими.
+ * Коротка стає майже постерною, а граничні 200 символів зменшуються й
+ * переносяться ЦІЛКОМ — без трикрапки та втрати частини тексту. */
+export interface ChatTitleLayout {
+  lines: string[]
+  fontSize: number
+  firstBaseline: number
+  lineHeight: number
+}
+
+export function layoutChatTitle(title: string): ChatTitleLayout {
+  const candidates = [
+    { maxLines: 1, fontSize: 170, maxChars: 9 },
+    { maxLines: 2, fontSize: 108, maxChars: 15 },
+    { maxLines: 3, fontSize: 76, maxChars: 21 },
+    { maxLines: 4, fontSize: 58, maxChars: 27 },
+    { maxLines: 5, fontSize: 44, maxChars: 36 },
+    { maxLines: 6, fontSize: 36, maxChars: 46 },
+  ]
+
+  let selected = candidates[candidates.length - 1]
+  let lines = wrapText(title, 50, selected.maxChars)
+  for (const candidate of candidates) {
+    const wrapped = wrapText(title, 50, candidate.maxChars)
+    if (wrapped.length <= candidate.maxLines) {
+      selected = candidate
+      lines = wrapped
+      break
+    }
+  }
+
+  const lineHeight = Math.round(selected.fontSize * 1.08)
+  const visualHeight = selected.fontSize + (lines.length - 1) * lineHeight
+  const zoneTop = 145
+  const zoneHeight = 270
+  const firstBaseline = Math.round(
+    zoneTop + Math.max(0, (zoneHeight - visualHeight) / 2) + selected.fontSize * 0.82,
+  )
+
+  return { lines, fontSize: selected.fontSize, firstBaseline, lineHeight }
+}
+
 const META_TOP = 452
 const BOTTOM_ROW_Y = 556
 
 function chatCardSvg(input: ShareCardInput): string {
   const { width, height } = SHARE_CARD_SIZES.chat
   const roleBadge = badge(input)
-  // Максимум 2 рядки назви: нижче йдуть дата, місце й рядок учасників,
-  // і третій рядок заголовка наїжджав би на них.
-  const titleLines = input.hideDetails
-    ? ['Закрита подія DormHub']
-    : wrapText(input.title, 2, 22)
-  const titleSize = titleLines.length >= 2 ? 74 : 92
+  const titleLayout = layoutChatTitle(
+    input.hideDetails ? 'Закрита подія DormHub' : input.title,
+  )
 
   const meta = input.hideDetails
     ? []
@@ -468,11 +500,12 @@ function chatCardSvg(input: ShareCardInput): string {
       : ''
   }
 
-  ${titleLines
+  ${titleLayout.lines
     .map(
       (line, index) =>
-        `<text x="72" y="${TITLE_TOP + index * (titleSize + 12)}" font-family="DejaVu Sans, sans-serif"
-               font-size="${titleSize}" font-weight="800" fill="#ffffff" letter-spacing="-2">${escapeXml(line)}</text>`,
+        `<text x="72" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="DejaVu Sans, sans-serif"
+               font-size="${titleLayout.fontSize}" font-weight="800" fill="#ffffff"
+               letter-spacing="-2">${escapeXml(line)}</text>`,
     )
     .join('')}
 

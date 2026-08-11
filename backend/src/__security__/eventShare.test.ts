@@ -19,6 +19,7 @@ import {
   wrapText,
   truncateLine,
   initialOf,
+  layoutChatTitle,
   loadParticipantAvatar,
   type ShareCardInput,
 } from '../utils/shareCard'
@@ -128,6 +129,18 @@ describe('share card rendering', () => {
     )
     const meta = await sharp(buffer).metadata()
     assert.equal(meta.width, SHARE_CARD_SIZES.chat.width)
+  })
+
+  it('fills the title area adaptively and keeps all 200 characters', () => {
+    const short = layoutChatTitle('Декодер')
+    assert.equal(short.lines.length, 1)
+    assert.equal(short.fontSize, 170)
+
+    const longTitle = 'Дуже довга назва події '.repeat(9).trim().slice(0, 200)
+    const long = layoutChatTitle(longTitle)
+    assert.equal(long.lines.join(' ').replace(/\s+/g, ' '), longTitle)
+    assert.ok(long.lines.length <= 6)
+    assert.ok(!long.lines.some((line) => line.endsWith('…')))
   })
 
   it('escapes XML-significant characters instead of injecting SVG nodes', () => {
