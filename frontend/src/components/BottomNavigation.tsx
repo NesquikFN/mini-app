@@ -25,7 +25,7 @@ export function BottomNavigation() {
   const { pathname } = useLocation()
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--surface-border)] bg-[var(--surface-bg)]/95 backdrop-blur">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--surface-border)] bg-[var(--surface-bg)]">
       <div className="mx-auto flex w-full max-w-[560px] items-stretch justify-between px-2 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {items.map(({ to, label, icon: Icon, end }) => {
           const active = isPathActive(pathname, to, end)

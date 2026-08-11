@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Archive, CalendarDays, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, Users, UserX } from 'lucide-react'
+import { Archive, CalendarDays, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, Users } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -12,6 +12,7 @@ import { UserRow } from '../components/UserRow'
 import { ParticipantsModal } from '../components/ParticipantsModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FormattedText } from '../components/FormattedText'
+import { ParticipantProfileRow } from '../components/ParticipantProfileRow'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import { fetchEventDetail, fetchEventShareLink, getErrorMessage, type EventDetailResponse } from '../services/api'
 
@@ -106,10 +107,14 @@ export function EventDetailPage() {
     )
   }
 
-  // Detail data is authoritative here. The shared events list may be
-  // filtered to the current dormitory, while profile links can point to
-  // an event from a different dormitory.
-  const event = events.find((item) => item.id === id) ?? members?.event
+  // Detail data is authoritative here. The shared events list may be an
+  // older snapshot (it is fetched independently), while the detail response
+  // contains the event and its participant profiles from the same request.
+  // During a detail refresh we temporarily use the context copy so join/leave
+  // mutations remain visible immediately.
+  const event = membersStatus === 'success'
+    ? members?.event
+    : events.find((item) => item.id === id) ?? members?.event
 
   if (!event && membersStatus === 'loading') {
     return (
@@ -156,6 +161,7 @@ export function EventDetailPage() {
       // Учасники в event (з контексту) вже оновились одразу — а от
       // аватарки/імена в members довантажуємо окремо, щоб не тримати
       // важкі профілі всіх учасників у спільному EventsContext.
+      setMembersStatus('loading')
       loadMembers()
     } catch (error) {
       setActionError(getErrorMessage(error))
@@ -204,6 +210,7 @@ export function EventDetailPage() {
     try {
       await removeParticipantFromEvent(eventId, participantPendingRemoval.id)
       setParticipantPendingRemoval(null)
+      setMembersStatus('loading')
       loadMembers()
     } catch (error) {
       setActionError(getErrorMessage(error))
@@ -374,22 +381,17 @@ export function EventDetailPage() {
                   Поки що ніхто не приєднався
                 </p>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2.5">
                   {previewParticipants.map((participant) => (
-                    <div key={participant.id} className="flex items-center gap-2">
-                      <div className="min-w-0 flex-1">
-                        <UserRow user={participant} />
-                      </div>
-                      {isCreator && participant.id !== event.creatorId && (
-                        <Button
-                          variant="outline"
-                          loading={removingParticipantId === participant.id}
-                          onClick={() => setParticipantPendingRemoval(participant)}
-                        >
-                          <UserX size={15} />
-                        </Button>
-                      )}
-                    </div>
+                    <ParticipantProfileRow
+                      key={participant.id}
+                      participant={participant}
+                      organizer={participant.id === event.creatorId}
+                      removable={isCreator && participant.id !== event.creatorId}
+                      removing={removingParticipantId === participant.id}
+                      removeDisabled={removingParticipantId !== null && removingParticipantId !== participant.id}
+                      onRemove={setParticipantPendingRemoval}
+                    />
                   ))}
                 </div>
               )}
@@ -398,7 +400,7 @@ export function EventDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowAllParticipants(true)}
-                  className="self-start text-sm font-medium text-[var(--accent)] active:text-[var(--accent-hover)]"
+                  className="self-start rounded-full bg-[var(--accent-soft-bg)] px-3 py-2 text-sm font-semibold text-[var(--accent)] active:text-[var(--accent-hover)]"
                 >
                   Показати всіх
                 </button>
@@ -410,7 +412,7 @@ export function EventDetailPage() {
         {actionError && <p className="text-sm text-red-400">{actionError}</p>}
       </main>
 
-      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-20 w-full max-w-[560px] -translate-x-1/2 border-t border-[var(--surface-border)] bg-[var(--surface-bg)]/95 p-3 backdrop-blur-xl">
+      <div className="fixed bottom-[calc(4rem+max(0.5rem,env(safe-area-inset-bottom)))] left-1/2 z-20 w-full max-w-[560px] -translate-x-1/2 border-t border-[var(--surface-border)] bg-[var(--surface-bg)] p-3">
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" fullWidth loading={sharing} onClick={handleShareEvent}>
             <Share2 size={19} /> {sharing ? 'Готую…' : 'Запросити'}

@@ -18,10 +18,17 @@ import { ParticipantAvatarStack } from './ParticipantAvatarStack'
 
 export function EventCard({ event }: { event: DormEvent }) {
   const { getDormitoryName } = useDormitories()
-  const isFull = event.participants.length >= event.maxParticipants
+  // The event list and its avatar preview are populated by separate DB reads.
+  // If somebody joins between them, the preview can briefly be newer than the
+  // id/count snapshot. Never render fewer participants than visible avatars.
+  const participantCount = Math.max(
+    event.participantCount ?? 0,
+    event.participants.length,
+    event.participantPreview?.length ?? 0,
+  )
+  const isFull = participantCount >= event.maxParticipants
   const isArchived = isEventPast(event.date, event.time)
   const dormitoryName = getDormitoryName(event.dormitoryId)
-  const participantCount = event.participantCount ?? event.participants.length
 
   return (
     <Link
@@ -94,7 +101,7 @@ export function EventCard({ event }: { event: DormEvent }) {
               />
               <span className="inline-flex shrink-0 items-center gap-1">
                 <Users size={14} className="text-orange-400" />
-                {event.participants.length}/{event.maxParticipants}
+                {participantCount}/{event.maxParticipants}
               </span>
             </span>
 

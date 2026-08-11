@@ -1,7 +1,5 @@
-import { UserRow } from './UserRow'
-import { UserX } from 'lucide-react'
-import { Button } from './Button'
 import type { PublicUser } from '../types/user'
+import { ParticipantProfileRow } from './ParticipantProfileRow'
 
 interface ParticipantsModalProps {
   participants: PublicUser[]
@@ -42,23 +40,17 @@ export function ParticipantsModal({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2.5">
             {participants.map((participant) => (
-              <div key={participant.id} className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <UserRow user={participant} />
-                </div>
-                {removable && participant.id !== creatorId && onRemove && (
-                  <Button
-                    variant="outline"
-                    loading={pendingUserId === participant.id}
-                    disabled={pendingUserId !== null && pendingUserId !== participant.id}
-                    onClick={() => onRemove(participant)}
-                  >
-                    <UserX size={15} />
-                  </Button>
-                )}
-              </div>
+              <ParticipantProfileRow
+                key={participant.id}
+                participant={participant}
+                organizer={participant.id === creatorId}
+                removable={removable && participant.id !== creatorId}
+                removing={pendingUserId === participant.id}
+                removeDisabled={pendingUserId !== null && pendingUserId !== participant.id}
+                onRemove={onRemove}
+              />
             ))}
           </div>
         </div>
