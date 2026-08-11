@@ -412,7 +412,7 @@ export function EventDetailPage() {
         {actionError && <p className="text-sm text-red-400">{actionError}</p>}
       </main>
 
-      <div className="fixed bottom-[calc(4rem+max(0.5rem,env(safe-area-inset-bottom)))] left-1/2 z-20 w-full max-w-[560px] -translate-x-1/2 border-t border-[var(--surface-border)] bg-[var(--surface-bg)] p-3">
+      <div className="fixed bottom-[calc(4rem+max(0.5rem,env(safe-area-inset-bottom)))] left-1/2 z-20 w-full max-w-[560px] -translate-x-1/2 border-t border-[var(--surface-border)] bg-[var(--surface-bg)] px-3 pt-3">
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" fullWidth loading={sharing} onClick={handleShareEvent}>
             <Share2 size={19} /> {sharing ? 'Готую…' : 'Запросити'}
