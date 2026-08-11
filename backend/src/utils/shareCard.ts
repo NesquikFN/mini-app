@@ -491,24 +491,24 @@ function chatCardSvg(input: ShareCardInput): string {
       <stop offset="100%" stop-color="#090909"/>
     </linearGradient>
     <clipPath id="chatCoverClip">
-      <path d="M684 52 H1200 V480 H684 Q658 480 658 454 V78 Q658 52 684 52 Z"/>
+      <path d="M658 0 H1200 V480 H684 Q658 480 658 454 Z"/>
     </clipPath>
   </defs>
 
   ${backgroundSvg(width, height)}
   <circle cx="${width - 60}" cy="40" r="340" fill="url(#accentGlow)"/>
 
-  <path d="M684 40 H1200 V492 H684 Q646 492 646 454 V78 Q646 40 684 40 Z"
+  <path d="M646 0 H1200 V492 H684 Q646 492 646 454 Z"
         fill="${ACCENT}" fill-opacity="0.09"/>
-  <path d="M684 46 H1200 V486 H684 Q652 486 652 454 V78 Q652 46 684 46 Z"
+  <path d="M652 0 H1200 V486 H684 Q652 486 652 454 Z"
         fill="url(#framePlaceholder)"/>
-  <path d="M1200 46 H684 Q652 46 652 78 V454 Q652 486 684 486 H1200"
+  <path d="M652 0 V454 Q652 486 684 486 H1200"
         fill="none" stroke="${ACCENT}" stroke-opacity="0.55" stroke-width="2"/>
   ${input.coverDataUri
-    ? `<image href="${input.coverDataUri}" x="658" y="52" width="542" height="428"
+    ? `<image href="${input.coverDataUri}" x="658" y="0" width="542" height="480"
               preserveAspectRatio="xMidYMid slice" clip-path="url(#chatCoverClip)"/>`
-    : `<circle cx="929" cy="266" r="150" fill="url(#accentGlow)"/>
-       <text x="929" y="278" font-family="${POSTER_FONT_FAMILY}" font-size="34"
+    : `<circle cx="929" cy="240" r="150" fill="url(#accentGlow)"/>
+       <text x="929" y="252" font-family="${POSTER_FONT_FAMILY}" font-size="34"
              font-weight="600" fill="#ffffff" fill-opacity="0.28" text-anchor="middle">DormHub</text>`}
 
   ${logoSvg(64, 38, 210)}
@@ -672,7 +672,7 @@ export async function renderShareCard(
   // Закриту подію ніколи не показуємо з чужою обкладинкою — інакше
   // картинка сама по собі розкривала б зміст закритої події.
   const coverSize = format === 'chat'
-    ? { width: 542, height: 428 }
+    ? { width: 542, height: 480 }
     : { width: 900, height: 580 }
   const cover = input.hasCover && !input.hideDetails
     ? await loadCoverArtwork(
