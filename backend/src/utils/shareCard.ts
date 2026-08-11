@@ -507,7 +507,7 @@ function chatCardSvg(input: ShareCardInput): string {
     : `<circle cx="${width - 60}" cy="40" r="340" fill="url(#accentGlow)"/>`}
 
   <rect x="40" y="24" width="232" height="72" rx="36"
-        fill="#000000" fill-opacity="0.58" stroke="#ffffff" stroke-opacity="0.08"/>
+        fill="#000000" fill-opacity="0.58"/>
   ${logoSvg(59, 36, 180)}
 
   ${
@@ -534,7 +534,7 @@ function chatCardSvg(input: ShareCardInput): string {
 
   ${input.coverDataUri && meta.length
     ? `<rect x="48" y="402" width="552" height="86" rx="24"
-             fill="#000000" fill-opacity="0.7" stroke="#ffffff" stroke-opacity="0.1"/>`
+             fill="#000000" fill-opacity="0.7"/>`
     : ''}
 
   ${meta.length
@@ -625,7 +625,7 @@ function storyCardSvg(input: ShareCardInput): string {
 
   ${input.coverDataUri
     ? `<rect x="340" y="70" width="400" height="124" rx="62"
-             fill="#000000" fill-opacity="0.58" stroke="#ffffff" stroke-opacity="0.08"/>
+             fill="#000000" fill-opacity="0.58"/>
        ${logoSvg(390, 90, 300)}`
     : logoSvg(width / 2 - 205, 100, 410)}
 
@@ -661,7 +661,7 @@ function storyCardSvg(input: ShareCardInput): string {
 
   ${input.coverDataUri && meta.length
     ? `<rect x="180" y="1252" width="720" height="176" rx="52"
-             fill="#000000" fill-opacity="0.68" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>`
+             fill="#000000" fill-opacity="0.68"/>`
     : ''}
 
   ${meta
