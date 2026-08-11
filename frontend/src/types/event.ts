@@ -10,6 +10,7 @@ export interface DormEvent {
   gameUrl?: string
   isOnline: boolean
   vipOnly: boolean
+  gpuOnly: boolean
   date: string
   time: string
   location: string
@@ -38,5 +39,6 @@ export interface CreateEventInput {
   gameUrl?: string
   isOnline: boolean
   vipOnly: boolean
+  gpuOnly: boolean
   imageFile?: File
 }

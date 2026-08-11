@@ -69,6 +69,10 @@ export interface VipListItem extends AdminUserView {
   vipSince: string
 }
 
+export interface GpuListItem extends AdminUserView {
+  gpuSince: string
+}
+
 export interface AdminUserListItem extends AdminUserView {
   eventsCreatedCount: number
 }

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import {
   Archive,
+  BadgeCheck,
   CalendarDays,
   Clock,
   Crown,
@@ -68,6 +69,11 @@ export function EventCard({ event }: { event: DormEvent }) {
           {event.vipOnly && (
             <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-black/65 px-3 py-2 text-[11px] font-bold text-amber-300 backdrop-blur-md">
               <Crown size={13} /> VIP
+            </span>
+          )}
+          {event.gpuOnly && (
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-blue-400/30 bg-black/65 px-3 py-2 text-[11px] font-bold text-blue-300 backdrop-blur-md">
+              <BadgeCheck size={13} /> ГПУ
             </span>
           )}
         </div>

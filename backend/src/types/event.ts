@@ -8,6 +8,7 @@ export interface Event {
   gameUrl?: string
   isOnline: boolean
   vipOnly: boolean
+  gpuOnly: boolean
   date: string
   time: string
   location: string

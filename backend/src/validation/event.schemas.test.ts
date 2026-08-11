@@ -4,6 +4,7 @@ import {
   createEventSchema,
   createEventFromTemplateSchema,
   eventTemplateSchema,
+  updateEventSchema,
 } from './event.schemas'
 
 const templateInput = {
@@ -67,5 +68,43 @@ describe('VIP event schema', () => {
 
   it('accepts an explicit VIP-only event flag', () => {
     assert.equal(createEventSchema.parse({ ...eventInput, vipOnly: true }).vipOnly, true)
+  })
+})
+
+describe('GPU event schema', () => {
+  const eventInput = {
+    title: 'Закрита зустріч ГПУ',
+    description: '',
+    date: '2099-09-10',
+    time: '19:30',
+    location: 'Хол',
+    maxParticipants: 10,
+  }
+
+  it('keeps ordinary events non-GPU by default', () => {
+    assert.equal(createEventSchema.parse(eventInput).gpuOnly, false)
+  })
+
+  it('accepts an explicit GPU-only event flag', () => {
+    assert.equal(createEventSchema.parse({ ...eventInput, gpuOnly: true }).gpuOnly, true)
+  })
+
+  it('rejects an event that is both VIP-only and GPU-only', () => {
+    assert.equal(
+      createEventSchema.safeParse({ ...eventInput, vipOnly: true, gpuOnly: true }).success,
+      false,
+    )
+  })
+
+  it('rejects a PATCH that turns an event both VIP-only and GPU-only', () => {
+    assert.equal(
+      updateEventSchema.safeParse({ vipOnly: true, gpuOnly: true }).success,
+      false,
+    )
+  })
+
+  it('allows a PATCH that sets only one of the two flags', () => {
+    assert.equal(updateEventSchema.safeParse({ gpuOnly: true }).success, true)
+    assert.equal(updateEventSchema.safeParse({ vipOnly: true }).success, true)
   })
 })

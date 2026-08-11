@@ -8,12 +8,14 @@ import * as eventsService from './events.service'
 import { adminRepository } from '../repositories/admin.repository'
 import { hostsRepository } from '../repositories/hosts.repository'
 import { vipsRepository } from '../repositories/vips.repository'
+import { gpusRepository } from '../repositories/gpus.repository'
 
 export interface PublicProfile {
   user: PublicUser
   isAdmin: boolean
   isHost: boolean
   isVip: boolean
+  isGpu: boolean
   createdEvents: EventResponse[]
 }
 
@@ -23,11 +25,13 @@ export async function getPublicProfile(userId: string, viewerId: string): Promis
     throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
   }
 
-  const [isAdmin, isHost, targetIsVip, viewerIsVip, events] = await Promise.all([
+  const [isAdmin, isHost, targetIsVip, viewerIsVip, targetIsGpu, viewerIsGpu, events] = await Promise.all([
     adminRepository.isAdmin(userId),
     hostsRepository.isHost(userId),
     vipsRepository.isVip(userId),
     vipsRepository.isVip(viewerId),
+    gpusRepository.isGpu(userId),
+    gpusRepository.isGpu(viewerId),
     eventsService.listEventsForUser(userId, viewerId),
   ])
 
@@ -36,17 +40,19 @@ export async function getPublicProfile(userId: string, viewerId: string): Promis
     isAdmin,
     isHost,
     isVip: viewerIsVip && targetIsVip,
+    isGpu: viewerIsGpu && targetIsGpu,
     createdEvents: events.created,
   }
 }
 
 export async function withRoles(user: AuthUser): Promise<AuthUser> {
-  const [isAdmin, isHost, isVip] = await Promise.all([
+  const [isAdmin, isHost, isVip, isGpu] = await Promise.all([
     adminRepository.isAdmin(user.id),
     hostsRepository.isHost(user.id),
     vipsRepository.isVip(user.id),
+    gpusRepository.isGpu(user.id),
   ])
-  return { ...user, isAdmin, isHost, isVip }
+  return { ...user, isAdmin, isHost, isVip, isGpu }
 }
 
 export async function updateDormitory(userId: string, dormitoryId: string): Promise<AuthUser> {

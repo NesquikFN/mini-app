@@ -24,6 +24,7 @@ import {
 } from './telegram-notifications.service'
 import { mapWithConcurrency } from '../utils/concurrency'
 import { vipsRepository } from '../repositories/vips.repository'
+import { gpusRepository } from '../repositories/gpus.repository'
 import { NO_DORMITORY_ID } from '../types/dormitory'
 
 export interface EventResponse {
@@ -36,6 +37,7 @@ export interface EventResponse {
   gameUrl?: string
   isOnline: boolean
   vipOnly: boolean
+  gpuOnly: boolean
   date: string
   time: string
   location: string
@@ -70,6 +72,7 @@ function toEventResponse(event: Event): EventResponse {
     gameUrl: event.gameUrl,
     isOnline: event.isOnline,
     vipOnly: event.vipOnly,
+    gpuOnly: event.gpuOnly,
     date: event.date,
     time: event.time,
     location: event.location,
@@ -122,30 +125,35 @@ export async function listEvents(
   userDormitoryId: string | undefined,
   userId: string,
 ): Promise<EventResponse[]> {
-  const includeVip = await vipsRepository.isVip(userId)
+  const [includeVip, includeGpu] = await Promise.all([
+    vipsRepository.isVip(userId),
+    gpusRepository.isGpu(userId),
+  ])
   if (userDormitoryId === NO_DORMITORY_ID) {
-    const events = await eventsRepository.findAll(undefined, includeVip, true)
+    const events = await eventsRepository.findAll(undefined, includeVip, true, includeGpu)
     return attachParticipantPreviews(events.map(toEventResponse))
   }
   if (scope === 'mine') {
     if (!userDormitoryId) return []
-    const events = await eventsRepository.findAll(userDormitoryId, includeVip)
+    const events = await eventsRepository.findAll(userDormitoryId, includeVip, false, includeGpu)
     return attachParticipantPreviews(events.map(toEventResponse))
   }
 
-  const events = await eventsRepository.findAll(undefined, includeVip)
+  const events = await eventsRepository.findAll(undefined, includeVip, false, includeGpu)
   return attachParticipantPreviews(events.map(toEventResponse))
 }
 
 export async function getEvent(id: string, viewerId?: string): Promise<EventResponse> {
   const event = await getEventOrThrow(id)
   if (viewerId) {
-    const [viewerIsVip, viewer] = await Promise.all([
+    const [viewerIsVip, viewerIsGpu, viewer] = await Promise.all([
       vipsRepository.isVip(viewerId),
+      gpusRepository.isGpu(viewerId),
       usersRepository.getUserById(viewerId),
     ])
     if (
       (event.vipOnly && !viewerIsVip) ||
+      (event.gpuOnly && !viewerIsGpu) ||
       (!event.isOnline && viewer?.dormitoryId === NO_DORMITORY_ID)
     ) {
       throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
@@ -212,9 +220,14 @@ export async function createEvent(
     date: input.date,
     time: input.time,
     maxParticipants: input.maxParticipants,
+    vipOnly: input.vipOnly,
+    gpuOnly: input.gpuOnly,
   })
   if (input.vipOnly && !(await vipsRepository.isVip(creatorId))) {
     throw new AppError(403, 'VIP_ACCESS_REQUIRED', 'Недостатньо прав для VIP-події')
+  }
+  if (input.gpuOnly && !(await gpusRepository.isGpu(creatorId))) {
+    throw new AppError(403, 'GPU_ACCESS_REQUIRED', 'Недостатньо прав для ГПУ-події')
   }
 
   const event = await eventsRepository.insert({
@@ -225,6 +238,7 @@ export async function createEvent(
     gameUrl: input.gameUrl,
     isOnline: input.isOnline,
     vipOnly: input.vipOnly,
+    gpuOnly: input.gpuOnly,
     date: input.date,
     time: input.time,
     location: input.location,
@@ -246,7 +260,7 @@ export async function announceEvent(event: EventResponse): Promise<void> {
 
   try {
     const settings = await settingsRepository.getNotificationSettings()
-    if (settings.chatId && !event.vipOnly) {
+    if (settings.chatId && !event.vipOnly && !event.gpuOnly) {
       await sendEventAnnouncement(settings.chatId, event, creatorInfo, settings.threadId)
     }
   } catch (error) {
@@ -255,9 +269,10 @@ export async function announceEvent(event: EventResponse): Promise<void> {
 
   // Онлайн-подія доступна всім гуртожиткам — сповіщаємо всіх підписників.
   // Офлайн-подія лишається в межах свого гуртожитку — так само й тут.
+  const requiredRole = event.vipOnly ? 'vip' : event.gpuOnly ? 'gpu' : undefined
   const subscriberIds = await usersRepository.getSubscribedTelegramIds(
     event.isOnline ? undefined : event.dormitoryId,
-    event.vipOnly,
+    requiredRole,
   )
   // Обмежена паралельність замість Promise.all по всьому списку: інакше
   // одна створена подія відкриває стільки одночасних запитів до Telegram,
@@ -300,6 +315,9 @@ export async function updateOwnEvent(
   if ((event.vipOnly || input.vipOnly) && !(await vipsRepository.isVip(creatorId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
+  if ((event.gpuOnly || input.gpuOnly) && !(await gpusRepository.isGpu(creatorId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
 
   assertEventEditable(event)
   // Перевіряємо підсумковий стан події (поточні значення + патч), а не
@@ -313,6 +331,8 @@ export async function updateOwnEvent(
     time: input.time ?? event.time,
     maxParticipants: input.maxParticipants ?? event.maxParticipants,
     currentParticipantCount: event.participantIds.length,
+    vipOnly: input.vipOnly ?? event.vipOnly,
+    gpuOnly: input.gpuOnly ?? event.gpuOnly,
   })
 
   return attachParticipantPreview(toEventResponse(await eventsRepository.update(id, input)))
@@ -332,6 +352,9 @@ export async function deleteOwnEvent(id: string, creatorId: string): Promise<voi
   if (event.vipOnly && !(await vipsRepository.isVip(creatorId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
+  if (event.gpuOnly && !(await gpusRepository.isGpu(creatorId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   if (event.creatorId !== creatorId) {
     throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Видалити подію може лише її автор')
   }
@@ -345,6 +368,9 @@ export async function removeOwnEventParticipant(
 ): Promise<EventResponse> {
   const event = await getEventOrThrow(eventId)
   if (event.vipOnly && !(await vipsRepository.isVip(creatorId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
+  if (event.gpuOnly && !(await gpusRepository.isGpu(creatorId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
   if (event.creatorId !== creatorId) {
@@ -367,6 +393,9 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
   if (event.vipOnly && !(await vipsRepository.isVip(userId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
+  if (event.gpuOnly && !(await gpusRepository.isGpu(userId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
   if (isKyivDateTimeInPast(event.date, event.time)) {
@@ -393,6 +422,9 @@ export async function leaveEvent(eventId: string, userId: string): Promise<Event
   if (event.vipOnly && !(await vipsRepository.isVip(userId))) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
+  if (event.gpuOnly && !(await gpusRepository.isGpu(userId))) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
 
   const removed = await eventsRepository.removeParticipant(eventId, userId)
   if (!removed) {
@@ -414,14 +446,18 @@ export async function listEventsForUser(
     eventsRepository.getUserParticipatingEvents(userId),
   ])
 
-  const [viewerIsVip, viewer] = await Promise.all([
+  const [viewerIsVip, viewerIsGpu, viewer] = await Promise.all([
     vipsRepository.isVip(viewerId),
+    gpusRepository.isGpu(viewerId),
     usersRepository.getUserById(viewerId),
   ])
   const includeVip = privileged || viewerIsVip
+  const includeGpu = privileged || viewerIsGpu
   const viewerOnlineOnly = !privileged && viewer?.dormitoryId === NO_DORMITORY_ID
   const visible = (event: Event): boolean =>
-    (!viewerOnlineOnly || event.isOnline) && (includeVip || !event.vipOnly)
+    (!viewerOnlineOnly || event.isOnline) &&
+    (includeVip || !event.vipOnly) &&
+    (includeGpu || !event.gpuOnly)
   const createdResponses = created.filter(visible).map(toEventResponse)
   const participatingResponses = participating.filter(visible).map(toEventResponse)
   const previews = await eventsRepository.findParticipantPreviews([
@@ -510,6 +546,7 @@ export async function createEventFromTemplate(
         location: template.isOnline ? 'Онлайн' : template.location,
         isOnline: template.isOnline,
         vipOnly: false,
+        gpuOnly: false,
         maxParticipants,
         groupUrl: template.groupUrl,
         gameUrl,

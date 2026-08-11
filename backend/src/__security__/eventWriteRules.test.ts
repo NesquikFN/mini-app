@@ -119,6 +119,18 @@ describe('shared event invariants', () => {
     )
   })
 
+  it('rejects an event that is both VIP-only and GPU-only', () => {
+    expectAppError(
+      () => assertEventInvariants(validInvariantInput({ vipOnly: true, gpuOnly: true })),
+      'VIP_GPU_CONFLICT',
+    )
+  })
+
+  it('allows VIP-only and GPU-only individually', () => {
+    assert.doesNotThrow(() => assertEventInvariants(validInvariantInput({ vipOnly: true })))
+    assert.doesNotThrow(() => assertEventInvariants(validInvariantInput({ gpuOnly: true })))
+  })
+
   it('treats a finished event as non-editable', () => {
     expectAppError(
       () => assertEventEditable({ date: PAST_DATE, time: '10:00' }),
@@ -138,6 +150,7 @@ function fakeEvent(overrides: Partial<Event> = {}): Event {
     description: '',
     isOnline: true,
     vipOnly: false,
+    gpuOnly: false,
     date: FUTURE_DATE,
     time: '18:00:00',
     location: 'Онлайн',

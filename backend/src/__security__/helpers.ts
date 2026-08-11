@@ -5,6 +5,7 @@ import { usersRepository } from '../repositories/users.repository'
 import { adminRepository } from '../repositories/admin.repository'
 import { hostsRepository } from '../repositories/hosts.repository'
 import { vipsRepository } from '../repositories/vips.repository'
+import { gpusRepository } from '../repositories/gpus.repository'
 import type { AuthUser, RegistrationStatus } from '../types/user'
 
 /**
@@ -49,16 +50,19 @@ export function stubAuthLayer(options: {
   admins?: string[]
   hosts?: string[]
   vips?: string[]
+  gpus?: string[]
 }): void {
   const byId = new Map(options.users.map((user) => [user.id, user]))
   const admins = new Set(options.admins ?? [])
   const hosts = new Set(options.hosts ?? [])
   const vips = new Set(options.vips ?? [])
+  const gpus = new Set(options.gpus ?? [])
 
   mock.method(usersRepository, 'getUserById', async (id: string) => byId.get(id) ?? null)
   mock.method(adminRepository, 'isAdmin', async (id: string) => admins.has(id))
   mock.method(hostsRepository, 'isHost', async (id: string) => hosts.has(id))
   mock.method(vipsRepository, 'isVip', async (id: string) => vips.has(id))
+  mock.method(gpusRepository, 'isGpu', async (id: string) => gpus.has(id))
 }
 
 export interface ApiErrorBody {

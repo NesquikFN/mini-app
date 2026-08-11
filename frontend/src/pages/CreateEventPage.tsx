@@ -59,6 +59,7 @@ export function CreateEventPage() {
           onSubmit={handleSubmit}
           submitting={submitting}
           canCreateVipOnly={Boolean(user?.isVip)}
+          canCreateGpuOnly={Boolean(user?.isGpu)}
           onlineOnly={user?.dormitoryId === NO_DORMITORY_ID}
           draftStorageKey="dormhub:create-event-draft:v1"
         />

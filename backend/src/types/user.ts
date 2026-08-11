@@ -23,6 +23,7 @@ export interface AuthUser {
   isAdmin?: boolean
   isHost?: boolean
   isVip?: boolean
+  isGpu?: boolean
 }
 
 /** Ширший погляд на users-рядок для адмін-панелі — включає поля, які

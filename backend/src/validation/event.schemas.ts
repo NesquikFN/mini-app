@@ -63,19 +63,25 @@ const locationSchema = z
   .min(1, 'Місце обовʼязкове')
   .max(300, 'Назва місця занадто довга')
 
-export const createEventSchema = z.object({
-  title: titleSchema,
-  description: descriptionSchema.default(''),
-  date: dateSchema,
-  time: timeSchema,
-  location: locationSchema,
-  groupUrl: telegramGroupUrlSchema.optional(),
-  gameUrl: gameUrlSchema.optional(),
-  deferNotification: z.boolean().optional(),
-  isOnline: z.boolean().default(false),
-  vipOnly: z.boolean().default(false),
-  maxParticipants: maxParticipantsSchema,
-})
+export const createEventSchema = z
+  .object({
+    title: titleSchema,
+    description: descriptionSchema.default(''),
+    date: dateSchema,
+    time: timeSchema,
+    location: locationSchema,
+    groupUrl: telegramGroupUrlSchema.optional(),
+    gameUrl: gameUrlSchema.optional(),
+    deferNotification: z.boolean().optional(),
+    isOnline: z.boolean().default(false),
+    vipOnly: z.boolean().default(false),
+    gpuOnly: z.boolean().default(false),
+    maxParticipants: maxParticipantsSchema,
+  })
+  .refine((value) => !(value.vipOnly && value.gpuOnly), {
+    message: 'Подія не може бути одночасно VIP-only і ГПУ-only',
+    path: ['gpuOnly'],
+  })
 
 export type CreateEventInput = z.infer<typeof createEventSchema>
 
@@ -94,18 +100,24 @@ export type CreateEventInput = z.infer<typeof createEventSchema>
  * міг би підставити довільний зовнішній URL, який вантажив би браузер
  * кожного глядача.
  */
-export const updateEventSchema = z.object({
-  title: titleSchema.optional(),
-  description: descriptionSchema.optional(),
-  date: dateSchema.optional(),
-  time: timeSchema.optional(),
-  location: locationSchema.optional(),
-  groupUrl: telegramGroupUrlSchema.optional(),
-  gameUrl: gameUrlSchema.optional(),
-  isOnline: z.boolean().optional(),
-  vipOnly: z.boolean().optional(),
-  maxParticipants: maxParticipantsSchema.optional(),
-})
+export const updateEventSchema = z
+  .object({
+    title: titleSchema.optional(),
+    description: descriptionSchema.optional(),
+    date: dateSchema.optional(),
+    time: timeSchema.optional(),
+    location: locationSchema.optional(),
+    groupUrl: telegramGroupUrlSchema.optional(),
+    gameUrl: gameUrlSchema.optional(),
+    isOnline: z.boolean().optional(),
+    vipOnly: z.boolean().optional(),
+    gpuOnly: z.boolean().optional(),
+    maxParticipants: maxParticipantsSchema.optional(),
+  })
+  .refine((value) => !(value.vipOnly && value.gpuOnly), {
+    message: 'Подія не може бути одночасно VIP-only і ГПУ-only',
+    path: ['gpuOnly'],
+  })
 
 export type UpdateEventInput = z.infer<typeof updateEventSchema>
 

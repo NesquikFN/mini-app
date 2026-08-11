@@ -15,6 +15,7 @@ import type {
   EventTemplateInput,
   HostListItem,
   VipListItem,
+  GpuListItem,
   NotificationLogResponse,
   RegistrationDetail,
   RegistrationsResponse,
@@ -320,6 +321,7 @@ export interface PublicProfileResponse {
   isAdmin: boolean
   isHost: boolean
   isVip: boolean
+  isGpu: boolean
   createdEvents: DormEvent[]
 }
 
@@ -560,6 +562,23 @@ export async function addVipByTelegramId(telegramId: number): Promise<VipListIte
 
 export async function removeVip(userId: string): Promise<void> {
   await request<{ success: boolean }>(`/admin/vips/${userId}`, { method: 'DELETE' })
+}
+
+export async function fetchAdminGpus(): Promise<GpuListItem[]> {
+  const data = await request<{ gpus: GpuListItem[] }>('/admin/gpus')
+  return data.gpus
+}
+
+export async function addGpuByTelegramId(telegramId: number): Promise<GpuListItem> {
+  const data = await request<{ gpu: GpuListItem }>('/admin/gpus', {
+    method: 'POST',
+    body: JSON.stringify({ telegramId }),
+  })
+  return data.gpu
+}
+
+export async function removeGpu(userId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/gpus/${userId}`, { method: 'DELETE' })
 }
 
 export async function fetchEventTemplates(): Promise<EventTemplate[]> {

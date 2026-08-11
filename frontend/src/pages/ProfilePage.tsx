@@ -107,7 +107,7 @@ export function ProfilePage() {
                   {user.nickname ?? user.firstName}
                 </p>
                 <div className="mt-1">
-                  <RoleBadges isAdmin={user.isAdmin} isHost={user.isHost} isVip={user.isVip} />
+                  <RoleBadges isAdmin={user.isAdmin} isHost={user.isHost} isVip={user.isVip} isGpu={user.isGpu} />
                 </div>
                 {user.username && (
                   <p className="text-sm text-[var(--text-secondary)]">@{user.username}</p>

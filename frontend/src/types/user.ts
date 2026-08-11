@@ -21,6 +21,7 @@ export interface AuthUser {
   isAdmin: boolean
   isHost: boolean
   isVip: boolean
+  isGpu: boolean
 }
 
 /** Публічний профіль організатора чи учасника події — те, що API

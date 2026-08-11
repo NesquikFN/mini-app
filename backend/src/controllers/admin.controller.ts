@@ -174,6 +174,22 @@ export async function removeVip(req: Request, res: Response): Promise<void> {
   res.json({ success: true })
 }
 
+export async function listGpus(_req: Request, res: Response): Promise<void> {
+  res.json({ gpus: await adminService.listGpus() })
+}
+
+export async function addGpu(req: Request, res: Response): Promise<void> {
+  const { telegramId } = addAdminSchema.parse(req.body)
+  const gpu = await adminService.addGpuByTelegramId(telegramId)
+  res.status(201).json({ gpu })
+}
+
+export async function removeGpu(req: Request, res: Response): Promise<void> {
+  const { userId } = adminUserIdParamSchema.parse(req.params)
+  await adminService.removeGpu(userId)
+  res.json({ success: true })
+}
+
 export async function listNotificationLog(req: Request, res: Response): Promise<void> {
   const { page, limit } = notificationLogQuerySchema.parse(req.query)
   const { entries, total } = await notificationLogRepository.listPaginated(page, limit)

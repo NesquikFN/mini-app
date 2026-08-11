@@ -94,6 +94,10 @@ create table if not exists events (
   group_url text,
   is_online boolean not null default false,
   is_vip_only boolean not null default false,
+  -- Роль «ГПУ» — незалежна від VIP (migrations/0026_gpu_role_and_events.sql):
+  -- жодна подія не може бути одночасно VIP-only й ГПУ-only, див.
+  -- constraint events_not_vip_and_gpu_only нижче.
+  is_gpu_only boolean not null default false,
   date date not null,
   time time not null,
   location text not null,
@@ -107,13 +111,15 @@ create table if not exists events (
   -- й для users.
   dormitory_id uuid references dormitories (id),
   created_at timestamptz not null default now(),
-  constraint events_max_participants_positive check (max_participants > 0)
+  constraint events_max_participants_positive check (max_participants > 0),
+  constraint events_not_vip_and_gpu_only check (not (is_vip_only and is_gpu_only))
 );
 
 create index if not exists idx_events_creator_id on events (creator_id);
 create index if not exists idx_events_date on events (date);
 create index if not exists idx_events_dormitory_id on events (dormitory_id);
 create index if not exists idx_events_vip_only_date on events (date) where is_vip_only = true;
+create index if not exists idx_events_gpu_only_date on events (date) where is_gpu_only = true;
 create index if not exists idx_events_reminder_pending
   on events (date, time)
   where reminder_sent_at is null;
@@ -200,6 +206,17 @@ create table if not exists vip_users (
 
 create index if not exists idx_vip_users_user_id on vip_users (user_id);
 
+-- «ГПУ» — та сама конструкція, що й vip_users, повністю незалежна роль
+-- (див. migrations/0026_gpu_role_and_events.sql).
+create table if not exists gpu_users (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint gpu_users_user_id_key unique (user_id)
+);
+
+create index if not exists idx_gpu_users_user_id on gpu_users (user_id);
+
 create index if not exists idx_hosts_user_id on hosts (user_id);
 
 -- =========================================================
@@ -218,6 +235,7 @@ alter table event_participants enable row level security;
 alter table admin_users enable row level security;
 alter table hosts enable row level security;
 alter table vip_users enable row level security;
+alter table gpu_users enable row level security;
 alter table dormitories enable row level security;
 
 -- Глобальні налаштування застосунку (один singleton-рядок).
@@ -269,9 +287,10 @@ declare
   v_max_participants integer;
   v_current_count integer;
   v_is_vip_only boolean;
+  v_is_gpu_only boolean;
 begin
-  select max_participants, is_vip_only
-  into v_max_participants, v_is_vip_only
+  select max_participants, is_vip_only, is_gpu_only
+  into v_max_participants, v_is_vip_only, v_is_gpu_only
   from events
   where id = p_event_id
   for update;
@@ -284,6 +303,12 @@ begin
     select 1 from vip_users where user_id = p_user_id
   ) then
     raise exception 'EVENT_VIP_REQUIRED';
+  end if;
+
+  if v_is_gpu_only and not exists (
+    select 1 from gpu_users where user_id = p_user_id
+  ) then
+    raise exception 'EVENT_GPU_REQUIRED';
   end if;
 
   if exists (

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
-import { Crown, Eraser, ImagePlus, MonitorPlay, X } from 'lucide-react'
+import { BadgeCheck, Crown, Eraser, ImagePlus, MonitorPlay, X } from 'lucide-react'
 import { Button } from './Button'
 import type { CreateEventInput, DormEvent } from '../types/event'
 import { todayISODate } from '../utils/date'
@@ -11,6 +11,7 @@ interface EventFormProps {
   submitLabel?: string
   submittingLabel?: string
   canCreateVipOnly?: boolean
+  canCreateGpuOnly?: boolean
   onlineOnly?: boolean
   draftStorageKey?: string
 }
@@ -26,6 +27,7 @@ interface EventFormDraft {
   gameUrl: string
   isOnline: boolean
   vipOnly: boolean
+  gpuOnly: boolean
 }
 
 const draftImages = new Map<string, { file: File; previewUrl: string }>()
@@ -48,6 +50,7 @@ export function EventForm({
   submitLabel = 'Створити подію',
   submittingLabel = 'Створюємо…',
   canCreateVipOnly = false,
+  canCreateGpuOnly = false,
   onlineOnly = false,
   draftStorageKey,
 }: EventFormProps) {
@@ -71,6 +74,7 @@ export function EventForm({
     onlineOnly || initialValues?.isOnline || savedDraft?.isOnline || false,
   )
   const [vipOnly, setVipOnly] = useState(initialValues?.vipOnly ?? savedDraft?.vipOnly ?? false)
+  const [gpuOnly, setGpuOnly] = useState(initialValues?.gpuOnly ?? savedDraft?.gpuOnly ?? false)
   const [imageFile, setImageFile] = useState<File | undefined>(savedImage?.file)
   const [imagePreview, setImagePreview] = useState<string | undefined>(
     initialValues?.imageUrl ?? savedImage?.previewUrl,
@@ -90,12 +94,14 @@ export function EventForm({
       gameUrl,
       isOnline,
       vipOnly,
+      gpuOnly,
     })
   }, [
     date,
     description,
     draftStorageKey,
     gameUrl,
+    gpuOnly,
     groupUrl,
     initialValues,
     isOnline,
@@ -186,6 +192,7 @@ export function EventForm({
     setGameUrl('')
     setIsOnline(onlineOnly)
     setVipOnly(false)
+    setGpuOnly(false)
     setImageFile(undefined)
     setImagePreview(initialValues?.imageUrl)
     setErrors({})
@@ -212,6 +219,7 @@ export function EventForm({
       gameUrl: gameUrl.trim() || undefined,
       isOnline,
       vipOnly: canCreateVipOnly ? vipOnly : false,
+      gpuOnly: canCreateGpuOnly ? gpuOnly : false,
       imageFile,
     })
     if (draftStorageKey && submitted !== false) clearForm()
@@ -329,8 +337,34 @@ export function EventForm({
           <input
             type="checkbox"
             checked={vipOnly}
-            onChange={(event) => setVipOnly(event.target.checked)}
+            onChange={(event) => {
+              setVipOnly(event.target.checked)
+              if (event.target.checked) setGpuOnly(false)
+            }}
             className="h-5 w-5 accent-amber-400"
+          />
+        </label>
+      )}
+
+      {canCreateGpuOnly && (
+        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-4">
+          <span className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-400/15 text-blue-400">
+              <BadgeCheck size={20} />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-[var(--text-primary)]">Тільки для ГПУ</span>
+              <span className="block text-xs text-[var(--text-secondary)]">Інші користувачі не побачать цю подію</span>
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={gpuOnly}
+            onChange={(event) => {
+              setGpuOnly(event.target.checked)
+              if (event.target.checked) setVipOnly(false)
+            }}
+            className="h-5 w-5 accent-blue-400"
           />
         </label>
       )}

@@ -93,6 +93,7 @@ export function UserProfilePage() {
                   isAdmin={profile.isAdmin}
                   isHost={profile.isHost}
                   isVip={profile.isVip}
+                  isGpu={profile.isGpu}
                   centered
                 />
               </div>

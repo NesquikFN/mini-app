@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Archive, CalendarDays, CalendarX, Crown, Home, MonitorPlay, Sparkles } from 'lucide-react'
+import { Archive, BadgeCheck, CalendarDays, CalendarX, Crown, Home, MonitorPlay, Sparkles } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { PageHeader } from '../components/PageHeader'
 import { EventCard } from '../components/EventCard'
@@ -11,7 +11,7 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 import { NO_DORMITORY_ID } from '../types/dormitory'
 
 type DateFilter = 'upcoming' | 'today' | 'week' | 'archive'
-type KindFilter = 'all' | 'offline' | 'online' | 'vip'
+type KindFilter = 'all' | 'offline' | 'online' | 'vip' | 'gpu'
 
 const DATE_OPTIONS: { value: DateFilter; label: string }[] = [
   { value: 'upcoming', label: 'Найближчі' },
@@ -25,6 +25,7 @@ const KIND_OPTIONS: { value: KindFilter; label: string; icon: ReactNode }[] = [
   { value: 'offline', label: 'Офлайн', icon: <Home size={25} /> },
   { value: 'online', label: 'Онлайн', icon: <MonitorPlay size={25} /> },
   { value: 'vip', label: 'VIP', icon: <Crown size={25} /> },
+  { value: 'gpu', label: 'ГПУ', icon: <BadgeCheck size={25} /> },
 ]
 
 export function EventsPage() {
@@ -62,6 +63,7 @@ export function EventsPage() {
       if (effectiveKindFilter === 'offline') return !event.isOnline
       if (effectiveKindFilter === 'online') return event.isOnline
       if (effectiveKindFilter === 'vip') return event.vipOnly
+      if (effectiveKindFilter === 'gpu') return event.gpuOnly
       return true
     })
     .sort((a, b) =>
@@ -73,6 +75,7 @@ export function EventsPage() {
   const availableKinds = KIND_OPTIONS.filter((option) => {
     if (onlineOnly && option.value === 'offline') return false
     if (!user?.isVip && option.value === 'vip') return false
+    if (!user?.isGpu && option.value === 'gpu') return false
     return true
   })
 

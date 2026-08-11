@@ -78,6 +78,7 @@ export function EditEventPage() {
           submitLabel="Зберегти зміни"
           submittingLabel="Зберігаємо…"
           canCreateVipOnly={Boolean(user.isVip)}
+          canCreateGpuOnly={Boolean(user.isGpu)}
         />
       </div>
     </div>

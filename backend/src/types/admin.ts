@@ -76,6 +76,10 @@ export interface VipListItem extends AdminUserView {
   vipSince: string
 }
 
+export interface GpuListItem extends AdminUserView {
+  gpuSince: string
+}
+
 export interface RegistrationListItem {
   id: string
   telegramId: number

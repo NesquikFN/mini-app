@@ -16,6 +16,7 @@ interface EventRow {
   game_url: string | null
   is_online: boolean
   is_vip_only: boolean
+  is_gpu_only: boolean
   date: string
   time: string
   location: string
@@ -35,6 +36,7 @@ export interface NewEvent {
   gameUrl?: string
   isOnline: boolean
   vipOnly: boolean
+  gpuOnly: boolean
   date: string
   time: string
   location: string
@@ -65,6 +67,7 @@ function toEvent(row: EventRow): Event {
     gameUrl: row.game_url ?? undefined,
     isOnline: row.is_online,
     vipOnly: row.is_vip_only,
+    gpuOnly: row.is_gpu_only,
     date: row.date,
     time: row.time,
     location: row.location,
@@ -91,6 +94,9 @@ function translateJoinError(error: unknown): never {
   if (message.includes('EVENT_VIP_REQUIRED')) {
     throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
   }
+  if (message.includes('EVENT_GPU_REQUIRED')) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
   throw error
 }
 
@@ -102,6 +108,7 @@ export const eventsRepository = {
     dormitoryId?: string,
     includeVip = false,
     onlineOnly = false,
+    includeGpu = false,
   ): Promise<Event[]> {
     // Physical events stay scoped to the selected dormitory, while
     // online events are global and must be visible to everyone.
@@ -113,6 +120,7 @@ export const eventsRepository = {
     }
     if (onlineOnly) conditions.push('e.is_online = true')
     if (!includeVip) conditions.push('e.is_vip_only = false')
+    if (!includeGpu) conditions.push('e.is_gpu_only = false')
     const where = conditions.length > 0 ? `where ${conditions.join(' and ')}` : ''
     const { rows } = await query<EventRow>(
       `${EVENTS_BASE_SELECT} ${where} group by e.id order by e.date asc`,
@@ -174,8 +182,8 @@ export const eventsRepository = {
     const { rows } = await query<{ id: string }>(
       `insert into events
          (creator_id, title, description, image_url, group_url, game_url, is_online,
-          is_vip_only, date, time, location, max_participants, dormitory_id, source_template_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          is_vip_only, is_gpu_only, date, time, location, max_participants, dormitory_id, source_template_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        returning id`,
       [
         newEvent.creatorId,
@@ -186,6 +194,7 @@ export const eventsRepository = {
         newEvent.gameUrl || null,
         newEvent.isOnline,
         newEvent.vipOnly,
+        newEvent.gpuOnly,
         newEvent.date,
         newEvent.time,
         newEvent.location,
@@ -218,6 +227,7 @@ export const eventsRepository = {
     if (patch.gameUrl !== undefined) columns.game_url = patch.gameUrl || null
     if (patch.isOnline !== undefined) columns.is_online = patch.isOnline
     if (patch.vipOnly !== undefined) columns.is_vip_only = patch.vipOnly
+    if (patch.gpuOnly !== undefined) columns.is_gpu_only = patch.gpuOnly
     if (patch.date !== undefined) columns.date = patch.date
     if (patch.time !== undefined) columns.time = patch.time
     if (patch.location !== undefined) columns.location = patch.location
@@ -274,12 +284,24 @@ export const eventsRepository = {
 
   /** Отримувачі нагадування про подію. Забанені й несхвалені
    * відсіюються так само, як у getSubscribedTelegramIds — бот не пише
-   * тим, кому доступ до застосунку закрито. */
-  async getParticipantTelegramIds(eventId: string, vipOnly = false): Promise<number[]> {
+   * тим, кому доступ до застосунку закрито. `requiredRole` — захист "про
+   * всяк випадок" на випадок, якщо роль знято вже після приєднання до
+   * закритої події: подія ніколи не буває одночасно vip і gpu, тож лише
+   * одне з двох джойнів застосовується. */
+  async getParticipantTelegramIds(
+    eventId: string,
+    requiredRole?: 'vip' | 'gpu',
+  ): Promise<number[]> {
+    const roleJoin =
+      requiredRole === 'vip'
+        ? 'join vip_users v on v.user_id = u.id'
+        : requiredRole === 'gpu'
+          ? 'join gpu_users g on g.user_id = u.id'
+          : ''
     const { rows } = await query<{ telegram_id: string }>(
       `select u.telegram_id from event_participants ep
        join users u on u.id = ep.user_id
-       ${vipOnly ? 'join vip_users v on v.user_id = u.id' : ''}
+       ${roleJoin}
        where ep.event_id = $1
          and u.registration_status = 'approved'
          and u.banned_permanently = false

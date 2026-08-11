@@ -29,9 +29,21 @@ export interface EventInvariantInput {
   maxParticipants: number
   /** Скільки учасників уже є — лише для редагування. */
   currentParticipantCount?: number
+  vipOnly?: boolean
+  gpuOnly?: boolean
 }
 
 export function assertEventInvariants(input: EventInvariantInput): void {
+  // Подія не може одночасно ховатись і за VIP, і за ГПУ — той самий
+  // інваріант, що й database/schema.sql: events_not_vip_and_gpu_only.
+  if (input.vipOnly && input.gpuOnly) {
+    throw new AppError(
+      400,
+      'VIP_GPU_CONFLICT',
+      'Подія не може бути одночасно VIP-only і ГПУ-only',
+    )
+  }
+
   if (input.dormitoryId === NO_DORMITORY_ID && !input.isOnline) {
     throw new AppError(
       400,

@@ -1,6 +1,7 @@
 import { adminRepository } from '../repositories/admin.repository'
 import { hostsRepository } from '../repositories/hosts.repository'
 import { vipsRepository } from '../repositories/vips.repository'
+import { gpusRepository } from '../repositories/gpus.repository'
 import { usersRepository } from '../repositories/users.repository'
 import { eventsRepository, type EventDateFilter } from '../repositories/events.repository'
 import * as eventsService from './events.service'
@@ -17,6 +18,7 @@ import type {
   AdminListItem,
   HostListItem,
   VipListItem,
+  GpuListItem,
   Pagination,
 } from '../types/admin'
 
@@ -380,5 +382,43 @@ export async function removeVip(userId: string): Promise<void> {
   const removed = await vipsRepository.removeVip(userId)
   if (!removed) {
     throw new AppError(404, 'VIP_NOT_FOUND', 'Цей користувач не має VIP-ролі')
+  }
+}
+
+export async function listGpus(): Promise<GpuListItem[]> {
+  const gpuRows = await gpusRepository.listGpus()
+  if (gpuRows.length === 0) return []
+
+  const users = await usersRepository.getUsersByIds(gpuRows.map((row) => row.userId))
+  const userById = new Map(users.map((user) => [user.id, user]))
+
+  return gpuRows
+    .map((row) => {
+      const user = userById.get(row.userId)
+      return user ? { ...user, gpuSince: row.gpuSince } : null
+    })
+    .filter((item): item is GpuListItem => item !== null)
+}
+
+export async function addGpuByTelegramId(telegramId: number): Promise<GpuListItem> {
+  const user = await usersRepository.getUserByTelegramId(telegramId)
+  if (!user) {
+    throw new AppError(
+      404,
+      'USER_NOT_FOUND',
+      'Користувача з таким Telegram ID ще немає в системі — попросіть спочатку відкрити застосунок',
+    )
+  }
+
+  const gpuRow = await gpusRepository.addGpu(user.id)
+  const gpuView = await usersRepository.getAdminUserById(user.id)
+  if (!gpuView) throw new Error('Не вдалося прочитати щойно доданого ГПУ')
+  return { ...gpuView, gpuSince: gpuRow.gpuSince }
+}
+
+export async function removeGpu(userId: string): Promise<void> {
+  const removed = await gpusRepository.removeGpu(userId)
+  if (!removed) {
+    throw new AppError(404, 'GPU_NOT_FOUND', 'Цей користувач не має ролі ГПУ')
   }
 }

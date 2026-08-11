@@ -9,6 +9,7 @@ import { bannedMessage, isUserBanned } from '../utils/ban'
 import { adminRepository } from '../repositories/admin.repository'
 import { hostsRepository } from '../repositories/hosts.repository'
 import { vipsRepository } from '../repositories/vips.repository'
+import { gpusRepository } from '../repositories/gpus.repository'
 
 /**
  * Local-dev-only stand-in profile. Only reachable when
@@ -41,12 +42,13 @@ export async function authenticateTelegramUser(initData: unknown): Promise<Teleg
     throw new AppError(403, 'USER_BANNED', bannedMessage(user))
   }
 
-  const [isAdmin, isHost, isVip] = await Promise.all([
+  const [isAdmin, isHost, isVip, isGpu] = await Promise.all([
     adminRepository.isAdmin(user.id),
     hostsRepository.isHost(user.id),
     vipsRepository.isVip(user.id),
+    gpusRepository.isGpu(user.id),
   ])
-  const userWithRoles = { ...user, isAdmin, isHost, isVip }
+  const userWithRoles = { ...user, isAdmin, isHost, isVip, isGpu }
   const token = signSession({ sub: user.id, telegramId: user.telegramId }, env.JWT_SECRET)
 
   return { user: userWithRoles, token }

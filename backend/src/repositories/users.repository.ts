@@ -195,8 +195,16 @@ export const usersRepository = {
    * анонс події — це вміст застосунку, доступ до якого вони саме й не
    * мають. Тимчасовий бан із простроченим banned_until знову пропускає
    * користувача, бо порівняння йде з now() на боці Postgres. */
-  async getSubscribedTelegramIds(dormitoryId?: string, vipOnly = false): Promise<number[]> {
-    const vipJoin = vipOnly ? 'join vip_users v on v.user_id = users.id' : ''
+  async getSubscribedTelegramIds(
+    dormitoryId?: string,
+    requiredRole?: 'vip' | 'gpu',
+  ): Promise<number[]> {
+    const roleJoin =
+      requiredRole === 'vip'
+        ? 'join vip_users v on v.user_id = users.id'
+        : requiredRole === 'gpu'
+          ? 'join gpu_users g on g.user_id = users.id'
+          : ''
     const conditions = [
       'notify_new_events = true',
       `registration_status = 'approved'`,
@@ -209,7 +217,7 @@ export const usersRepository = {
       conditions.push(`dormitory_id = $${params.length}`)
     }
     const { rows } = await query<{ telegram_id: string }>(
-      `select telegram_id from users ${vipJoin} where ${conditions.join(' and ')}`,
+      `select telegram_id from users ${roleJoin} where ${conditions.join(' and ')}`,
       params,
     )
     return rows.map((row) => Number(row.telegram_id))
