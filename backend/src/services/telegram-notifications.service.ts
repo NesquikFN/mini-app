@@ -458,6 +458,42 @@ export async function sendEventReminder(
   )
 }
 
+/**
+ * DM тому, кого черга автоматично перевела в учасники. Кнопка веде в
+ * саму подію тим самим deep link, що й анонс — людина потрапляє одразу
+ * на потрібний екран, а не в загальний список.
+ *
+ * Помилку відправки навмисно не ловить: sendAndLog уже записав її в
+ * notification_log, а викликач (events.service) свідомо ігнорує збій —
+ * просування вже зафіксоване в БД і відкочувати його через Telegram не
+ * можна.
+ */
+export async function sendWaitlistPromotionMessage(
+  chatId: string,
+  event: Pick<EventResponse, 'id' | 'title'>,
+): Promise<void> {
+  const text = escapeMarkdownV2(
+    `🎉 Для вас звільнилося місце у події «${event.title}». Ви автоматично додані до учасників.`,
+  )
+
+  await sendAndLog(
+    'waitlist_promoted',
+    chatId,
+    async () => {
+      const replyMarkup = {
+        inline_keyboard: [[{ text: '🎉 Відкрити подію', url: await buildEventDeepLink(event.id) }]],
+      }
+      await botApi('sendMessage', {
+        chat_id: chatId,
+        text,
+        parse_mode: 'MarkdownV2',
+        reply_markup: replyMarkup,
+      })
+    },
+    { id: event.id, title: event.title },
+  )
+}
+
 export interface QuickPlanJoinNotification {
   planText: string
   joinerName: string

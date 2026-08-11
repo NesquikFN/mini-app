@@ -94,6 +94,11 @@ export async function deleteUser(actorId: string, userId: string): Promise<void>
     }
   }
 
+  // Події, де він був учасником, треба знати ДО видалення: після нього
+  // рядки event_participants зникнуть каскадом, і дізнатись, у яких
+  // подіях звільнилось місце, вже не буде звідки.
+  const affectedEventIds = await eventsRepository.findEventIdsWithParticipant(userId)
+
   // events.creator_id intentionally uses RESTRICT, so delete authored
   // events first. Their participants are removed by the DB cascade;
   // the user's remaining participations and admin marker cascade when
@@ -102,6 +107,12 @@ export async function deleteUser(actorId: string, userId: string): Promise<void>
   const removed = await usersRepository.remove(userId)
   if (!removed) {
     throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
+  }
+
+  // Події, які він створював, уже видалені — promoteWaitlist для них
+  // просто нічого не знайде й тихо вийде.
+  for (const eventId of affectedEventIds) {
+    await eventsService.promoteWaitlist(eventId)
   }
 }
 
@@ -222,6 +233,9 @@ export async function removeParticipant(eventId: string, userId: string): Promis
   if (!removed) {
     throw new AppError(404, 'PARTICIPANT_NOT_FOUND', 'Учасника не знайдено')
   }
+  // Місце звільнилось — той самий шлях просування черги, що й після
+  // звичайного виходу учасника.
+  await eventsService.promoteWaitlist(eventId)
 }
 
 /** Список адмінів — деталі профілю домальовуються батчем через

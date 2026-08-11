@@ -170,6 +170,30 @@ create index if not exists idx_event_participants_event_id on event_participants
 create index if not exists idx_event_participants_user_id on event_participants (user_id);
 
 -- =========================================================
+-- Лист очікування (див. migrations/0028_event_waitlist.sql)
+-- =========================================================
+-- Черга на заповнену подію. Порядок — (created_at, id), де id працює як
+-- стабільний tie-breaker. Індекс повторює саме цей порядок.
+--
+-- created_at за замовчуванням clock_timestamp(), а НЕ now(): now() — це
+-- час початку транзакції, однаковий для всіх операцій усередині неї, тож
+-- дві транзакції, що стартували одночасно, отримували б однаковий
+-- created_at і дублювали позиції в черзі (перевірено конкурентним
+-- тестом). clock_timestamp() бере реальний час самої вставки, а оскільки
+-- вставки серіалізовані блокуванням рядка події, він гарантовано зростає.
+create table if not exists event_waitlist (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references users (id) on delete cascade,
+  created_at timestamptz not null default clock_timestamp(),
+  constraint event_waitlist_unique unique (event_id, user_id)
+);
+
+create index if not exists idx_event_waitlist_event_created
+  on event_waitlist (event_id, created_at, id);
+create index if not exists idx_event_waitlist_user_id on event_waitlist (user_id);
+
+-- =========================================================
 -- Таблиця admin_users (див. migrations/0002_admin_users.sql)
 -- =========================================================
 -- Маркер "цей users.id — адміністратор". Окремого поля-прапорця на users
@@ -236,6 +260,7 @@ alter table admin_users enable row level security;
 alter table hosts enable row level security;
 alter table vip_users enable row level security;
 alter table gpu_users enable row level security;
+alter table event_waitlist enable row level security;
 alter table dormitories enable row level security;
 
 -- Глобальні налаштування застосунку (один singleton-рядок).
@@ -332,6 +357,7 @@ declare
   v_current_count integer;
   v_is_vip_only boolean;
   v_is_gpu_only boolean;
+  v_next_waiter uuid;
 begin
   select max_participants, is_vip_only, is_gpu_only
   into v_max_participants, v_is_vip_only, v_is_gpu_only
@@ -371,7 +397,208 @@ begin
     raise exception 'EVENT_FULL';
   end if;
 
+  -- Місце, що звільнилось, належить черзі: без цієї перевірки будь-хто,
+  -- хто натисне "Я піду" одразу після виходу учасника, обігнав би того,
+  -- хто вже чекає. Виняток — сам перший у черзі: для нього прямий join
+  -- це не обхід, а використання своєї ж позиції.
+  v_next_waiter := next_eligible_waitlist_user(p_event_id);
+  if v_next_waiter is not null and v_next_waiter <> p_user_id then
+    raise exception 'EVENT_FULL';
+  end if;
+
   insert into event_participants (event_id, user_id) values (p_event_id, p_user_id);
+
+  delete from event_waitlist where event_id = p_event_id and user_id = p_user_id;
+end;
+$$;
+
+-- =========================================================
+-- Лист очікування: допустимість, вступ, вихід, просування
+-- =========================================================
+-- Ті самі правила доступу, що й для звичайного приєднання
+-- (events.service.ts): схвалена реєстрація, відсутність бану, роль для
+-- VIP/ГПУ-події та гуртожиток для офлайн-події. Винесено в окрему
+-- функцію, щоб join_event і promote_event_waitlist користувались однією
+-- копією правил.
+--
+-- Свідомо НЕ перевіряє, чи подія завершилась: date/time — наївні
+-- колонки в київському "стінному" часі, і вся така математика живе в
+-- utils/kyivTime.ts. Сервіс не запускає просування для завершеної події.
+create or replace function event_waitlist_entry_is_valid(
+  p_event_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from events e
+    join users u on u.id = p_user_id
+    where e.id = p_event_id
+      and u.registration_status = 'approved'
+      and u.banned_permanently = false
+      and (u.banned_until is null or u.banned_until <= now())
+      and (
+        e.is_online
+        or u.dormitory_id is distinct from '00000000-0000-0000-0000-000000000100'::uuid
+      )
+      and (not e.is_vip_only or exists (select 1 from vip_users v where v.user_id = p_user_id))
+      and (not e.is_gpu_only or exists (select 1 from gpu_users g where g.user_id = p_user_id))
+      and not exists (
+        select 1 from event_participants ep
+        where ep.event_id = p_event_id and ep.user_id = p_user_id
+      )
+  );
+$$;
+
+create or replace function next_eligible_waitlist_user(p_event_id uuid)
+returns uuid
+language sql
+stable
+as $$
+  select w.user_id
+  from event_waitlist w
+  where w.event_id = p_event_id
+    and event_waitlist_entry_is_valid(p_event_id, w.user_id)
+  order by w.created_at asc, w.id asc
+  limit 1;
+$$;
+
+create or replace function join_event_waitlist(p_event_id uuid, p_user_id uuid)
+returns integer
+language plpgsql
+as $$
+declare
+  v_max_participants integer;
+  v_current_count integer;
+  v_position integer;
+begin
+  select max_participants into v_max_participants
+  from events where id = p_event_id for update;
+
+  if not found then
+    raise exception 'EVENT_NOT_FOUND';
+  end if;
+
+  if exists (
+    select 1 from event_participants
+    where event_id = p_event_id and user_id = p_user_id
+  ) then
+    raise exception 'ALREADY_JOINED';
+  end if;
+
+  if not event_waitlist_entry_is_valid(p_event_id, p_user_id) then
+    raise exception 'EVENT_ACCESS_DENIED';
+  end if;
+
+  select count(*) into v_current_count
+  from event_participants where event_id = p_event_id;
+
+  -- Місце звільнилось між натисканням і запитом — черга не потрібна,
+  -- сервіс замість цього виконає звичайне приєднання.
+  if v_current_count < v_max_participants then
+    raise exception 'EVENT_NOT_FULL';
+  end if;
+
+  insert into event_waitlist (event_id, user_id)
+  values (p_event_id, p_user_id)
+  on conflict (event_id, user_id) do nothing;
+
+  if not found then
+    raise exception 'ALREADY_WAITLISTED';
+  end if;
+
+  select count(*) into v_position
+  from event_waitlist w
+  where w.event_id = p_event_id
+    and (w.created_at, w.id) <= (
+      select w2.created_at, w2.id from event_waitlist w2
+      where w2.event_id = p_event_id and w2.user_id = p_user_id
+    );
+
+  return v_position;
+end;
+$$;
+
+create or replace function leave_event_waitlist(p_event_id uuid, p_user_id uuid)
+returns boolean
+language plpgsql
+as $$
+declare
+  v_removed integer;
+begin
+  delete from event_waitlist where event_id = p_event_id and user_id = p_user_id;
+  get diagnostics v_removed = row_count;
+  return v_removed > 0;
+end;
+$$;
+
+-- Викликається після КОЖНОЇ операції, що звільняє місце: вихід
+-- учасника, видалення учасника організатором чи адміном, збільшення
+-- max_participants, видалення користувача.
+--
+-- `for update` на рядку події блокує його на весь час виконання, тож
+-- паралельні виклики (два одночасні виходи) або одночасний join_event
+-- шикуються в чергу й кожен бачить уже оновлену кількість учасників —
+-- завдяки цьому кількість учасників ніколи не перевищує
+-- max_participants, а два звільнені місця дають рівно два просування.
+--
+-- Цикл, а не одне просування: якщо ліміт підняли одразу на кілька
+-- місць, переводиться стільки людей, скільки місць з'явилось.
+--
+-- Недійсні записи (втрачена роль, бан, знята реєстрація, вже учасник)
+-- не пропускаються мовчки, а видаляються з черги, щоб не блокувати
+-- наступних. Повертає id переведених — сервіс шле їм DM після коміту.
+create or replace function promote_event_waitlist(p_event_id uuid)
+returns uuid[]
+language plpgsql
+as $$
+declare
+  v_max_participants integer;
+  v_current_count integer;
+  v_entry_id uuid;
+  v_user_id uuid;
+  v_promoted uuid[] := '{}';
+begin
+  select max_participants into v_max_participants
+  from events where id = p_event_id for update;
+
+  -- Подію могли видалити — просувати нікуди, і це не помилка.
+  if not found then
+    return v_promoted;
+  end if;
+
+  select count(*) into v_current_count
+  from event_participants where event_id = p_event_id;
+
+  while v_current_count < v_max_participants loop
+    select w.id, w.user_id into v_entry_id, v_user_id
+    from event_waitlist w
+    where w.event_id = p_event_id
+    order by w.created_at asc, w.id asc
+    limit 1;
+
+    exit when v_entry_id is null;
+
+    if event_waitlist_entry_is_valid(p_event_id, v_user_id) then
+      insert into event_participants (event_id, user_id)
+      values (p_event_id, v_user_id)
+      on conflict (event_id, user_id) do nothing;
+
+      delete from event_waitlist where id = v_entry_id;
+
+      v_promoted := array_append(v_promoted, v_user_id);
+      v_current_count := v_current_count + 1;
+    else
+      delete from event_waitlist where id = v_entry_id;
+    end if;
+
+    v_entry_id := null;
+  end loop;
+
+  return v_promoted;
 end;
 $$;
 

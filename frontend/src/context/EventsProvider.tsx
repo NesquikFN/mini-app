@@ -13,7 +13,9 @@ import {
   fetchEvents,
   getErrorMessage,
   joinEventRequest,
+  joinEventWaitlistRequest,
   leaveEventRequest,
+  leaveEventWaitlistRequest,
   removeEventParticipantRequest,
   updateEventRequest,
 } from '../services/api'
@@ -104,6 +106,28 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const joinWaitlist = useCallback(async (eventId: string) => {
+    setPendingEventId(eventId)
+    try {
+      const updated = await joinEventWaitlistRequest(eventId)
+      setEvents((prev) => prev.map((item) => (item.id === eventId ? updated : item)))
+      return updated
+    } finally {
+      setPendingEventId(null)
+    }
+  }, [])
+
+  const leaveWaitlist = useCallback(async (eventId: string) => {
+    setPendingEventId(eventId)
+    try {
+      const updated = await leaveEventWaitlistRequest(eventId)
+      setEvents((prev) => prev.map((item) => (item.id === eventId ? updated : item)))
+      return updated
+    } finally {
+      setPendingEventId(null)
+    }
+  }, [])
+
   const value = useMemo(
     () => ({
       events,
@@ -119,6 +143,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       removeParticipant,
       joinEvent,
       leaveEvent,
+      joinWaitlist,
+      leaveWaitlist,
     }),
     [
       events,
@@ -134,6 +160,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       removeParticipant,
       joinEvent,
       leaveEvent,
+      joinWaitlist,
+      leaveWaitlist,
     ],
   )
 

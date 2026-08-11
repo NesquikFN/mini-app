@@ -7,6 +7,7 @@ import {
   Clock,
   Crown,
   Home,
+  Hourglass,
   MapPin,
   MonitorPlay,
   PartyPopper,
@@ -28,6 +29,7 @@ export function EventCard({ event }: { event: DormEvent }) {
     event.participantPreview?.length ?? 0,
   )
   const isFull = participantCount >= event.maxParticipants
+  const waitlistCount = event.waitlistCount ?? 0
   const isArchived = isEventPast(event.date, event.time)
   const dormitoryName = getDormitoryName(event.dormitoryId)
 
@@ -114,7 +116,13 @@ export function EventCard({ event }: { event: DormEvent }) {
             {isArchived ? (
               <StatusBadge muted icon={<Archive size={13} />}>Завершено</StatusBadge>
             ) : isFull ? (
-              <StatusBadge muted>Місць немає</StatusBadge>
+              // Черга показується лише коли вона справді є — на
+              // незаповненій події її не буває.
+              waitlistCount > 0 ? (
+                <StatusBadge muted icon={<Hourglass size={12} />}>{`Черга · ${waitlistCount}`}</StatusBadge>
+              ) : (
+                <StatusBadge muted>Місць немає</StatusBadge>
+              )
             ) : (
               <StatusBadge>Є місця</StatusBadge>
             )}

@@ -29,6 +29,8 @@ adminRouter.get('/events/:id', adminController.getEventDetail)
 adminRouter.delete('/events/:id', adminController.deleteEvent)
 adminRouter.get('/events/:id/participants', adminController.getEventParticipants)
 adminRouter.delete('/events/:id/participants/:userId', adminController.removeParticipant)
+adminRouter.get('/events/:id/waitlist', adminController.getEventWaitlist)
+adminRouter.delete('/events/:id/waitlist/:userId', adminController.removeFromEventWaitlist)
 
 adminRouter.get('/admins', adminController.listAdmins)
 adminRouter.post('/admins', adminController.addAdmin)

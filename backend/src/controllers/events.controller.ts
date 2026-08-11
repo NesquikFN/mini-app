@@ -88,3 +88,29 @@ export async function leaveEvent(req: Request, res: Response): Promise<void> {
   const event = await eventsService.leaveEvent(id, req.user.id)
   res.json({ event })
 }
+
+export async function joinWaitlist(req: Request, res: Response): Promise<void> {
+  const { id } = eventIdParamSchema.parse(req.params)
+  const event = await eventsService.joinEventWaitlist(id, req.user.id)
+  res.json({ event })
+}
+
+export async function leaveWaitlist(req: Request, res: Response): Promise<void> {
+  const { id } = eventIdParamSchema.parse(req.params)
+  const event = await eventsService.leaveEventWaitlist(id, req.user.id)
+  res.json({ event })
+}
+
+/** Повний список черги — лише організатору (авторство перевіряє сервіс);
+ * звичайний користувач бачить тільки waitlistCount і власну позицію. */
+export async function getWaitlist(req: Request, res: Response): Promise<void> {
+  const { id } = eventIdParamSchema.parse(req.params)
+  res.json({ waitlist: await eventsService.listEventWaitlist(id, req.user.id) })
+}
+
+export async function removeFromWaitlist(req: Request, res: Response): Promise<void> {
+  const { id } = eventIdParamSchema.parse(req.params)
+  const { userId } = userIdParamSchema.parse(req.params)
+  await eventsService.removeFromEventWaitlist(id, req.user.id, userId)
+  res.json({ success: true })
+}

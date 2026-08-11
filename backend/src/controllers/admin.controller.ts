@@ -17,6 +17,7 @@ import { settingsRepository } from '../repositories/settings.repository'
 import { notificationLogRepository } from '../repositories/notification-log.repository'
 import * as telegramNotifications from '../services/telegram-notifications.service'
 import * as quickPlansService from '../services/quick-plans.service'
+import * as eventsService from '../services/events.service'
 
 /** Скільки останніх активних планів показує адмінський блок-огляд. */
 const ADMIN_QUICK_PLANS_LIMIT = 5
@@ -128,6 +129,19 @@ export async function removeParticipant(req: Request, res: Response): Promise<vo
   const { id } = eventIdParamSchema.parse(req.params)
   const { userId } = participantIdParamSchema.parse(req.params)
   await adminService.removeParticipant(id, userId)
+  res.json({ success: true })
+}
+
+export async function getEventWaitlist(req: Request, res: Response): Promise<void> {
+  const { id } = eventIdParamSchema.parse(req.params)
+  // privileged=true: адміну не потрібно бути автором події.
+  res.json({ waitlist: await eventsService.listEventWaitlist(id, req.user.id, true) })
+}
+
+export async function removeFromEventWaitlist(req: Request, res: Response): Promise<void> {
+  const { id } = eventIdParamSchema.parse(req.params)
+  const { userId } = participantIdParamSchema.parse(req.params)
+  await eventsService.removeFromEventWaitlist(id, req.user.id, userId, true)
   res.json({ success: true })
 }
 

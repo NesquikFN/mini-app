@@ -100,6 +100,32 @@ function translateJoinError(error: unknown): never {
   throw error
 }
 
+/** Помилки join_event_waitlist. EVENT_NOT_FULL не помилка для клієнта:
+ * сервіс перехоплює його окремо й робить звичайне приєднання. */
+export class EventNotFullError extends Error {}
+
+function translateWaitlistError(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('EVENT_NOT_FULL')) {
+    throw new EventNotFullError('EVENT_NOT_FULL')
+  }
+  if (message.includes('EVENT_NOT_FOUND')) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
+  if (message.includes('ALREADY_JOINED')) {
+    throw new AppError(409, 'ALREADY_JOINED', 'Ви вже берете участь у цій події')
+  }
+  if (message.includes('ALREADY_WAITLISTED')) {
+    throw new AppError(409, 'ALREADY_WAITLISTED', 'Ви вже в черзі на цю подію')
+  }
+  // Втратив роль/доступ між відкриттям сторінки й натисканням — та сама
+  // «подію не знайдено», що й скрізь, щоб не розкривати причину.
+  if (message.includes('EVENT_ACCESS_DENIED')) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
+  throw error
+}
+
 export const eventsRepository = {
   /** dormitoryId — необов'язковий server-side фільтр (звідки саме він
    * узятий і чи довіряти йому, вирішує events.service, не тут). Без
@@ -272,6 +298,127 @@ export const eventsRepository = {
       [eventId, userId],
     )
     return rows.length > 0
+  },
+
+  /** Вступ до черги. Уся перевірка (заповненість, ролі, дублі) —
+   * усередині PostgreSQL-функції під `for update` на рядку події, тож
+   * два одночасні вступи не можуть дати ні дубля, ні однакової позиції. */
+  async joinWaitlist(eventId: string, userId: string): Promise<number> {
+    try {
+      const { rows } = await query<{ join_event_waitlist: number }>(
+        'select join_event_waitlist($1, $2)',
+        [eventId, userId],
+      )
+      return rows[0].join_event_waitlist
+    } catch (error) {
+      translateWaitlistError(error)
+    }
+  },
+
+  async leaveWaitlist(eventId: string, userId: string): Promise<boolean> {
+    const { rows } = await query<{ leave_event_waitlist: boolean }>(
+      'select leave_event_waitlist($1, $2)',
+      [eventId, userId],
+    )
+    return rows[0].leave_event_waitlist
+  },
+
+  /**
+   * Атомарне просування черги після звільнення місця. Повертає id тих,
+   * кого перевели в учасники, — сервіс шле їм DM уже після того, як
+   * транзакція функції закомітилась, тож збій Telegram нічого не
+   * відкочує.
+   */
+  async promoteFromWaitlist(eventId: string): Promise<string[]> {
+    const { rows } = await query<{ promote_event_waitlist: string[] | null }>(
+      'select promote_event_waitlist($1)',
+      [eventId],
+    )
+    return rows[0]?.promote_event_waitlist ?? []
+  },
+
+  async getWaitlistCount(eventId: string): Promise<number> {
+    const { rows } = await query<{ count: string }>(
+      'select count(*) from event_waitlist where event_id = $1',
+      [eventId],
+    )
+    return Number(rows[0].count)
+  },
+
+  /** Позиція користувача в черзі (1-based) або null, якщо його там нема.
+   * Порядок той самий, що й у SQL-функціях: (created_at, id). */
+  async getWaitlistPosition(eventId: string, userId: string): Promise<number | null> {
+    const { rows } = await query<{ position: string }>(
+      `select count(*) as position
+       from event_waitlist w
+       where w.event_id = $1
+         and (w.created_at, w.id) <= (
+           select w2.created_at, w2.id from event_waitlist w2
+           where w2.event_id = $1 and w2.user_id = $2
+         )`,
+      [eventId, userId],
+    )
+    const position = Number(rows[0].position)
+    return position > 0 ? position : null
+  },
+
+  /** Впорядкований список id у черзі — лише для організатора й адміна
+   * (звичайному користувачеві сервіс його не віддає). */
+  async getWaitlistUserIds(eventId: string): Promise<string[]> {
+    const { rows } = await query<{ user_id: string }>(
+      `select user_id from event_waitlist
+       where event_id = $1
+       order by created_at asc, id asc`,
+      [eventId],
+    )
+    return rows.map((row) => row.user_id)
+  },
+
+  /** Кількість у черзі одразу для списку подій — один запит замість
+   * N+1, той самий підхід, що й findParticipantPreviews. */
+  async findWaitlistCounts(eventIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>()
+    if (eventIds.length === 0) return counts
+
+    const { rows } = await query<{ event_id: string; count: string }>(
+      `select event_id, count(*) as count from event_waitlist
+       where event_id = any($1) group by event_id`,
+      [eventIds],
+    )
+    for (const row of rows) counts.set(row.event_id, Number(row.count))
+    return counts
+  },
+
+  /** Позиції поточного глядача в чергах одразу для списку подій. */
+  async findWaitlistPositions(
+    eventIds: string[],
+    userId: string,
+  ): Promise<Map<string, number>> {
+    const positions = new Map<string, number>()
+    if (eventIds.length === 0) return positions
+
+    const { rows } = await query<{ event_id: string; position: string }>(
+      `select event_id, position from (
+         select w.event_id, w.user_id,
+           row_number() over (partition by w.event_id order by w.created_at asc, w.id asc) as position
+         from event_waitlist w
+         where w.event_id = any($1)
+       ) ranked
+       where ranked.user_id = $2`,
+      [eventIds, userId],
+    )
+    for (const row of rows) positions.set(row.event_id, Number(row.position))
+    return positions
+  },
+
+  /** Події, у яких користувач є учасником — потрібні перед видаленням
+   * користувача, щоб після каскаду просунути чергу саме в них. */
+  async findEventIdsWithParticipant(userId: string): Promise<string[]> {
+    const { rows } = await query<{ event_id: string }>(
+      'select event_id from event_participants where user_id = $1',
+      [userId],
+    )
+    return rows.map((row) => row.event_id)
   },
 
   async getParticipants(eventId: string): Promise<string[]> {

@@ -22,3 +22,10 @@ eventsRouter.put(
 eventsRouter.post('/:id/join', eventsController.joinEvent)
 eventsRouter.delete('/:id/leave', eventsController.leaveEvent)
 eventsRouter.delete('/:id/participants/:userId', eventsController.removeParticipant)
+
+// Лист очікування. Повний список і зняття з черги доступні лише
+// організатору — перевірка авторства всередині events.service.
+eventsRouter.post('/:id/waitlist', eventsController.joinWaitlist)
+eventsRouter.delete('/:id/waitlist', eventsController.leaveWaitlist)
+eventsRouter.get('/:id/waitlist', eventsController.getWaitlist)
+eventsRouter.delete('/:id/waitlist/:userId', eventsController.removeFromWaitlist)

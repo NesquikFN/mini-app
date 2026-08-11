@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Archive, BadgeCheck, CalendarDays, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, Users } from 'lucide-react'
+import { Archive, BadgeCheck, CalendarDays, ChevronDown, ChevronUp, Crown, ExternalLink, Home, Hourglass, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, Users } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDormitories } from '../hooks/useDormitories'
@@ -14,7 +14,14 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FormattedText } from '../components/FormattedText'
 import { ParticipantProfileRow } from '../components/ParticipantProfileRow'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
-import { fetchEventDetail, fetchEventShareLink, getErrorMessage, type EventDetailResponse } from '../services/api'
+import {
+  fetchEventDetail,
+  fetchEventShareLink,
+  fetchEventWaitlist,
+  getErrorMessage,
+  removeEventWaitlistEntry,
+  type EventDetailResponse,
+} from '../services/api'
 
 type MembersStatus = 'loading' | 'success' | 'error'
 
@@ -32,6 +39,8 @@ export function EventDetailPage() {
     leaveEvent,
     deleteEvent,
     removeParticipant: removeParticipantFromEvent,
+    joinWaitlist,
+    leaveWaitlist,
     pendingEventId,
   } = useEvents()
   const {
@@ -55,6 +64,16 @@ export function EventDetailPage() {
   >(null)
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null)
   const membersRequestId = useRef(0)
+  const [showWaitlist, setShowWaitlist] = useState(false)
+  const [waitlist, setWaitlist] = useState<EventDetailResponse['participants']>([])
+  const [waitlistEntryPendingRemoval, setWaitlistEntryPendingRemoval] = useState<
+    EventDetailResponse['participants'][number] | null
+  >(null)
+  const [removingWaitlistId, setRemovingWaitlistId] = useState<string | null>(null)
+  const [promotedNotice, setPromotedNotice] = useState(false)
+  // Чи був користувач у черзі на попередньому рендері — щоб помітити
+  // момент, коли фонове оновлення перевело його в учасники.
+  const wasWaitlisted = useRef(false)
 
   const loadMembers = useCallback((silent = false) => {
     if (!id) return
@@ -86,6 +105,32 @@ export function EventDetailPage() {
       membersRequestId.current += 1
     }
   }, [loadMembers])
+
+  // Автоматичне переведення з черги в учасники помічається тим самим
+  // фоновим оновленням, що вже працює на цій сторінці — окремого
+  // опитування не додаємо. Перехід «був у черзі → більше не в черзі, але
+  // вже учасник» і є моментом, коли місце звільнилось.
+  useEffect(() => {
+    const detailEvent = members?.event
+    if (!detailEvent || !user) return
+
+    const nowWaitlisted = detailEvent.viewerWaitlistPosition !== undefined
+    const nowJoined = detailEvent.participants.includes(user.id)
+    if (wasWaitlisted.current && !nowWaitlisted && nowJoined) {
+      setPromotedNotice(true)
+    }
+    wasWaitlisted.current = nowWaitlisted
+  }, [members, user])
+
+  const loadWaitlist = useCallback(() => {
+    if (!id) return
+    fetchEventWaitlist(id)
+      .then(setWaitlist)
+      .catch(() => {
+        // Список черги — додаткова інформація для організатора; якщо він
+        // не завантажився, решта сторінки має лишитись робочою.
+      })
+  }, [id])
 
   if (userStatus === 'loading' || (eventsStatus === 'loading' && membersStatus === 'loading')) {
     return (
@@ -156,6 +201,9 @@ export function EventDetailPage() {
 
   const isJoined = event.participants.includes(user.id)
   const isFull = event.participants.length >= event.maxParticipants
+  const waitlistCount = event.waitlistCount ?? 0
+  const waitlistPosition = event.viewerWaitlistPosition
+  const isWaitlisted = waitlistPosition !== undefined
   const isPending = pendingEventId === event.id
   const isCreator = event.creatorId === user.id
   const eventId = event.id
@@ -182,6 +230,41 @@ export function EventDetailPage() {
       loadMembers()
     } catch (error) {
       setActionError(getErrorMessage(error))
+    }
+  }
+
+  const handleToggleWaitlist = async () => {
+    setActionError(null)
+    try {
+      if (isWaitlisted) {
+        await leaveWaitlist(eventId)
+      } else {
+        // Якщо місце встигло звільнитись, backend виконує звичайне
+        // приєднання — тоді користувач одразу стає учасником.
+        const updated = await joinWaitlist(eventId)
+        if (user && updated.participants.includes(user.id)) setPromotedNotice(true)
+      }
+      setMembersStatus('loading')
+      loadMembers()
+      if (showWaitlist) loadWaitlist()
+    } catch (error) {
+      setActionError(getErrorMessage(error))
+    }
+  }
+
+  async function handleRemoveFromWaitlist() {
+    if (!waitlistEntryPendingRemoval) return
+    setRemovingWaitlistId(waitlistEntryPendingRemoval.id)
+    setActionError(null)
+    try {
+      await removeEventWaitlistEntry(eventId, waitlistEntryPendingRemoval.id)
+      setWaitlistEntryPendingRemoval(null)
+      loadWaitlist()
+      loadMembers()
+    } catch (error) {
+      setActionError(getErrorMessage(error))
+    } finally {
+      setRemovingWaitlistId(null)
     }
   }
 
@@ -429,12 +512,89 @@ export function EventDetailPage() {
               )}
             </>
           )}
+
+          {waitlistCount > 0 && (
+            <div className="flex flex-col gap-2 border-t border-[var(--surface-border)] pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-secondary)]">
+                  <Hourglass size={15} className="text-[var(--accent)]" /> У черзі: {waitlistCount}
+                </p>
+                {/* Повний список черги бачить лише організатор — решті
+                    API його взагалі не повертає. */}
+                {isCreator && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !showWaitlist
+                      setShowWaitlist(next)
+                      if (next) loadWaitlist()
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]"
+                  >
+                    {showWaitlist ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    {showWaitlist ? 'Згорнути' : 'Показати чергу'}
+                  </button>
+                )}
+              </div>
+
+              {waitlistPosition !== undefined && (
+                <p className="text-sm font-semibold text-[var(--accent)]">
+                  Ваше місце в черзі: {waitlistPosition}
+                </p>
+              )}
+
+              {isCreator && showWaitlist && (
+                <div className="flex flex-col gap-2.5">
+                  {waitlist.length === 0 ? (
+                    <p className="text-sm text-[var(--text-secondary)]">Черга порожня.</p>
+                  ) : (
+                    waitlist.map((entry, index) => (
+                      <div key={entry.id} className="flex items-center gap-2">
+                        <span className="w-6 shrink-0 text-center text-sm font-bold text-[var(--text-secondary)]">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <ParticipantProfileRow
+                            participant={entry}
+                            removable
+                            removing={removingWaitlistId === entry.id}
+                            removeDisabled={
+                              removingWaitlistId !== null && removingWaitlistId !== entry.id
+                            }
+                            onRemove={setWaitlistEntryPendingRemoval}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
+
+        {promotedNotice && (
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-400">
+            <PartyPopper size={18} /> Для вас звільнилося місце — ви вже серед учасників!
+          </div>
+        )}
 
         {actionError && <p className="text-sm text-red-400">{actionError}</p>}
       </main>
 
       <div className="fixed bottom-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] left-1/2 z-20 w-full max-w-[560px] -translate-x-1/2 border-t border-[var(--surface-border)] bg-[var(--surface-bg)] p-3">
+        {/* Пояснення показуємо саме перед вступом у чергу — коли воно
+            справді потрібне, а не постійно. */}
+        {!isArchived && isFull && !isJoined && !isWaitlisted && (
+          <p className="mb-2 text-center text-xs leading-snug text-[var(--text-secondary)]">
+            Коли звільниться місце, ми автоматично додамо вас до учасників і повідомимо в Telegram.
+          </p>
+        )}
+        {!isArchived && isWaitlisted && (
+          <p className="mb-2 text-center text-xs font-semibold text-[var(--accent)]">
+            Ваше місце в черзі: {waitlistPosition}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" fullWidth loading={sharing} onClick={handleShareEvent}>
             <Share2 size={19} /> {sharing ? 'Готую…' : 'Запросити'}
@@ -444,8 +604,23 @@ export function EventDetailPage() {
               Завершено
             </Button>
           ) : isFull && !isJoined ? (
-            <Button variant="secondary" fullWidth disabled>
-              Немає місць
+            // Заповнена подія більше не дає мертву кнопку «Немає місць»:
+            // замість неї активний вступ у чергу (або вихід з неї).
+            <Button
+              variant={isWaitlisted ? 'outline' : 'primary'}
+              fullWidth
+              loading={isPending}
+              disabled={isPending}
+              onClick={handleToggleWaitlist}
+            >
+              <Hourglass size={17} />
+              {isPending
+                ? isWaitlisted
+                  ? 'Виходжу…'
+                  : 'Стаю в чергу…'
+                : isWaitlisted
+                  ? 'Вийти з черги'
+                  : 'Стати в чергу'}
             </Button>
           ) : (
             <Button
@@ -497,6 +672,17 @@ export function EventDetailPage() {
           loading={removingParticipantId !== null}
           onConfirm={handleRemoveParticipant}
           onCancel={() => setParticipantPendingRemoval(null)}
+        />
+      )}
+
+      {waitlistEntryPendingRemoval && (
+        <ConfirmDialog
+          title="Прибрати з черги?"
+          description={`${waitlistEntryPendingRemoval.firstName} більше не чекатиме на місце в цій події.`}
+          confirmLabel="Прибрати"
+          loading={removingWaitlistId !== null}
+          onConfirm={handleRemoveFromWaitlist}
+          onCancel={() => setWaitlistEntryPendingRemoval(null)}
         />
       )}
     </div>

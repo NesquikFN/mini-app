@@ -21,6 +21,11 @@ export interface EventsContextValue {
   removeParticipant: (eventId: string, userId: string) => Promise<void>
   joinEvent: (eventId: string) => Promise<void>
   leaveEvent: (eventId: string) => Promise<void>
+  /** Стати в чергу. Якщо місце встигло звільнитись, backend замість
+   * черги виконує звичайне приєднання — повернута подія вже містить
+   * користувача серед учасників. */
+  joinWaitlist: (eventId: string) => Promise<DormEvent>
+  leaveWaitlist: (eventId: string) => Promise<DormEvent>
 }
 
 export const EventsContext = createContext<EventsContextValue | null>(null)

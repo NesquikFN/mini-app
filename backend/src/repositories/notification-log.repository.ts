@@ -9,6 +9,7 @@ export type NotificationKind =
   | 'notifications_off_confirmation'
   | 'registration_approved'
   | 'quick_plan_join'
+  | 'waitlist_promoted'
 
 export interface NewNotificationLogEntry {
   chatId: string

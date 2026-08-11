@@ -1,4 +1,4 @@
-import { eventsRepository } from '../repositories/events.repository'
+import { eventsRepository, EventNotFullError } from '../repositories/events.repository'
 import { usersRepository } from '../repositories/users.repository'
 import {
   eventTemplatesRepository,
@@ -20,6 +20,7 @@ import {
   buildEventDeepLink,
   sendEventAnnouncement,
   sendEventJoinConfirmation,
+  sendWaitlistPromotionMessage,
   NOTIFICATION_CONCURRENCY,
 } from './telegram-notifications.service'
 import { mapWithConcurrency } from '../utils/concurrency'
@@ -54,6 +55,11 @@ export interface EventResponse {
   participantPreview: PublicUser[]
   createdAt: string
   dormitoryId: string
+  /** Скільки людей чекає в черзі. Видно всім — на відміну від самого
+   * списку черги, який отримують лише організатор і адмін. */
+  waitlistCount: number
+  /** Позиція саме цього глядача в черзі (1-based), якщо він у ній. */
+  viewerWaitlistPosition?: number
 }
 
 export interface UserEvents {
@@ -82,25 +88,86 @@ function toEventResponse(event: Event): EventResponse {
     participantPreview: [],
     createdAt: event.createdAt,
     dormitoryId: event.dormitoryId,
+    // Реальні значення домальовує attachParticipantPreviews разом із
+    // прев'ю учасників — тими самими batch-запитами, без N+1.
+    waitlistCount: 0,
   }
 }
 
 /**
- * Fills in `participantPreview` for a batch of events with exactly one
- * extra SQL query (events.repository.findParticipantPreviews), no matter
- * how many events are passed — the batch query every EventResponse-
- * returning function below funnels through, so the API never does N+1
- * (one query per event) to build avatar previews.
+ * Fills in `participantPreview`, `waitlistCount` and (when a viewer is
+ * known) `viewerWaitlistPosition` for a batch of events with a fixed
+ * number of extra SQL queries — never one per event. Every
+ * EventResponse-returning function below funnels through here, so the
+ * API never does N+1 to build avatar previews or queue counters.
  */
-async function attachParticipantPreviews(events: EventResponse[]): Promise<EventResponse[]> {
+async function attachParticipantPreviews(
+  events: EventResponse[],
+  viewerId?: string,
+): Promise<EventResponse[]> {
   if (events.length === 0) return events
-  const previews = await eventsRepository.findParticipantPreviews(events.map((event) => event.id))
-  return events.map((event) => ({ ...event, participantPreview: previews.get(event.id) ?? [] }))
+  const eventIds = events.map((event) => event.id)
+
+  const [previews, waitlistCounts, viewerPositions] = await Promise.all([
+    eventsRepository.findParticipantPreviews(eventIds),
+    eventsRepository.findWaitlistCounts(eventIds),
+    viewerId
+      ? eventsRepository.findWaitlistPositions(eventIds, viewerId)
+      : Promise.resolve(new Map<string, number>()),
+  ])
+
+  return events.map((event) => ({
+    ...event,
+    participantPreview: previews.get(event.id) ?? [],
+    waitlistCount: waitlistCounts.get(event.id) ?? 0,
+    viewerWaitlistPosition: viewerPositions.get(event.id),
+  }))
 }
 
-async function attachParticipantPreview(event: EventResponse): Promise<EventResponse> {
-  const [withPreview] = await attachParticipantPreviews([event])
+async function attachParticipantPreview(
+  event: EventResponse,
+  viewerId?: string,
+): Promise<EventResponse> {
+  const [withPreview] = await attachParticipantPreviews([event], viewerId)
   return withPreview
+}
+
+/**
+ * Просуває чергу після того, як звільнилось місце, і повідомляє тих,
+ * кого перевели. Викликається з КОЖНОГО шляху, що звільняє місце
+ * (вихід, видалення учасника організатором чи адміном, збільшення
+ * ліміту, видалення користувача) — сама перестановка атомарна всередині
+ * promote_event_waitlist.
+ *
+ * DM надсилаються вже ПІСЛЯ того, як просування закомічене, і їх збій
+ * лише логується: людина вже в учасниках, і відкочувати це через
+ * помилку Telegram не можна.
+ *
+ * Завершену подію не чіпаємо — у неї нікого не додають заднім числом.
+ */
+export async function promoteWaitlist(eventId: string): Promise<string[]> {
+  const event = await eventsRepository.findById(eventId)
+  if (!event || isKyivDateTimeInPast(event.date, event.time)) return []
+
+  const promotedIds = await eventsRepository.promoteFromWaitlist(eventId)
+  if (promotedIds.length === 0) return []
+
+  const promotedUsers = await usersRepository.getUsersByIds(promotedIds)
+  await mapWithConcurrency(promotedUsers, NOTIFICATION_CONCURRENCY, async (user) => {
+    try {
+      await sendWaitlistPromotionMessage(String(user.telegramId), {
+        id: event.id,
+        title: event.title,
+      })
+    } catch (error) {
+      console.error(
+        `Не вдалося сповістити користувача ${user.id} про місце у події ${eventId}:`,
+        error,
+      )
+    }
+  })
+
+  return promotedIds
 }
 
 async function getEventOrThrow(id: string): Promise<Event> {
@@ -131,16 +198,16 @@ export async function listEvents(
   ])
   if (userDormitoryId === NO_DORMITORY_ID) {
     const events = await eventsRepository.findAll(undefined, includeVip, true, includeGpu)
-    return attachParticipantPreviews(events.map(toEventResponse))
+    return attachParticipantPreviews(events.map(toEventResponse), userId)
   }
   if (scope === 'mine') {
     if (!userDormitoryId) return []
     const events = await eventsRepository.findAll(userDormitoryId, includeVip, false, includeGpu)
-    return attachParticipantPreviews(events.map(toEventResponse))
+    return attachParticipantPreviews(events.map(toEventResponse), userId)
   }
 
   const events = await eventsRepository.findAll(undefined, includeVip, false, includeGpu)
-  return attachParticipantPreviews(events.map(toEventResponse))
+  return attachParticipantPreviews(events.map(toEventResponse), userId)
 }
 
 export async function getEvent(id: string, viewerId?: string): Promise<EventResponse> {
@@ -159,7 +226,7 @@ export async function getEvent(id: string, viewerId?: string): Promise<EventResp
       throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
     }
   }
-  return attachParticipantPreview(toEventResponse(event))
+  return attachParticipantPreview(toEventResponse(event), viewerId)
 }
 
 export async function getEventShareLink(id: string, viewerId: string): Promise<string> {
@@ -335,7 +402,15 @@ export async function updateOwnEvent(
     gpuOnly: input.gpuOnly ?? event.gpuOnly,
   })
 
-  return attachParticipantPreview(toEventResponse(await eventsRepository.update(id, input)))
+  const updated = await eventsRepository.update(id, input)
+  // Підняли ліміт — з'явились вільні місця, які належать черзі. Скільки
+  // саме людей перевести, вирішує promote_event_waitlist (цикл до
+  // заповнення), тож кілька доданих місць дають кілька просувань.
+  if (input.maxParticipants !== undefined && input.maxParticipants > event.maxParticipants) {
+    await promoteWaitlist(id)
+    return attachParticipantPreview(toEventResponse(await getEventOrThrow(id)), creatorId)
+  }
+  return attachParticipantPreview(toEventResponse(updated), creatorId)
 }
 
 /** Лише адмін-панель. event_participants видаляються каскадом (FK ON
@@ -383,24 +458,48 @@ export async function removeOwnEventParticipant(
   if (!removed) {
     throw new AppError(404, 'PARTICIPANT_NOT_FOUND', 'Учасника не знайдено')
   }
-  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
+  // Місце звільнилось — воно належить першому в черзі.
+  await promoteWaitlist(eventId)
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)), creatorId)
+}
+
+/**
+ * «Чи взагалі існує ця подія для цього користувача»: гуртожиток для
+ * офлайн-події плюс роль для VIP/ГПУ-події. Кожен провал — та сама 404,
+ * що й для неіснуючої події, щоб не розкривати сам факт її існування.
+ *
+ * Спільна функція для join, waitlist-join і waitlist-leave: інакше
+ * котрийсь із шляхів рано чи пізно виявився б м'якшим за решту.
+ */
+async function assertEventVisible(event: Event, userId: string): Promise<void> {
+  const [viewer, isVip, isGpu] = await Promise.all([
+    usersRepository.getUserById(userId),
+    event.vipOnly ? vipsRepository.isVip(userId) : Promise.resolve(true),
+    event.gpuOnly ? gpusRepository.isGpu(userId) : Promise.resolve(true),
+  ])
+
+  if (
+    (!event.isOnline && viewer?.dormitoryId === NO_DORMITORY_ID) ||
+    !isVip ||
+    !isGpu
+  ) {
+    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
+  }
+}
+
+/** Видимість + подія ще не завершилась. Спільний гейт для звичайного
+ * приєднання і для вступу в чергу. */
+async function assertEventJoinable(event: Event, userId: string): Promise<void> {
+  await assertEventVisible(event, userId)
+  if (isKyivDateTimeInPast(event.date, event.time)) {
+    throw new AppError(409, 'EVENT_ARCHIVED', 'Цю подію вже завершено')
+  }
 }
 
 export async function joinEvent(eventId: string, userId: string): Promise<EventResponse> {
   const event = await getEventOrThrow(eventId)
+  await assertEventJoinable(event, userId)
   const participant = await usersRepository.getUserById(userId)
-  if (!event.isOnline && participant?.dormitoryId === NO_DORMITORY_ID) {
-    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
-  }
-  if (event.vipOnly && !(await vipsRepository.isVip(userId))) {
-    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
-  }
-  if (event.gpuOnly && !(await gpusRepository.isGpu(userId))) {
-    throw new AppError(404, 'EVENT_NOT_FOUND', 'Подію не знайдено')
-  }
-  if (isKyivDateTimeInPast(event.date, event.time)) {
-    throw new AppError(409, 'EVENT_ARCHIVED', 'Цю подію вже завершено')
-  }
   // Перевірка ліміту місць і повторного приєднання відбувається
   // атомарно всередині PostgreSQL-функції join_event (repository),
   // тому тут немає окремого "прочитати → перевірити → вставити".
@@ -408,7 +507,10 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
   // participantPreview у відповіді дозволяє EventsProvider оновити
   // avatar-стек на картці, підмінивши лише цю подію в списку — без
   // повторного GET /api/events для всіх подій одразу.
-  const response = await attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
+  const response = await attachParticipantPreview(
+    toEventResponse(await getEventOrThrow(eventId)),
+    userId,
+  )
   if (participant) {
     await sendEventJoinConfirmation(String(participant.telegramId), response).catch((error) => {
       console.error(`Не вдалося надіслати підтвердження приєднання користувачу ${userId}:`, error)
@@ -431,7 +533,95 @@ export async function leaveEvent(eventId: string, userId: string): Promise<Event
     throw new AppError(409, 'NOT_PARTICIPATING', 'Ви не берете участі у цій події')
   }
 
-  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)))
+  await promoteWaitlist(eventId)
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)), userId)
+}
+
+/**
+ * Вступ до черги на заповнену подію. Уся перевірка (заповненість, ролі,
+ * дублі, участь) відбувається атомарно всередині join_event_waitlist під
+ * `for update` на рядку події.
+ *
+ * Якщо між натисканням і запитом місце встигло звільнитись, функція
+ * повертає EVENT_NOT_FULL — тоді замість черги виконуємо звичайне
+ * приєднання, щоб користувач не отримав порожню помилку через те, що
+ * йому пощастило.
+ */
+export async function joinEventWaitlist(
+  eventId: string,
+  userId: string,
+): Promise<EventResponse> {
+  const event = await getEventOrThrow(eventId)
+  await assertEventJoinable(event, userId)
+
+  try {
+    await eventsRepository.joinWaitlist(eventId, userId)
+  } catch (error) {
+    if (error instanceof EventNotFullError) {
+      return joinEvent(eventId, userId)
+    }
+    throw error
+  }
+
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)), userId)
+}
+
+export async function leaveEventWaitlist(
+  eventId: string,
+  userId: string,
+): Promise<EventResponse> {
+  const event = await getEventOrThrow(eventId)
+  await assertEventVisible(event, userId)
+
+  const removed = await eventsRepository.leaveWaitlist(eventId, userId)
+  if (!removed) {
+    throw new AppError(409, 'NOT_WAITLISTED', 'Ви не в черзі на цю подію')
+  }
+
+  return attachParticipantPreview(toEventResponse(await getEventOrThrow(eventId)), userId)
+}
+
+/** Впорядкований список черги з публічними профілями — лише для
+ * організатора й адміна. Звичайному користувачу сервіс його не віддає
+ * (він бачить тільки waitlistCount і власну позицію). */
+export async function listEventWaitlist(
+  eventId: string,
+  viewerId: string,
+  privileged = false,
+): Promise<PublicUser[]> {
+  const event = await getEventOrThrow(eventId)
+  if (!privileged && event.creatorId !== viewerId) {
+    throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Список черги доступний лише автору події')
+  }
+
+  const userIds = await eventsRepository.getWaitlistUserIds(eventId)
+  if (userIds.length === 0) return []
+
+  const users = await usersRepository.getPublicUsersByIds(userIds)
+  const byId = new Map(users.map((user) => [user.id, user]))
+  // Порядок черги задає SQL — не порядок, у якому повернувся batch.
+  return userIds.map((id) => byId.get(id) ?? { id, firstName: 'Учасник DormHub' })
+}
+
+/** Організатор або адмін знімає когось із черги. */
+export async function removeFromEventWaitlist(
+  eventId: string,
+  actorId: string,
+  targetUserId: string,
+  privileged = false,
+): Promise<void> {
+  const event = await getEventOrThrow(eventId)
+  if (!privileged) {
+    await assertEventVisible(event, actorId)
+    if (event.creatorId !== actorId) {
+      throw new AppError(403, 'EVENT_OWNER_REQUIRED', 'Керувати чергою може лише автор події')
+    }
+  }
+
+  const removed = await eventsRepository.leaveWaitlist(eventId, targetUserId)
+  if (!removed) {
+    throw new AppError(404, 'NOT_WAITLISTED', 'Цього користувача немає в черзі')
+  }
 }
 
 /** Один batch-запит прев'ю на ОБИДВА списки разом (а не по одному на
@@ -460,12 +650,19 @@ export async function listEventsForUser(
     (includeGpu || !event.gpuOnly)
   const createdResponses = created.filter(visible).map(toEventResponse)
   const participatingResponses = participating.filter(visible).map(toEventResponse)
-  const previews = await eventsRepository.findParticipantPreviews([
+  const eventIds = [
     ...new Set([...createdResponses, ...participatingResponses].map((event) => event.id)),
+  ]
+  const [previews, waitlistCounts, viewerPositions] = await Promise.all([
+    eventsRepository.findParticipantPreviews(eventIds),
+    eventsRepository.findWaitlistCounts(eventIds),
+    eventsRepository.findWaitlistPositions(eventIds, viewerId),
   ])
   const withPreview = (event: EventResponse): EventResponse => ({
     ...event,
     participantPreview: previews.get(event.id) ?? [],
+    waitlistCount: waitlistCounts.get(event.id) ?? 0,
+    viewerWaitlistPosition: viewerPositions.get(event.id),
   })
 
   return {

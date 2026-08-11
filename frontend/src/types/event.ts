@@ -26,6 +26,11 @@ export interface DormEvent {
   createdAt: string
   /** FK на dormitories.id — гуртожиток творця на момент створення. */
   dormitoryId: string
+  /** Скільки людей у черзі. Сам список черги звичайному користувачу не
+   * повертається — лише організатору й адміну окремим запитом. */
+  waitlistCount?: number
+  /** Позиція поточного користувача в черзі (1-based), якщо він у ній. */
+  viewerWaitlistPosition?: number
 }
 
 export interface CreateEventInput {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CalendarDays, Clock, Home, MapPin, Trash2, UserX } from 'lucide-react'
+import { CalendarDays, ChevronDown, ChevronUp, Clock, Home, Hourglass, MapPin, Trash2, UserX } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { UserRow } from '../../components/UserRow'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -13,7 +13,9 @@ import { formatEventDate, formatEventTime } from '../../utils/date'
 import {
   deleteAdminEvent,
   fetchAdminEventDetail,
+  fetchAdminEventWaitlist,
   getErrorMessage,
+  removeAdminEventWaitlistEntry,
   removeAdminParticipant,
 } from '../../services/api'
 import type { AdminEventDetail } from '../../types/admin'
@@ -37,6 +39,20 @@ export function AdminEventDetailPage() {
     null,
   )
   const [removingParticipant, setRemovingParticipant] = useState(false)
+  const [waitlist, setWaitlist] = useState<PublicUser[]>([])
+  const [showWaitlist, setShowWaitlist] = useState(false)
+  const [waitlistPendingRemoval, setWaitlistPendingRemoval] = useState<PublicUser | null>(null)
+  const [removingWaitlist, setRemovingWaitlist] = useState(false)
+
+  const loadWaitlist = useCallback(() => {
+    if (!id) return
+    fetchAdminEventWaitlist(id)
+      .then(setWaitlist)
+      .catch(() => {
+        // Черга — додаткова інформація; її відсутність не повинна
+        // ламати сторінку події.
+      })
+  }, [id])
 
   const runFetch = useCallback(() => {
     if (!id) return
@@ -49,7 +65,8 @@ export function AdminEventDetailPage() {
         setErrorMessage(getErrorMessage(error))
         setStatus('error')
       })
-  }, [id])
+    loadWaitlist()
+  }, [id, loadWaitlist])
 
   useEffect(() => {
     runFetch()
@@ -107,6 +124,21 @@ export function AdminEventDetailPage() {
       setActionError(getErrorMessage(error))
     } finally {
       setRemovingParticipant(false)
+    }
+  }
+
+  async function handleRemoveFromWaitlist() {
+    if (!id || !waitlistPendingRemoval) return
+    setRemovingWaitlist(true)
+    setActionError(null)
+    try {
+      await removeAdminEventWaitlistEntry(id, waitlistPendingRemoval.id)
+      setWaitlistPendingRemoval(null)
+      load()
+    } catch (error) {
+      setActionError(getErrorMessage(error))
+    } finally {
+      setRemovingWaitlist(false)
     }
   }
 
@@ -190,6 +222,55 @@ export function AdminEventDetailPage() {
           </div>
         )}
       </section>
+
+      {waitlist.length > 0 && (
+        <section className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+          <button
+            type="button"
+            onClick={() => setShowWaitlist((current) => !current)}
+            className="flex items-center justify-between gap-2"
+          >
+            <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+              <Hourglass size={15} className="text-[var(--accent)]" /> Черга · {waitlist.length}
+            </h2>
+            <span className="text-[var(--accent)]">
+              {showWaitlist ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </span>
+          </button>
+
+          {showWaitlist && (
+            <div className="flex flex-col gap-2">
+              {waitlist.map((entry, index) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--surface-border)] p-2"
+                >
+                  <span className="w-5 shrink-0 text-center text-xs font-bold text-[var(--text-secondary)]">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <UserRow user={entry} />
+                  </div>
+                  <Button variant="outline" onClick={() => setWaitlistPendingRemoval(entry)}>
+                    <UserX size={14} /> Прибрати
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {waitlistPendingRemoval && (
+        <ConfirmDialog
+          title="Прибрати з черги?"
+          description={`${waitlistPendingRemoval.firstName} більше не чекатиме на місце в цій події.`}
+          confirmLabel="Прибрати"
+          loading={removingWaitlist}
+          onConfirm={handleRemoveFromWaitlist}
+          onCancel={() => setWaitlistPendingRemoval(null)}
+        />
+      )}
 
       {confirmingDeleteEvent && (
         <ConfirmDialog

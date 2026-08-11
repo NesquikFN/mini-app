@@ -6,6 +6,7 @@ import { adminRepository } from '../repositories/admin.repository'
 import { hostsRepository } from '../repositories/hosts.repository'
 import { vipsRepository } from '../repositories/vips.repository'
 import { gpusRepository } from '../repositories/gpus.repository'
+import { eventsRepository } from '../repositories/events.repository'
 import type { AuthUser, RegistrationStatus } from '../types/user'
 
 /**
@@ -63,6 +64,14 @@ export function stubAuthLayer(options: {
   mock.method(hostsRepository, 'isHost', async (id: string) => hosts.has(id))
   mock.method(vipsRepository, 'isVip', async (id: string) => vips.has(id))
   mock.method(gpusRepository, 'isGpu', async (id: string) => gpus.has(id))
+
+  // Лічильники черги домальовуються до КОЖНОЇ відповіді з подією
+  // (events.service.attachParticipantPreviews), тож без заглушки будь-який
+  // тест із подією впирався б у справжній Postgres. За замовчуванням —
+  // «черги немає»; тести про саму чергу перевизначають ці методи після
+  // виклику stubAuthLayer.
+  mock.method(eventsRepository, 'findWaitlistCounts', async () => new Map<string, number>())
+  mock.method(eventsRepository, 'findWaitlistPositions', async () => new Map<string, number>())
 }
 
 export interface ApiErrorBody {

@@ -312,6 +312,52 @@ export async function leaveEventRequest(eventId: string): Promise<DormEvent> {
   return data.event
 }
 
+// --- Лист очікування -------------------------------------------------
+// Backend сам вирішує, чи подія справді заповнена: якщо місце встигло
+// звільнитись, POST /waitlist виконує звичайне приєднання й повертає
+// подію вже з користувачем серед учасників.
+
+export async function joinEventWaitlistRequest(eventId: string): Promise<DormEvent> {
+  const data = await request<EventResponseBody>(`/events/${eventId}/waitlist`, {
+    method: 'POST',
+  })
+  return data.event
+}
+
+export async function leaveEventWaitlistRequest(eventId: string): Promise<DormEvent> {
+  const data = await request<EventResponseBody>(`/events/${eventId}/waitlist`, {
+    method: 'DELETE',
+  })
+  return data.event
+}
+
+/** Повний список черги — доступний лише організатору події. */
+export async function fetchEventWaitlist(eventId: string): Promise<PublicUser[]> {
+  const data = await request<{ waitlist: PublicUser[] }>(`/events/${eventId}/waitlist`)
+  return data.waitlist
+}
+
+export async function removeEventWaitlistEntry(eventId: string, userId: string): Promise<void> {
+  await request<{ success: boolean }>(`/events/${eventId}/waitlist/${userId}`, {
+    method: 'DELETE',
+  })
+}
+
+/** Те саме для адмінки — окремий маршрут, захищений requireAdmin. */
+export async function fetchAdminEventWaitlist(eventId: string): Promise<PublicUser[]> {
+  const data = await request<{ waitlist: PublicUser[] }>(`/admin/events/${eventId}/waitlist`)
+  return data.waitlist
+}
+
+export async function removeAdminEventWaitlistEntry(
+  eventId: string,
+  userId: string,
+): Promise<void> {
+  await request<{ success: boolean }>(`/admin/events/${eventId}/waitlist/${userId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function fetchCurrentUser(): Promise<AuthUser> {
   const data = await request<MeResponse>('/me')
   return data.user
