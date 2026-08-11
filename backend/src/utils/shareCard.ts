@@ -428,7 +428,7 @@ export interface ChatTitleLayout {
 
 export function layoutChatTitle(title: string): ChatTitleLayout {
   const candidates = [
-    { maxLines: 1, fontSize: 90, maxChars: 9 },
+    { maxLines: 1, fontSize: 84, maxChars: 9 },
     { maxLines: 2, fontSize: 64, maxChars: 14 },
     { maxLines: 3, fontSize: 48, maxChars: 18 },
     { maxLines: 4, fontSize: 38, maxChars: 24 },
@@ -454,7 +454,6 @@ export function layoutChatTitle(title: string): ChatTitleLayout {
   return { lines, fontSize: selected.fontSize, firstBaseline, lineHeight }
 }
 
-const META_TOP = 370
 const BOTTOM_ROW_Y = 542
 
 function chatCardSvg(input: ShareCardInput): string {
@@ -463,6 +462,11 @@ function chatCardSvg(input: ShareCardInput): string {
   const titleLayout = layoutChatTitle(
     input.hideDetails ? 'Закрита подія DormHub' : input.title,
   )
+  const titleLastBaseline = titleLayout.firstBaseline
+    + (titleLayout.lines.length - 1) * titleLayout.lineHeight
+  const detailsDividerY = Math.max(302, titleLastBaseline + 30)
+  const detailsLabelY = detailsDividerY + 52
+  const detailsValueY = detailsDividerY + 90
 
   const meta = input.hideDetails
     ? []
@@ -490,6 +494,11 @@ function chatCardSvg(input: ShareCardInput): string {
       <stop offset="55%" stop-color="#151515"/>
       <stop offset="100%" stop-color="#090909"/>
     </linearGradient>
+    <linearGradient id="coverEdgeFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0b0b0b" stop-opacity="0.92"/>
+      <stop offset="55%" stop-color="#0b0b0b" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="#0b0b0b" stop-opacity="0"/>
+    </linearGradient>
     <clipPath id="chatCoverClip">
       <path d="M658 0 H1200 V480 H684 Q658 480 658 454 Z"/>
     </clipPath>
@@ -498,20 +507,19 @@ function chatCardSvg(input: ShareCardInput): string {
   ${backgroundSvg(width, height)}
   <circle cx="${width - 60}" cy="40" r="340" fill="url(#accentGlow)"/>
 
-  <path d="M646 0 H1200 V492 H684 Q646 492 646 454 Z"
-        fill="${ACCENT}" fill-opacity="0.09"/>
   <path d="M652 0 H1200 V486 H684 Q652 486 652 454 Z"
         fill="url(#framePlaceholder)"/>
-  <path d="M652 0 V454 Q652 486 684 486 H1200"
-        fill="none" stroke="${ACCENT}" stroke-opacity="0.55" stroke-width="2"/>
   ${input.coverDataUri
     ? `<image href="${input.coverDataUri}" x="658" y="0" width="542" height="480"
               preserveAspectRatio="xMidYMid slice" clip-path="url(#chatCoverClip)"/>`
     : `<circle cx="929" cy="240" r="150" fill="url(#accentGlow)"/>
        <text x="929" y="252" font-family="${POSTER_FONT_FAMILY}" font-size="34"
              font-weight="600" fill="#ffffff" fill-opacity="0.28" text-anchor="middle">DormHub</text>`}
+  <rect x="652" y="0" width="112" height="486" fill="url(#coverEdgeFade)"/>
+  <path d="M652 0 V454 Q652 486 684 486 H1200"
+        fill="none" stroke="${ACCENT}" stroke-opacity="0.38" stroke-width="2"/>
 
-  ${logoSvg(64, 38, 210)}
+  ${logoSvg(59, 42, 180)}
 
   ${
     roleBadge
@@ -531,13 +539,19 @@ function chatCardSvg(input: ShareCardInput): string {
     )
     .join('')}
 
-  ${meta
-    .map(
-      (line, index) =>
-        `<text x="64" y="${META_TOP + index * 46}" font-family="${POSTER_FONT_FAMILY}"
-               font-size="29" font-weight="400" letter-spacing="-0.4" fill="#e5e5e5">${escapeXml(line)}</text>`,
-    )
-    .join('')}
+  <line x1="64" y1="${detailsDividerY}" x2="566" y2="${detailsDividerY}" stroke="${ACCENT}"
+        stroke-opacity="0.3" stroke-width="2"/>
+
+  ${meta.length
+    ? `<text x="64" y="${detailsLabelY}" font-family="${POSTER_FONT_FAMILY}" font-size="13"
+             font-weight="600" letter-spacing="1.5" fill="${ACCENT}">КОЛИ</text>
+       <text x="64" y="${detailsValueY}" font-family="${POSTER_FONT_FAMILY}" font-size="26"
+             font-weight="400" letter-spacing="-0.4" fill="#f2f2f2">${escapeXml(meta[0])}</text>
+       <text x="342" y="${detailsLabelY}" font-family="${POSTER_FONT_FAMILY}" font-size="13"
+             font-weight="600" letter-spacing="1.5" fill="${ACCENT}">${input.isOnline ? 'ФОРМАТ' : 'МІСЦЕ'}</text>
+       <text x="342" y="${detailsValueY}" font-family="${POSTER_FONT_FAMILY}" font-size="24"
+             font-weight="400" letter-spacing="-0.4" fill="#f2f2f2">${escapeXml(truncateLine(meta[1], 20))}</text>`
+    : ''}
 
   ${
     input.hideDetails
