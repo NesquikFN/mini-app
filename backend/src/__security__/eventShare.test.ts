@@ -134,7 +134,7 @@ describe('share card rendering', () => {
   it('fills the title area adaptively and keeps all 200 characters', () => {
     const short = layoutChatTitle('Декодер')
     assert.equal(short.lines.length, 1)
-    assert.equal(short.fontSize, 145)
+    assert.equal(short.fontSize, 90)
 
     const longTitle = 'Дуже довга назва події '.repeat(9).trim().slice(0, 200)
     const long = layoutChatTitle(longTitle)

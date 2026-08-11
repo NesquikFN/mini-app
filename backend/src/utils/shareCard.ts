@@ -425,12 +425,12 @@ export interface ChatTitleLayout {
 
 export function layoutChatTitle(title: string): ChatTitleLayout {
   const candidates = [
-    { maxLines: 1, fontSize: 145, maxChars: 9 },
-    { maxLines: 2, fontSize: 90, maxChars: 15 },
-    { maxLines: 3, fontSize: 64, maxChars: 21 },
-    { maxLines: 4, fontSize: 50, maxChars: 27 },
-    { maxLines: 5, fontSize: 39, maxChars: 36 },
-    { maxLines: 6, fontSize: 32, maxChars: 46 },
+    { maxLines: 1, fontSize: 90, maxChars: 10 },
+    { maxLines: 2, fontSize: 68, maxChars: 16 },
+    { maxLines: 3, fontSize: 52, maxChars: 22 },
+    { maxLines: 4, fontSize: 42, maxChars: 28 },
+    { maxLines: 5, fontSize: 34, maxChars: 37 },
+    { maxLines: 6, fontSize: 29, maxChars: 46 },
   ]
 
   let selected = candidates[candidates.length - 1]
@@ -445,14 +445,14 @@ export function layoutChatTitle(title: string): ChatTitleLayout {
   }
 
   const lineHeight = Math.round(selected.fontSize * 1.1)
-  const zoneTop = 145
+  const zoneTop = 150
   const firstBaseline = Math.round(zoneTop + selected.fontSize * 0.82)
 
   return { lines, fontSize: selected.fontSize, firstBaseline, lineHeight }
 }
 
-const META_TOP = 452
-const BOTTOM_ROW_Y = 556
+const META_TOP = 394
+const BOTTOM_ROW_Y = 542
 
 function chatCardSvg(input: ShareCardInput): string {
   const { width, height } = SHARE_CARD_SIZES.chat
@@ -483,17 +483,24 @@ function chatCardSvg(input: ShareCardInput): string {
       <stop offset="100%" stop-color="${ACCENT}" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(0,0,0,0.72)"/>
-      <stop offset="45%" stop-color="rgba(0,0,0,0.55)"/>
+      <stop offset="0%" stop-color="rgba(0,0,0,0.55)"/>
+      <stop offset="55%" stop-color="rgba(0,0,0,0.42)"/>
       <stop offset="100%" stop-color="rgba(0,0,0,0.95)"/>
+    </linearGradient>
+    <linearGradient id="sideScrim" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.9"/>
+      <stop offset="48%" stop-color="#000000" stop-opacity="0.68"/>
+      <stop offset="78%" stop-color="#000000" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </linearGradient>
   </defs>
 
   ${backgroundSvg(width, height, input.hasCover)}
   <rect width="${width}" height="${height}" fill="url(#scrim)"/>
+  <rect width="${width}" height="${height}" fill="url(#sideScrim)"/>
   <circle cx="${width - 60}" cy="40" r="340" fill="url(#accentGlow)"/>
 
-  ${logoSvg(72, 52, 260)}
+  ${logoSvg(64, 38, 210)}
 
   ${
     roleBadge
@@ -507,24 +514,24 @@ function chatCardSvg(input: ShareCardInput): string {
   ${titleLayout.lines
     .map(
       (line, index) =>
-        `<text x="72" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="${POSTER_FONT_FAMILY}"
+        `<text x="64" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="${POSTER_FONT_FAMILY}"
                font-size="${titleLayout.fontSize}" font-weight="600" fill="#ffffff"
-               letter-spacing="-2">${escapeXml(line)}</text>`,
+               letter-spacing="-1.5">${escapeXml(line)}</text>`,
     )
     .join('')}
 
   ${meta
     .map(
       (line, index) =>
-        `<text x="72" y="${META_TOP + index * 52}" font-family="${POSTER_FONT_FAMILY}"
-               font-size="32" font-weight="400" letter-spacing="-0.5" fill="#e5e5e5">${escapeXml(line)}</text>`,
+        `<text x="64" y="${META_TOP + index * 46}" font-family="${POSTER_FONT_FAMILY}"
+               font-size="29" font-weight="400" letter-spacing="-0.4" fill="#e5e5e5">${escapeXml(line)}</text>`,
     )
     .join('')}
 
   ${
     input.hideDetails
       ? ''
-      : `<g transform="translate(72, ${BOTTOM_ROW_Y})">
+      : `<g transform="translate(64, ${BOTTOM_ROW_Y})">
            ${avatarsSvg(input, 0, 0, 30, 30)}
            <text x="${Math.min(input.participants.length, 3) * 48 + (input.participantCount > 3 ? 48 : 0) + 24}" y="12"
                  font-family="${POSTER_FONT_FAMILY}" font-size="31" font-weight="600"
@@ -532,8 +539,10 @@ function chatCardSvg(input: ShareCardInput): string {
          </g>`
   }
 
-  <text x="${width - 72}" y="${BOTTOM_ROW_Y + 12}" font-family="${POSTER_FONT_FAMILY}" font-size="28"
-        font-weight="600" letter-spacing="-0.5" fill="${ACCENT}" text-anchor="end">Приєднуйся в DormHub</text>
+  <rect x="${width - 394}" y="${BOTTOM_ROW_Y - 34}" width="330" height="68" rx="34"
+        fill="${ACCENT}" fill-opacity="0.12" stroke="${ACCENT}" stroke-width="2"/>
+  <text x="${width - 229}" y="${BOTTOM_ROW_Y + 10}" font-family="${POSTER_FONT_FAMILY}" font-size="24"
+        font-weight="600" letter-spacing="-0.4" fill="${ACCENT}" text-anchor="middle">ПРИЄДНАТИСЯ</text>
 </svg>`
 }
 
