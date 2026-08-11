@@ -451,7 +451,7 @@ export function layoutChatTitle(title: string): ChatTitleLayout {
   return { lines, fontSize: selected.fontSize, firstBaseline, lineHeight }
 }
 
-const META_TOP = 394
+const META_TOP = 370
 const BOTTOM_ROW_Y = 542
 
 function chatCardSvg(input: ShareCardInput): string {
@@ -488,9 +488,10 @@ function chatCardSvg(input: ShareCardInput): string {
       <stop offset="100%" stop-color="rgba(0,0,0,0.95)"/>
     </linearGradient>
     <linearGradient id="sideScrim" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#000000" stop-opacity="0.9"/>
-      <stop offset="48%" stop-color="#000000" stop-opacity="0.68"/>
-      <stop offset="78%" stop-color="#000000" stop-opacity="0.16"/>
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.98"/>
+      <stop offset="46%" stop-color="#000000" stop-opacity="0.92"/>
+      <stop offset="62%" stop-color="#000000" stop-opacity="0.68"/>
+      <stop offset="80%" stop-color="#000000" stop-opacity="0.14"/>
       <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </linearGradient>
   </defs>
