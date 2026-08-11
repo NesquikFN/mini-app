@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, CalendarX, MonitorPlay } from 'lucide-react'
+import { ArrowUpRight, CalendarDays, CalendarX, GraduationCap, MessageCircle, MonitorPlay } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { EventCard } from '../components/EventCard'
@@ -11,6 +11,8 @@ import { SocialLinks } from '../components/SocialLinks'
 import { fetchAppSettings, type SocialLinks as SocialLinksType } from '../services/api'
 import { isEventPast } from '../utils/date'
 import { NO_DORMITORY_ID } from '../types/dormitory'
+
+const GPU_BOT_URL = 'https://t.me/gpubsmu_bot'
 
 export function HomePage() {
   const { events, status, errorMessage, reload } = useEvents()
@@ -58,6 +60,46 @@ export function HomePage() {
           <DormitorySelector />
         </div>
       </div>
+
+      <a
+        href={GPU_BOT_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => {
+          const openTelegramLink = window.Telegram?.WebApp?.openTelegramLink
+          if (!openTelegramLink) return
+          event.preventDefault()
+          openTelegramLink.call(window.Telegram?.WebApp, GPU_BOT_URL)
+        }}
+        className="group relative overflow-hidden rounded-[26px] border border-blue-400/30 bg-[linear-gradient(135deg,rgba(37,99,235,0.3),rgba(29,78,216,0.13)_55%,rgba(59,130,246,0.06))] p-4 shadow-[0_18px_45px_rgba(37,99,235,0.14)] transition-transform active:scale-[0.985]"
+      >
+        <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-blue-400/20 blur-3xl" />
+        <div className="relative flex items-center gap-3.5">
+          <span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border border-blue-300/25 bg-blue-500/20 text-blue-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+            <GraduationCap size={27} strokeWidth={2} />
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="text-base font-extrabold tracking-tight text-white">ГПУ</span>
+              <span className="rounded-full bg-blue-400/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                Для навчання
+              </span>
+            </span>
+            <span className="mt-1 block text-sm leading-snug text-blue-100/75">
+              Допомога з навчанням і доступ до чату спільноти
+            </span>
+          </span>
+
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-300/20 bg-blue-400/15 text-blue-200 transition-transform group-active:translate-x-0.5">
+            <ArrowUpRight size={20} />
+          </span>
+        </div>
+
+        <span className="relative mt-3 flex items-center gap-2 border-t border-blue-300/15 pt-3 text-xs font-semibold text-blue-200">
+          <MessageCircle size={15} /> Відкрити @gpubsmu_bot
+        </span>
+      </a>
 
       {!onlineOnly && !offlineCollapsed && <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">
