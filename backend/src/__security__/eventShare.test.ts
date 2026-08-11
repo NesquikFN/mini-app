@@ -178,7 +178,7 @@ describe('share card rendering', () => {
     assert.equal(initialOf('🎉 42'), '4')
   })
 
-  it('uses a same-origin template cover inside the artwork frame', async () => {
+  it('uses a same-origin template cover as the full poster', async () => {
     const relativeDir = join('event-templates', 'share-cover-test')
     await mkdir(join(TEST_UPLOADS_DIR, relativeDir), { recursive: true })
     await writeFile(
@@ -197,7 +197,7 @@ describe('share card rendering', () => {
     )
     const withoutCover = await renderShareCard(cardInput({ hasCover: false }), 'chat')
 
-    assert.ok(!withCover.equals(withoutCover), 'template cover must appear inside the frame')
+    assert.ok(!withCover.equals(withoutCover), 'template cover must become the full poster')
   })
 
   it('downloads avatars only from the bounded Telegram userpic endpoint', async () => {

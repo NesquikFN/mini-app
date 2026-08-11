@@ -467,6 +467,8 @@ function chatCardSvg(input: ShareCardInput): string {
   const detailsDividerY = Math.max(302, titleLastBaseline + 30)
   const detailsLabelY = detailsDividerY + 52
   const detailsValueY = detailsDividerY + 90
+  const renderedDetailsLabelY = input.coverDataUri ? 430 : detailsLabelY
+  const renderedDetailsValueY = input.coverDataUri ? 468 : detailsValueY
 
   const meta = input.hideDetails
     ? []
@@ -489,37 +491,24 @@ function chatCardSvg(input: ShareCardInput): string {
       <stop offset="0%" stop-color="${ACCENT}" stop-opacity="0.3"/>
       <stop offset="100%" stop-color="${ACCENT}" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="framePlaceholder" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#25170d"/>
-      <stop offset="55%" stop-color="#151515"/>
-      <stop offset="100%" stop-color="#090909"/>
+    <linearGradient id="fullCoverScrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.2"/>
+      <stop offset="55%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="68%" stop-color="#000000" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.92"/>
     </linearGradient>
-    <linearGradient id="coverEdgeFade" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#0b0b0b" stop-opacity="0.92"/>
-      <stop offset="55%" stop-color="#0b0b0b" stop-opacity="0.42"/>
-      <stop offset="100%" stop-color="#0b0b0b" stop-opacity="0"/>
-    </linearGradient>
-    <clipPath id="chatCoverClip">
-      <path d="M658 0 H1200 V480 H684 Q658 480 658 454 Z"/>
-    </clipPath>
   </defs>
 
   ${backgroundSvg(width, height)}
-  <circle cx="${width - 60}" cy="40" r="340" fill="url(#accentGlow)"/>
-
-  <path d="M652 0 H1200 V486 H684 Q652 486 652 454 Z"
-        fill="url(#framePlaceholder)"/>
   ${input.coverDataUri
-    ? `<image href="${input.coverDataUri}" x="658" y="0" width="542" height="480"
-              preserveAspectRatio="xMidYMid slice" clip-path="url(#chatCoverClip)"/>`
-    : `<circle cx="929" cy="240" r="150" fill="url(#accentGlow)"/>
-       <text x="929" y="252" font-family="${POSTER_FONT_FAMILY}" font-size="34"
-             font-weight="600" fill="#ffffff" fill-opacity="0.28" text-anchor="middle">DormHub</text>`}
-  <rect x="652" y="0" width="112" height="486" fill="url(#coverEdgeFade)"/>
-  <path d="M652 0 V454 Q652 486 684 486 H1200"
-        fill="none" stroke="${ACCENT}" stroke-opacity="0.38" stroke-width="2"/>
+    ? `<image href="${input.coverDataUri}" x="0" y="0" width="${width}" height="${height}"
+              preserveAspectRatio="xMidYMid slice"/>
+       <rect width="${width}" height="${height}" fill="url(#fullCoverScrim)"/>`
+    : `<circle cx="${width - 60}" cy="40" r="340" fill="url(#accentGlow)"/>`}
 
-  ${logoSvg(59, 42, 180)}
+  <rect x="40" y="24" width="232" height="72" rx="36"
+        fill="#000000" fill-opacity="0.58" stroke="#ffffff" stroke-opacity="0.08"/>
+  ${logoSvg(59, 36, 180)}
 
   ${
     roleBadge
@@ -530,26 +519,32 @@ function chatCardSvg(input: ShareCardInput): string {
       : ''
   }
 
-  ${titleLayout.lines
-    .map(
-      (line, index) =>
-        `<text x="64" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="${POSTER_FONT_FAMILY}"
-               font-size="${titleLayout.fontSize}" font-weight="600" fill="#ffffff"
-               letter-spacing="-1.5">${escapeXml(line)}</text>`,
-    )
-    .join('')}
+  ${!input.coverDataUri
+    ? `${titleLayout.lines
+      .map(
+        (line, index) =>
+          `<text x="64" y="${titleLayout.firstBaseline + index * titleLayout.lineHeight}" font-family="${POSTER_FONT_FAMILY}"
+                 font-size="${titleLayout.fontSize}" font-weight="600" fill="#ffffff"
+                 letter-spacing="-1.5">${escapeXml(line)}</text>`,
+      )
+      .join('')}
+       <line x1="64" y1="${detailsDividerY}" x2="566" y2="${detailsDividerY}" stroke="${ACCENT}"
+             stroke-opacity="0.3" stroke-width="2"/>`
+    : ''}
 
-  <line x1="64" y1="${detailsDividerY}" x2="566" y2="${detailsDividerY}" stroke="${ACCENT}"
-        stroke-opacity="0.3" stroke-width="2"/>
+  ${input.coverDataUri && meta.length
+    ? `<rect x="48" y="402" width="552" height="86" rx="24"
+             fill="#000000" fill-opacity="0.7" stroke="#ffffff" stroke-opacity="0.1"/>`
+    : ''}
 
   ${meta.length
-    ? `<text x="64" y="${detailsLabelY}" font-family="${POSTER_FONT_FAMILY}" font-size="13"
+    ? `<text x="64" y="${renderedDetailsLabelY}" font-family="${POSTER_FONT_FAMILY}" font-size="13"
              font-weight="600" letter-spacing="1.5" fill="${ACCENT}">КОЛИ</text>
-       <text x="64" y="${detailsValueY}" font-family="${POSTER_FONT_FAMILY}" font-size="26"
+       <text x="64" y="${renderedDetailsValueY}" font-family="${POSTER_FONT_FAMILY}" font-size="26"
              font-weight="400" letter-spacing="-0.4" fill="#f2f2f2">${escapeXml(meta[0])}</text>
-       <text x="342" y="${detailsLabelY}" font-family="${POSTER_FONT_FAMILY}" font-size="13"
+       <text x="342" y="${renderedDetailsLabelY}" font-family="${POSTER_FONT_FAMILY}" font-size="13"
              font-weight="600" letter-spacing="1.5" fill="${ACCENT}">${input.isOnline ? 'ФОРМАТ' : 'МІСЦЕ'}</text>
-       <text x="342" y="${detailsValueY}" font-family="${POSTER_FONT_FAMILY}" font-size="24"
+       <text x="342" y="${renderedDetailsValueY}" font-family="${POSTER_FONT_FAMILY}" font-size="24"
              font-weight="400" letter-spacing="-0.4" fill="#f2f2f2">${escapeXml(truncateLine(meta[1], 20))}</text>`
     : ''}
 
@@ -582,6 +577,7 @@ function storyCardSvg(input: ShareCardInput): string {
   const titleLineHeight = titleSize + 14
   const titleTop = 1060
   const metaTop = titleTop + titleLines.length * titleLineHeight + 34
+  const renderedMetaTop = input.coverDataUri ? height - 610 : metaTop
 
   const meta = input.hideDetails
     ? []
@@ -612,23 +608,36 @@ function storyCardSvg(input: ShareCardInput): string {
     <clipPath id="storyCoverClip">
       <rect x="90" y="350" width="900" height="580" rx="44"/>
     </clipPath>
+    <linearGradient id="fullCoverScrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.28"/>
+      <stop offset="55%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="70%" stop-color="#000000" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.96"/>
+    </linearGradient>
   </defs>
 
   ${backgroundSvg(width, height)}
-  <circle cx="${width / 2}" cy="180" r="620" fill="url(#accentGlow)"/>
-
-  ${logoSvg(width / 2 - 205, 100, 410)}
-
-  <rect x="70" y="330" width="940" height="620" rx="62"
-        fill="${ACCENT}" fill-opacity="0.09"/>
-  <rect x="80" y="340" width="920" height="600" rx="52"
-        fill="url(#framePlaceholder)" stroke="${ACCENT}" stroke-opacity="0.55" stroke-width="3"/>
   ${input.coverDataUri
-    ? `<image href="${input.coverDataUri}" x="90" y="350" width="900" height="580"
-              preserveAspectRatio="xMidYMid slice" clip-path="url(#storyCoverClip)"/>`
-    : `<circle cx="540" cy="640" r="300" fill="url(#accentGlow)"/>
+    ? `<image href="${input.coverDataUri}" x="0" y="0" width="${width}" height="${height}"
+              preserveAspectRatio="xMidYMid slice"/>
+       <rect width="${width}" height="${height}" fill="url(#fullCoverScrim)"/>`
+    : `<circle cx="${width / 2}" cy="180" r="620" fill="url(#accentGlow)"/>`}
+
+  ${input.coverDataUri
+    ? `<rect x="340" y="70" width="400" height="124" rx="62"
+             fill="#000000" fill-opacity="0.58" stroke="#ffffff" stroke-opacity="0.08"/>
+       ${logoSvg(390, 90, 300)}`
+    : logoSvg(width / 2 - 205, 100, 410)}
+
+  ${!input.coverDataUri
+    ? `<rect x="70" y="330" width="940" height="620" rx="62"
+             fill="${ACCENT}" fill-opacity="0.09"/>
+       <rect x="80" y="340" width="920" height="600" rx="52"
+             fill="url(#framePlaceholder)" stroke="${ACCENT}" stroke-opacity="0.55" stroke-width="3"/>
+       <circle cx="540" cy="640" r="300" fill="url(#accentGlow)"/>
        <text x="540" y="660" font-family="${POSTER_FONT_FAMILY}" font-size="62"
-             font-weight="600" fill="#ffffff" fill-opacity="0.28" text-anchor="middle">DormHub</text>`}
+             font-weight="600" fill="#ffffff" fill-opacity="0.28" text-anchor="middle">DormHub</text>`
+    : ''}
 
   ${
     roleBadge
@@ -639,19 +648,26 @@ function storyCardSvg(input: ShareCardInput): string {
       : ''
   }
 
-  ${titleLines
-    .map(
-      (line, index) =>
-        `<text x="${width / 2}" y="${titleTop + index * titleLineHeight}"
-               font-family="${POSTER_FONT_FAMILY}" font-size="${titleSize}" font-weight="600"
-               fill="#ffffff" text-anchor="middle" letter-spacing="-2">${escapeXml(line)}</text>`,
-    )
-    .join('')}
+  ${!input.coverDataUri
+    ? titleLines
+      .map(
+        (line, index) =>
+          `<text x="${width / 2}" y="${titleTop + index * titleLineHeight}"
+                 font-family="${POSTER_FONT_FAMILY}" font-size="${titleSize}" font-weight="600"
+                 fill="#ffffff" text-anchor="middle" letter-spacing="-2">${escapeXml(line)}</text>`,
+      )
+      .join('')
+    : ''}
+
+  ${input.coverDataUri && meta.length
+    ? `<rect x="180" y="1252" width="720" height="176" rx="52"
+             fill="#000000" fill-opacity="0.68" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>`
+    : ''}
 
   ${meta
     .map(
       (line, index) =>
-        `<text x="${width / 2}" y="${metaTop + index * 68}"
+        `<text x="${width / 2}" y="${renderedMetaTop + index * 68}"
                font-family="${POSTER_FONT_FAMILY}" font-size="45" font-weight="400" fill="#e5e5e5"
                text-anchor="middle">${escapeXml(line)}</text>`,
     )
@@ -676,8 +692,8 @@ function storyCardSvg(input: ShareCardInput): string {
 
 /**
  * Рендерить картку у фінальний буфер. Обкладинка (якщо є) спочатку
- * нормалізується в PNG, а потім кладеться в окрему захищену рамку —
- * її власний текст більше не конкурує з інформацією картки.
+ * нормалізується в PNG, а потім стає повноекранним постером. Ми не
+ * дублюємо її назву, але зберігаємо дату, формат і нижню CTA-панель.
  */
 export async function renderShareCard(
   input: ShareCardInput,
@@ -686,8 +702,8 @@ export async function renderShareCard(
   // Закриту подію ніколи не показуємо з чужою обкладинкою — інакше
   // картинка сама по собі розкривала б зміст закритої події.
   const coverSize = format === 'chat'
-    ? { width: 542, height: 480 }
-    : { width: 900, height: 580 }
+    ? SHARE_CARD_SIZES.chat
+    : SHARE_CARD_SIZES.story
   const cover = input.hasCover && !input.hideDetails
     ? await loadCoverArtwork(
         input.eventId,
