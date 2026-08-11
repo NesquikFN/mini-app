@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Archive, CalendarDays, Crown, ExternalLink, Home, MapPin, MessageCircle, MonitorPlay, PartyPopper, Pencil, Share2, Trash2, Users } from 'lucide-react'
 import { useEvents } from '../hooks/useEvents'
@@ -19,6 +19,7 @@ import { fetchEventDetail, fetchEventShareLink, getErrorMessage, type EventDetai
 type MembersStatus = 'loading' | 'success' | 'error'
 
 const PARTICIPANTS_PREVIEW_COUNT = 4
+const MEMBERS_REFRESH_INTERVAL_MS = 5_000
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -53,21 +54,37 @@ export function EventDetailPage() {
     EventDetailResponse['participants'][number] | null
   >(null)
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null)
+  const membersRequestId = useRef(0)
 
-  const loadMembers = useCallback(() => {
+  const loadMembers = useCallback((silent = false) => {
     if (!id) return
+    const requestId = ++membersRequestId.current
     fetchEventDetail(id)
       .then((data) => {
+        if (requestId !== membersRequestId.current) return
         setMembers(data)
         setMembersStatus('success')
       })
       .catch(() => {
+        if (requestId !== membersRequestId.current || silent) return
         setMembersStatus('error')
       })
   }, [id])
 
   useEffect(() => {
     loadMembers()
+
+    const refreshMembers = () => {
+      if (document.visibilityState === 'visible') loadMembers(true)
+    }
+    const refreshTimer = window.setInterval(refreshMembers, MEMBERS_REFRESH_INTERVAL_MS)
+    document.addEventListener('visibilitychange', refreshMembers)
+
+    return () => {
+      window.clearInterval(refreshTimer)
+      document.removeEventListener('visibilitychange', refreshMembers)
+      membersRequestId.current += 1
+    }
   }, [loadMembers])
 
   if (userStatus === 'loading' || (eventsStatus === 'loading' && membersStatus === 'loading')) {
