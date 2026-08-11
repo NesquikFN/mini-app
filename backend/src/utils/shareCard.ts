@@ -248,6 +248,7 @@ async function loadCoverBackground(
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 const AVATAR_TIMEOUT_MS = 2_500
 const TELEGRAM_AVATAR_PATH = '/i/userpic/'
+const TELEGRAM_AVATAR_CONTENT_TYPES = [...UPLOAD_CONTENT_TYPES, 'image/svg+xml']
 
 async function readLimitedBody(response: Response, maxBytes: number): Promise<Buffer | null> {
   const declaredLength = Number(response.headers.get('content-length'))
@@ -298,7 +299,9 @@ export async function loadParticipantAvatar(photoUrl?: string): Promise<string |
       signal: AbortSignal.timeout(AVATAR_TIMEOUT_MS),
     })
     const contentType = response.headers.get('content-type')?.split(';')[0].trim()
-    if (!response.ok || !contentType || !UPLOAD_CONTENT_TYPES.includes(contentType)) return undefined
+    if (!response.ok || !contentType || !TELEGRAM_AVATAR_CONTENT_TYPES.includes(contentType)) {
+      return undefined
+    }
 
     const body = await readLimitedBody(response, MAX_AVATAR_BYTES)
     if (!body) return undefined
@@ -398,8 +401,8 @@ function backgroundSvg(width: number, height: number, hasCover: boolean): string
  * зсував би все нижче й наїжджав на ряд з аватарками (саме це й ловив
  * візуальний прогін). Тепер довжина назви на решту макета не впливає.
  */
-const TITLE_TOP = 286
-const META_TOP = 452
+const TITLE_TOP = 210
+const META_TOP = 420
 const BOTTOM_ROW_Y = 556
 
 function chatCardSvg(input: ShareCardInput): string {
@@ -458,8 +461,9 @@ function chatCardSvg(input: ShareCardInput): string {
   ${titleLines
     .map(
       (line, index) =>
-        `<text x="72" y="${TITLE_TOP + index * (titleSize + 12)}" font-family="DejaVu Sans, sans-serif"
-               font-size="${titleSize}" font-weight="800" fill="#ffffff" letter-spacing="-2">${escapeXml(line)}</text>`,
+        `<text x="${width - 72}" y="${TITLE_TOP + index * (titleSize + 12)}" font-family="DejaVu Sans, sans-serif"
+               font-size="${titleSize}" font-weight="800" fill="#ffffff" letter-spacing="-2"
+               text-anchor="end">${escapeXml(line)}</text>`,
     )
     .join('')}
 
@@ -494,7 +498,7 @@ function storyCardSvg(input: ShareCardInput): string {
     ? ['Закрита', 'подія DormHub']
     : wrapText(input.title, 4, 18)
   const titleSize = titleLines.length >= 4 ? 92 : 104
-  const titleTop = 900
+  const titleTop = 560
 
   const meta = input.hideDetails
     ? []
@@ -543,9 +547,9 @@ function storyCardSvg(input: ShareCardInput): string {
   ${titleLines
     .map(
       (line, index) =>
-        `<text x="${width / 2}" y="${titleTop + index * (titleSize + 16)}"
+        `<text x="${width - 72}" y="${titleTop + index * (titleSize + 16)}"
                font-family="DejaVu Sans, sans-serif" font-size="${titleSize}" font-weight="800"
-               fill="#ffffff" text-anchor="middle" letter-spacing="-2">${escapeXml(line)}</text>`,
+               fill="#ffffff" text-anchor="end" letter-spacing="-2">${escapeXml(line)}</text>`,
     )
     .join('')}
 

@@ -181,13 +181,12 @@ describe('share card rendering', () => {
 
   it('downloads avatars only from the bounded Telegram userpic endpoint', async () => {
     const originalFetch = globalThis.fetch
-    const avatar = await sharp({
-      create: { width: 48, height: 48, channels: 3, background: '#ef4444' },
-    }).jpeg().toBuffer()
+    // Telegram офіційно може повертати photo_url як JPEG або SVG.
+    const avatar = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><circle cx="24" cy="24" r="24" fill="#ef4444"/></svg>'
     let calls = 0
     globalThis.fetch = (async () => {
       calls += 1
-      return new Response(avatar, { headers: { 'Content-Type': 'image/jpeg' } })
+      return new Response(avatar, { headers: { 'Content-Type': 'image/svg+xml' } })
     }) as typeof fetch
 
     try {

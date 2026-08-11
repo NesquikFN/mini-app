@@ -88,7 +88,7 @@ export function shareCardFingerprint(
   const parts = [
     // Версія рендера входить у ключ, щоб Railway Volume не продовжував
     // віддавати старий дизайн після змін шрифтів, фону чи аватарок.
-    'share-card-v3-cover-avatars-logo',
+    'share-card-v4-svg-avatars-right-title',
     event.id,
     event.title,
     event.date,
