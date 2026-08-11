@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { healthRouter } from './health.routes'
 import { authRouter } from './auth.routes'
 import * as telegramWebhookController from '../controllers/telegram-webhook.controller'
+import * as eventShareController from '../controllers/event-share.controller'
 import { eventsRouter } from './events.routes'
 import { eventTemplatesRouter } from './event-templates.routes'
 import { quickPlansRouter } from './quick-plans.routes'
@@ -27,6 +28,12 @@ const approved = [...authenticated, requireApprovedUser]
 apiRouter.use('/health', healthRouter)
 apiRouter.use('/auth', authRateLimiter, authRouter)
 apiRouter.post('/telegram/webhook', telegramWebhookController.receiveUpdate)
+
+// Картку поширення тягне сам Telegram (сервери — для photo_url у
+// prepared-повідомленні, клієнт — для media_url у Stories), тож сесії
+// тут не буває в принципі. Замість requireTelegramAuth доступ дає
+// короткоживучий підписаний токен у query — див. share-token.service.
+apiRouter.get('/share-cards/:file', eventShareController.getShareCardImage)
 
 // --- Доступні одразу після Telegram-автентифікації, ДО схвалення заявки ---
 // /me — статус власного профілю й подача (чи повторна подача) заявки:

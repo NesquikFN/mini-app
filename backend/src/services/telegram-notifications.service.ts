@@ -148,7 +148,14 @@ function chatTitle(chat: TelegramChat): string {
 
 let botUsernamePromise: Promise<string> | undefined
 function getBotUsername(): Promise<string> {
-  botUsernamePromise ??= botApi<{ username: string }>('getMe').then((me) => me.username)
+  botUsernamePromise ??= botApi<{ username: string }>('getMe')
+    .then((me) => me.username)
+    .catch((error: unknown) => {
+      // Тимчасовий збій Telegram не можна кешувати назавжди: інакше
+      // всі deep links лишаються зламаними до перезапуску процесу.
+      botUsernamePromise = undefined
+      throw error
+    })
   return botUsernamePromise
 }
 
@@ -167,6 +174,52 @@ export function buildMiniAppDeepLink(
 export async function buildEventDeepLink(eventId: string): Promise<string> {
   const botUsername = await getBotUsername()
   return buildMiniAppDeepLink(botUsername, `event_${eventId}`)
+}
+
+/**
+ * Заготовка повідомлення для WebApp.shareMessage (Bot API 8.0,
+ * savePreparedInlineMessage). Сигнатура звірена з офіційною
+ * документацією: user_id + result (InlineQueryResult) + прапорці
+ * allow_*_chats; повертається PreparedInlineMessage { id, expiration_date }.
+ *
+ * Важливо: бот НІЧОГО не надсилає цим викликом — він лише зберігає
+ * заготовку, яку потім відправить сам користувач зі свого клієнта.
+ */
+export interface PreparedInlineMessageResult {
+  id: string
+  expiration_date: number
+}
+
+/** Мінімальний зріз InlineQueryResultPhoto — рівно ті поля, які ми
+ * заповнюємо. photo_url має бути JPEG до 5 МБ (вимога Bot API). */
+export interface InlineQueryResultPhotoInput {
+  type: 'photo'
+  id: string
+  photo_url: string
+  thumbnail_url: string
+  photo_width?: number
+  photo_height?: number
+  caption?: string
+  reply_markup?: { inline_keyboard: Array<Array<{ text: string; url: string }>> }
+}
+
+export interface SavePreparedInlineMessageInput {
+  user_id: number
+  result: InlineQueryResultPhotoInput
+  allow_user_chats?: boolean
+  allow_bot_chats?: boolean
+  allow_group_chats?: boolean
+  allow_channel_chats?: boolean
+}
+
+export async function savePreparedInlineMessage(
+  input: SavePreparedInlineMessageInput,
+): Promise<PreparedInlineMessageResult> {
+  return botApi<PreparedInlineMessageResult>('savePreparedInlineMessage', {
+    ...input,
+    // Bot API очікує result як JSON-об'єкт у тілі — botApi серіалізує
+    // усе тіло цілком, тож додаткового stringify тут не треба.
+  })
 }
 
 async function isActiveMember(chatId: string, userId: number): Promise<boolean> {

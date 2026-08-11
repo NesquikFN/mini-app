@@ -1,6 +1,11 @@
 import { Router, raw } from 'express'
 import * as eventsController from '../controllers/events.controller'
-import { createEventRateLimiter, imageUploadRateLimiter } from '../middleware/rateLimit'
+import {
+  createEventRateLimiter,
+  eventShareRateLimiter,
+  imageUploadRateLimiter,
+} from '../middleware/rateLimit'
+import * as eventShareController from '../controllers/event-share.controller'
 import { MAX_IMAGE_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '../utils/uploads'
 
 export const eventsRouter = Router()
@@ -22,6 +27,11 @@ eventsRouter.put(
 eventsRouter.post('/:id/join', eventsController.joinEvent)
 eventsRouter.delete('/:id/leave', eventsController.leaveEvent)
 eventsRouter.delete('/:id/participants/:userId', eventsController.removeParticipant)
+
+// Поширення події карткою. Обидва маршрути під окремим лімітом: вони
+// рендерять зображення й ходять у Bot API.
+eventsRouter.post('/:id/share-card', eventShareRateLimiter, eventShareController.createShareCardUrl)
+eventsRouter.post('/:id/share-message', eventShareRateLimiter, eventShareController.createShareMessage)
 
 // Лист очікування. Повний список і зняття з черги доступні лише
 // організатору — перевірка авторства всередині events.service.

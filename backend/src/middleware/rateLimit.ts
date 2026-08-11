@@ -45,6 +45,10 @@ export const RATE_LIMITS = {
   quickPlanJoinPerHour: 60,
   /** Адмінські ендпоїнти, що самі ходять у Telegram Bot API. */
   telegramProbePerHour: 60,
+  /** Поширення події: кожне натискання рендерить картку (sharp) і може
+   * піти в Bot API, тож повторні тапи не повинні молотити ні диск, ні
+   * Telegram. */
+  eventSharePerHour: 40,
 } as const
 
 /** Стабільний ключ: id користувача для автентифікованих запитів, інакше
@@ -114,6 +118,11 @@ export const imageUploadRateLimiter = buildLimiter({
 export const telegramProbeRateLimiter = buildLimiter({
   windowMs: HOUR,
   limit: RATE_LIMITS.telegramProbePerHour,
+})
+
+export const eventShareRateLimiter = buildLimiter({
+  windowMs: HOUR,
+  limit: RATE_LIMITS.eventSharePerHour,
 })
 
 export const createQuickPlanRateLimiter = buildLimiter({

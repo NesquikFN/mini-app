@@ -10,13 +10,13 @@ import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { UserRow } from '../components/UserRow'
 import { ParticipantsModal } from '../components/ParticipantsModal'
+import { ShareEventSheet } from '../components/ShareEventSheet'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FormattedText } from '../components/FormattedText'
 import { ParticipantProfileRow } from '../components/ParticipantProfileRow'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import {
   fetchEventDetail,
-  fetchEventShareLink,
   fetchEventWaitlist,
   getErrorMessage,
   removeEventWaitlistEntry,
@@ -52,7 +52,7 @@ export function EventDetailPage() {
   const { getDormitoryName } = useDormitories()
   const navigate = useNavigate()
   const [actionError, setActionError] = useState<string | null>(null)
-  const [sharing, setSharing] = useState(false)
+  const [shareSheetOpen, setShareSheetOpen] = useState(false)
 
   const [members, setMembers] = useState<EventDetailResponse | null>(null)
   const [membersStatus, setMembersStatus] = useState<MembersStatus>('loading')
@@ -281,27 +281,6 @@ export function EventDetailPage() {
     }
   }
 
-  async function handleShareEvent() {
-    setSharing(true)
-    setActionError(null)
-    try {
-      const eventUrl = await fetchEventShareLink(eventId)
-      const shareUrl = new URL('https://t.me/share/url')
-      shareUrl.searchParams.set('url', eventUrl)
-      shareUrl.searchParams.set('text', `🎉 ${eventTitle}\nПриєднуйся до події в DormHub!`)
-
-      const webApp = window.Telegram?.WebApp
-      if (webApp?.openTelegramLink) {
-        webApp.openTelegramLink(shareUrl.toString())
-      } else {
-        window.open(shareUrl.toString(), '_blank', 'noopener,noreferrer')
-      }
-    } catch (error) {
-      setActionError(getErrorMessage(error))
-    } finally {
-      setSharing(false)
-    }
-  }
 
   async function handleRemoveParticipant() {
     if (!participantPendingRemoval) return
@@ -596,8 +575,8 @@ export function EventDetailPage() {
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" fullWidth loading={sharing} onClick={handleShareEvent}>
-            <Share2 size={19} /> {sharing ? 'Готую…' : 'Запросити'}
+          <Button variant="outline" fullWidth onClick={() => setShareSheetOpen(true)}>
+            <Share2 size={19} /> Запросити
           </Button>
           {isArchived ? (
             <Button variant="secondary" fullWidth disabled>
@@ -672,6 +651,15 @@ export function EventDetailPage() {
           loading={removingParticipantId !== null}
           onConfirm={handleRemoveParticipant}
           onCancel={() => setParticipantPendingRemoval(null)}
+        />
+      )}
+
+      {shareSheetOpen && (
+        <ShareEventSheet
+          eventId={eventId}
+          eventTitle={eventTitle}
+          locked={event.vipOnly || event.gpuOnly}
+          onClose={() => setShareSheetOpen(false)}
         />
       )}
 

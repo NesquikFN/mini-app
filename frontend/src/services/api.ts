@@ -312,6 +312,40 @@ export async function leaveEventRequest(eventId: string): Promise<DormEvent> {
   return data.event
 }
 
+// --- Поширення події карткою -----------------------------------------
+
+export interface ShareCardUrlResponse {
+  url: string
+  expiresIn: number
+}
+
+/** Підписане посилання на картку для Stories. Доступ до події
+ * перевіряється на backend ДО видачі посилання. */
+export async function createEventShareCard(
+  eventId: string,
+  format: 'chat' | 'story' = 'story',
+): Promise<ShareCardUrlResponse> {
+  return request<ShareCardUrlResponse>(`/events/${eventId}/share-card`, {
+    method: 'POST',
+    body: JSON.stringify({ format }),
+  })
+}
+
+export interface PreparedShareMessageResponse {
+  preparedMessageId: string
+  expirationDate: number
+}
+
+/** Готує inline-повідомлення (Bot API savePreparedInlineMessage) —
+ * повертає id для WebApp.shareMessage. Нічого нікому не надсилає. */
+export async function createEventShareMessage(
+  eventId: string,
+): Promise<PreparedShareMessageResponse> {
+  return request<PreparedShareMessageResponse>(`/events/${eventId}/share-message`, {
+    method: 'POST',
+  })
+}
+
 // --- Лист очікування -------------------------------------------------
 // Backend сам вирішує, чи подія справді заповнена: якщо місце встигло
 // звільнитись, POST /waitlist виконує звичайне приєднання й повертає
