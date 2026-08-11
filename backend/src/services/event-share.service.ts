@@ -13,6 +13,7 @@ import { NO_DORMITORY_ID } from '../types/dormitory'
 import {
   renderShareCard,
   SHARE_CARD_CONTENT_TYPE,
+  loadParticipantAvatar,
   type ShareCardFormat,
   type ShareCardInput,
 } from '../utils/shareCard'
@@ -85,9 +86,9 @@ export function shareCardFingerprint(
   locked: boolean,
 ): string {
   const parts = [
-    // Версія рендера входить у ключ, щоб після зміни шрифтів Railway
-    // Volume не продовжував віддавати старі картки з квадратами.
-    'share-card-v2-bundled-fonts',
+    // Версія рендера входить у ключ, щоб Railway Volume не продовжував
+    // віддавати старий дизайн після змін шрифтів, фону чи аватарок.
+    'share-card-v3-cover-avatars-logo',
     event.id,
     event.title,
     event.date,
@@ -188,14 +189,17 @@ async function buildCardInput(
 ): Promise<ShareCardInput> {
   const { event, locked } = context
 
-  // Імена учасників потрібні лише для ініціалів у кружках, і лише для
-  // відкритих подій. Фото не завантажуємо взагалі — жодних зовнішніх
-  // URL із backend.
-  const participants = locked
+  // Для відкритої події показуємо до трьох профілів. Фото проходять
+  // окремий Telegram-only loader; якщо воно недоступне, лишається ініціал.
+  const participantUsers = locked
     ? []
-    : (await usersRepository.getPublicUsersByIds(event.participantIds.slice(0, 3))).map((user) => ({
-        displayName: user.nickname ?? user.firstName,
-      }))
+    : await usersRepository.getPublicUsersByIds(event.participantIds.slice(0, 3))
+  const participants = await Promise.all(
+    participantUsers.map(async (user) => ({
+      displayName: user.nickname ?? user.firstName,
+      avatarDataUri: await loadParticipantAvatar(user.photoUrl),
+    })),
+  )
 
   const dormitoryName = locked || event.isOnline
     ? undefined
@@ -215,9 +219,10 @@ async function buildCardInput(
     vipOnly: event.vipOnly,
     gpuOnly: event.gpuOnly,
     hideDetails: locked,
-    // Обкладинка береться з локального uploads і лише якщо подія має
-    // imageUrl у базі; сам URL для читання файлу не використовується.
+    // URL використовується лише для вибору same-origin файлу в uploads
+    // (зокрема обкладинки шаблону), а не для мережевого завантаження.
     hasCover: Boolean(event.imageUrl),
+    coverImageUrl: event.imageUrl,
   }
 }
 

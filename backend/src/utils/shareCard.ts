@@ -3,7 +3,7 @@ import { relative, resolve, sep } from 'node:path'
 import sharp from 'sharp'
 import { Resvg } from '@resvg/resvg-js'
 import { env } from '../config/env'
-import { MAX_INPUT_PIXELS } from './uploads'
+import { MAX_INPUT_PIXELS, UPLOAD_CONTENT_TYPES } from './uploads'
 
 /**
  * Генерація картки події для поширення в Telegram.
@@ -11,14 +11,14 @@ import { MAX_INPUT_PIXELS } from './uploads'
  * Безпека — головне тут, бо на вхід приходять дані, які писали
  * користувачі (назва, місце, імена):
  *  - усе, що потрапляє в SVG, проходить escapeXml;
- *  - обкладинка читається ЛИШЕ з локального uploads-каталогу за id
- *    події, ніколи за URL із бази — тож ні SSRF, ні path traversal;
- *  - зовнішні аватарки (Telegram photo_url) не завантажуються взагалі —
- *    замість них малюється кружок з ініціалом;
+ *  - обкладинка читається ЛИШЕ з локального uploads-каталогу; URL із БД
+ *    приймається лише як same-origin шлях усередині /uploads;
+ *  - аватарки завантажуються лише з HTTPS t.me/i/userpic без redirect,
+ *    з лімітом часу, байтів і пікселів, після чого нормалізуються в PNG;
  *  - sharp обмежений limitInputPixels, як і в uploads.ts.
  *
  * SVG рендериться через resvg з явно переданими локальними шрифтами,
- * без браузера й без мережі.
+ * без браузера. Єдиний дозволений мережевий ресурс — Telegram userpic.
  */
 
 export type ShareCardFormat = 'chat' | 'story'
@@ -37,8 +37,10 @@ export const SHARE_CARD_CONTENT_TYPE: Record<ShareCardFormat, string> = {
 }
 
 export interface ShareCardParticipant {
-  /** Показуємо лише першу літеру — фото не тягнемо. */
   displayName: string
+  /** Локально нормалізований PNG data URI. Довільний URL у SVG ніколи
+   * не потрапляє. */
+  avatarDataUri?: string
 }
 
 export interface ShareCardInput {
@@ -61,6 +63,9 @@ export interface ShareCardInput {
   hideDetails: boolean
   /** Чи має подія локальну обкладинку в uploads. */
   hasCover: boolean
+  /** Серверний URL потрібен лише щоб знайти локальний файл шаблону;
+   * мережевих запитів за ним немає. */
+  coverImageUrl?: string
 }
 
 const ACCENT = '#ff7a00'
@@ -182,7 +187,9 @@ export function formatCardDateTime(date: string, time: string): string {
 /** Перша літера імені для кружка-аватарки. Емодзі та сурогатні пари
  * беруться цілим символом, а не половиною код-юніта. */
 export function initialOf(name: string): string {
-  const first = [...name.trim()][0]
+  // Emoji на початку nickname немає в текстовому шрифті картки й раніше
+  // ставав квадратом. Беремо першу справжню літеру/цифру.
+  const first = [...name.trim()].find((char) => /[\p{L}\p{N}]/u.test(char))
   return (first ?? '?').toUpperCase()
 }
 
@@ -192,9 +199,26 @@ export function initialOf(name: string): string {
  * жоден зовнішній хост сюди не потрапляє. Додаткова перевірка
  * входження в UPLOADS_DIR лишається другим рубежем.
  */
-function resolveCoverPath(eventId: string): string | null {
+function resolveCoverPath(eventId: string, imageUrl?: string): string | null {
   const root = resolve(env.UPLOADS_DIR)
-  const target = resolve(root, `${eventId}/cover.webp`)
+  let relativePath = `${eventId}/cover.webp`
+
+  // Події, створені з шаблону, посилаються на його локальну обкладинку,
+  // а не мають копії в `<eventId>/cover.webp`. Приймаємо лише URL нашого
+  // backend і лише каталог /uploads; зовнішні адреси не читаємо й не fetch-имо.
+  if (imageUrl) {
+    try {
+      const candidate = new URL(imageUrl)
+      const publicUrl = new URL(env.PUBLIC_URL)
+      if (candidate.origin === publicUrl.origin && candidate.pathname.startsWith('/uploads/')) {
+        relativePath = decodeURIComponent(candidate.pathname.slice('/uploads/'.length))
+      }
+    } catch {
+      // Некоректний або старий URL — спробуємо стандартний шлях події.
+    }
+  }
+
+  const target = resolve(root, relativePath)
   const rel = relative(root, target)
   if (rel.startsWith('..') || rel.startsWith(sep)) return null
   return target
@@ -203,10 +227,11 @@ function resolveCoverPath(eventId: string): string | null {
 /** Обкладинка як фон картки, або null якщо файлу нема / він побитий. */
 async function loadCoverBackground(
   eventId: string,
+  imageUrl: string | undefined,
   width: number,
   height: number,
 ): Promise<Buffer | null> {
-  const coverPath = resolveCoverPath(eventId)
+  const coverPath = resolveCoverPath(eventId, imageUrl)
   if (!coverPath) return null
 
   try {
@@ -217,6 +242,76 @@ async function loadCoverBackground(
   } catch {
     // Файлу немає або він не читається — картка чудово працює й без нього.
     return null
+  }
+}
+
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024
+const AVATAR_TIMEOUT_MS = 2_500
+const TELEGRAM_AVATAR_PATH = '/i/userpic/'
+
+async function readLimitedBody(response: Response, maxBytes: number): Promise<Buffer | null> {
+  const declaredLength = Number(response.headers.get('content-length'))
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) return null
+  if (!response.body) return null
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel()
+        return null
+      }
+      chunks.push(value)
+    }
+  } catch {
+    return null
+  }
+  return Buffer.concat(chunks, total)
+}
+
+/**
+ * Telegram profile photo → small, canonical PNG embedded into the SVG.
+ * The URL comes from signed initData, but we still accept only Telegram's
+ * documented t.me userpic path, reject redirects and cap bytes/pixels.
+ */
+export async function loadParticipantAvatar(photoUrl?: string): Promise<string | undefined> {
+  if (!photoUrl) return undefined
+
+  let url: URL
+  try {
+    url = new URL(photoUrl)
+  } catch {
+    return undefined
+  }
+  if (url.protocol !== 'https:' || url.hostname !== 't.me' || !url.pathname.startsWith(TELEGRAM_AVATAR_PATH)) {
+    return undefined
+  }
+
+  try {
+    const response = await fetch(url, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(AVATAR_TIMEOUT_MS),
+    })
+    const contentType = response.headers.get('content-type')?.split(';')[0].trim()
+    if (!response.ok || !contentType || !UPLOAD_CONTENT_TYPES.includes(contentType)) return undefined
+
+    const body = await readLimitedBody(response, MAX_AVATAR_BYTES)
+    if (!body) return undefined
+    const avatar = await sharp(body, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+      .rotate()
+      .resize(128, 128, { fit: 'cover', position: 'attention' })
+      .png({ compressionLevel: 9 })
+      .toBuffer()
+    return `data:image/png;base64,${avatar.toString('base64')}`
+  } catch {
+    // Фото профілю — прикраса. Timeout, старий URL чи битий файл не
+    // повинні заважати поділитись подією: лишається безпечний ініціал.
+    return undefined
   }
 }
 
@@ -232,15 +327,17 @@ function badge(input: ShareCardInput): { label: string; color: string } | null {
 function logoSvg(x: number, y: number, scale = 1): string {
   const fontSize = 34 * scale
   const boxWidth = 78 * scale
-  const boxHeight = 44 * scale
+  const boxHeight = 48 * scale
   const radius = 12 * scale
+  const boxX = x + 102 * scale
+  const boxY = y - 36 * scale
   return `
     <text x="${x}" y="${y}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}"
           font-weight="800" fill="#ffffff" letter-spacing="-1">dorm</text>
-    <rect x="${x + 92 * scale}" y="${y - boxHeight + 10 * scale}" width="${boxWidth}" height="${boxHeight}"
+    <rect x="${boxX}" y="${boxY}" width="${boxWidth}" height="${boxHeight}"
           rx="${radius}" fill="${ACCENT}"/>
-    <text x="${x + 104 * scale}" y="${y}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}"
-          font-weight="800" fill="#000000" letter-spacing="-1">hub</text>
+    <text x="${boxX + boxWidth / 2}" y="${y}" font-family="DejaVu Sans, sans-serif" font-size="${fontSize}"
+          font-weight="800" fill="#000000" letter-spacing="-1" text-anchor="middle">hub</text>
   `
 }
 
@@ -258,12 +355,18 @@ function avatarsSvg(
 
   const circles = visible.map((participant, index) => {
     const cx = x + radius + index * step
-    return `
-      <circle cx="${cx}" cy="${y}" r="${radius}" fill="#1c1c1c" stroke="${ACCENT}" stroke-width="3"/>
-      <text x="${cx}" y="${y + fontSize * 0.35}" font-family="DejaVu Sans, sans-serif"
+    const avatar = participant.avatarDataUri
+      ? `<clipPath id="avatar-${index}"><circle cx="${cx}" cy="${y}" r="${radius - 2}"/></clipPath>
+         <image href="${participant.avatarDataUri}" x="${cx - radius}" y="${y - radius}"
+                width="${radius * 2}" height="${radius * 2}" preserveAspectRatio="xMidYMid slice"
+                clip-path="url(#avatar-${index})"/>`
+      : `<text x="${cx}" y="${y + fontSize * 0.35}" font-family="DejaVu Sans, sans-serif"
             font-size="${fontSize}" font-weight="700" fill="#ffffff" text-anchor="middle">${escapeXml(
               initialOf(participant.displayName),
-            )}</text>
+            )}</text>`
+    return `
+      <circle cx="${cx}" cy="${y}" r="${radius}" fill="#1c1c1c" stroke="${ACCENT}" stroke-width="3"/>
+      ${avatar}
     `
   })
 
@@ -485,7 +588,7 @@ export async function renderShareCard(
   // Закриту подію ніколи не показуємо з чужою обкладинкою — інакше
   // картинка сама по собі розкривала б зміст закритої події.
   const cover = input.hasCover && !input.hideDetails
-    ? await loadCoverBackground(input.eventId, width, height)
+    ? await loadCoverBackground(input.eventId, input.coverImageUrl, width, height)
     : null
 
   const svg = Buffer.from(

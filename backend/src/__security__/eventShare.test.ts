@@ -1,7 +1,9 @@
-import './testEnv'
+import { TEST_UPLOADS_DIR } from './testEnv'
 import { describe, it, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { mock } from 'node:test'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import request from 'supertest'
 import sharp from 'sharp'
 import { app } from '../app'
@@ -15,6 +17,8 @@ import {
   escapeXml,
   wrapText,
   truncateLine,
+  initialOf,
+  loadParticipantAvatar,
   type ShareCardInput,
 } from '../utils/shareCard'
 import { NO_DORMITORY_ID } from '../types/dormitory'
@@ -146,6 +150,56 @@ describe('share card rendering', () => {
     const second = await renderShareCard(cardInput({ title: 'ҐЄІЇ' }), 'chat')
 
     assert.ok(!first.equals(second), 'Cyrillic letters must render as glyphs, not identical boxes')
+  })
+
+  it('skips emoji and uses the first real letter for an avatar fallback', () => {
+    assert.equal(initialOf('🔥 Тимофій'), 'Т')
+    assert.equal(initialOf('🎉 42'), '4')
+  })
+
+  it('uses a same-origin template cover as the card background', async () => {
+    const relativeDir = join('event-templates', 'share-cover-test')
+    await mkdir(join(TEST_UPLOADS_DIR, relativeDir), { recursive: true })
+    await writeFile(
+      join(TEST_UPLOADS_DIR, relativeDir, 'cover.webp'),
+      await sharp({
+        create: { width: 800, height: 500, channels: 3, background: '#2563eb' },
+      }).webp().toBuffer(),
+    )
+
+    const withCover = await renderShareCard(
+      cardInput({
+        hasCover: true,
+        coverImageUrl: `https://backend.test/uploads/${relativeDir}/cover.webp?v=1`,
+      }),
+      'chat',
+    )
+    const withoutCover = await renderShareCard(cardInput({ hasCover: false }), 'chat')
+
+    assert.ok(!withCover.equals(withoutCover), 'template cover must affect the rendered background')
+  })
+
+  it('downloads avatars only from the bounded Telegram userpic endpoint', async () => {
+    const originalFetch = globalThis.fetch
+    const avatar = await sharp({
+      create: { width: 48, height: 48, channels: 3, background: '#ef4444' },
+    }).jpeg().toBuffer()
+    let calls = 0
+    globalThis.fetch = (async () => {
+      calls += 1
+      return new Response(avatar, { headers: { 'Content-Type': 'image/jpeg' } })
+    }) as typeof fetch
+
+    try {
+      const dataUri = await loadParticipantAvatar('https://t.me/i/userpic/320/example.jpg')
+      assert.match(dataUri ?? '', /^data:image\/png;base64,/)
+      assert.equal(calls, 1)
+
+      assert.equal(await loadParticipantAvatar('https://attacker.example/avatar.jpg'), undefined)
+      assert.equal(calls, 1, 'foreign hosts must be rejected before fetch')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 
   it('wraps and truncates long text deterministically', () => {
