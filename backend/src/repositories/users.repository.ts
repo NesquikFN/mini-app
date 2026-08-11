@@ -100,6 +100,16 @@ export interface NewUser {
   photoUrl?: string
 }
 
+/** Мінімум внутрішніх даних для картки поширення. telegramId потрібен
+ * лише щоб бот забрав актуальне фото профілю; назовні цей тип не йде. */
+export interface ShareCardUser {
+  id: string
+  telegramId: number
+  firstName: string
+  nickname?: string
+  photoUrl?: string
+}
+
 const PUBLIC_USER_COLUMNS = 'id, first_name, username, photo_url, nickname, instagram, bio, age, dormitory_id'
 
 export interface UserProfileUpdate {
@@ -244,6 +254,28 @@ export const usersRepository = {
       [ids],
     )
     return rows.map(toPublicUser)
+  },
+
+  async getShareCardUsersByIds(ids: string[]): Promise<ShareCardUser[]> {
+    if (ids.length === 0) return []
+    const { rows } = await query<{
+      id: string
+      telegram_id: string
+      first_name: string
+      nickname: string | null
+      photo_url: string | null
+    }>(
+      `select id, telegram_id, first_name, nickname, photo_url
+       from users where id = any($1)`,
+      [ids],
+    )
+    return rows.map((row) => ({
+      id: row.id,
+      telegramId: Number(row.telegram_id),
+      firstName: row.first_name,
+      nickname: row.nickname ?? undefined,
+      photoUrl: row.photo_url ?? undefined,
+    }))
   },
 
   async getPublicUserById(id: string): Promise<PublicUser | null> {

@@ -14,11 +14,16 @@ import {
   renderShareCard,
   SHARE_CARD_CONTENT_TYPE,
   loadParticipantAvatar,
+  normalizeParticipantAvatar,
   type ShareCardFormat,
   type ShareCardInput,
 } from '../utils/shareCard'
 import { signShareToken, verifyShareToken } from './share-token.service'
-import { buildEventDeepLink, savePreparedInlineMessage } from './telegram-notifications.service'
+import {
+  buildEventDeepLink,
+  getTelegramProfilePhoto,
+  savePreparedInlineMessage,
+} from './telegram-notifications.service'
 import type { Event } from '../types/event'
 
 /**
@@ -88,7 +93,7 @@ export function shareCardFingerprint(
   const parts = [
     // Версія рендера входить у ключ, щоб Railway Volume не продовжував
     // віддавати старий дизайн після змін шрифтів, фону чи аватарок.
-    'share-card-v4-svg-avatars-right-title',
+    'share-card-v5-bot-avatars-large-title',
     event.id,
     event.title,
     event.date,
@@ -193,12 +198,21 @@ async function buildCardInput(
   // окремий Telegram-only loader; якщо воно недоступне, лишається ініціал.
   const participantUsers = locked
     ? []
-    : await usersRepository.getPublicUsersByIds(event.participantIds.slice(0, 3))
+    : await usersRepository.getShareCardUsersByIds(event.participantIds.slice(0, 3))
   const participants = await Promise.all(
-    participantUsers.map(async (user) => ({
-      displayName: user.nickname ?? user.firstName,
-      avatarDataUri: await loadParticipantAvatar(user.photoUrl),
-    })),
+    participantUsers.map(async (user) => {
+      // Спочатку Bot API — він стабільніший за photo_url із WebApp і не
+      // залежить від того, який CDN/формат повернув конкретний клієнт.
+      const botPhoto = user.photoUrl
+        ? await getTelegramProfilePhoto(user.telegramId)
+        : undefined
+      return {
+        displayName: user.nickname ?? user.firstName,
+        avatarDataUri:
+          (botPhoto ? await normalizeParticipantAvatar(botPhoto) : undefined) ??
+          (await loadParticipantAvatar(user.photoUrl)),
+      }
+    }),
   )
 
   const dormitoryName = locked || event.isOnline

@@ -11,6 +11,7 @@ import { eventsRepository } from '../repositories/events.repository'
 import { usersRepository } from '../repositories/users.repository'
 import { dormitoriesRepository } from '../repositories/dormitories.repository'
 import { signShareToken } from '../services/share-token.service'
+import { getTelegramProfilePhoto } from '../services/telegram-notifications.service'
 import {
   renderShareCard,
   SHARE_CARD_SIZES,
@@ -62,6 +63,13 @@ function stubReads(event: Event) {
   mock.method(eventsRepository, 'findById', async () => event)
   mock.method(usersRepository, 'getPublicUsersByIds', async () => [
     { id: '00000000-0000-0000-0000-000000000001', firstName: 'Тимофій' },
+  ])
+  mock.method(usersRepository, 'getShareCardUsersByIds', async () => [
+    {
+      id: '00000000-0000-0000-0000-000000000001',
+      telegramId: 100001,
+      firstName: 'Тимофій',
+    },
   ])
   mock.method(dormitoriesRepository, 'findAll', async () => [
     { id: DORM_A, name: 'Гуртожиток №1', createdAt: new Date().toISOString() },
@@ -196,6 +204,40 @@ describe('share card rendering', () => {
 
       assert.equal(await loadParticipantAvatar('https://attacker.example/avatar.jpg'), undefined)
       assert.equal(calls, 1, 'foreign hosts must be rejected before fetch')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('loads the current participant avatar through Telegram Bot API', async () => {
+    const originalFetch = globalThis.fetch
+    const avatar = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: '#22c55e' },
+    }).jpeg().toBuffer()
+
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/getUserProfilePhotos')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          result: { total_count: 1, photos: [[{ file_id: 'small' }, { file_id: 'large' }]] },
+        }), { headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/getFile')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          result: { file_path: 'photos/avatar.jpg', file_size: avatar.length },
+        }), { headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/file/bot')) {
+        return new Response(avatar, { headers: { 'Content-Type': 'image/jpeg' } })
+      }
+      throw new Error(`Unexpected Telegram URL: ${url}`)
+    }) as typeof fetch
+
+    try {
+      const result = await getTelegramProfilePhoto(100001)
+      assert.ok(result?.equals(avatar))
     } finally {
       globalThis.fetch = originalFetch
     }

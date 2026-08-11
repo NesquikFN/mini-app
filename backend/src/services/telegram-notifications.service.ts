@@ -222,6 +222,76 @@ export async function savePreparedInlineMessage(
   })
 }
 
+interface TelegramPhotoSize {
+  file_id: string
+  file_size?: number
+}
+
+interface TelegramUserProfilePhotos {
+  total_count: number
+  photos: TelegramPhotoSize[][]
+}
+
+const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024
+
+async function readTelegramFileLimited(response: Response): Promise<Buffer | undefined> {
+  if (!response.body) return undefined
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > MAX_PROFILE_PHOTO_BYTES) {
+      await reader.cancel()
+      return undefined
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks, total)
+}
+
+/** Актуальна аватарка через Bot API. На відміну від WebApp photo_url,
+ * цей шлях не залежить від CDN-домену чи формату URL, який видав клієнт. */
+export async function getTelegramProfilePhoto(telegramUserId: number): Promise<Buffer | undefined> {
+  try {
+    const profile = await botApi<TelegramUserProfilePhotos>('getUserProfilePhotos', {
+      user_id: telegramUserId,
+      offset: 0,
+      limit: 1,
+    })
+    const sizes = profile.photos[0]
+    const largest = sizes?.[sizes.length - 1]
+    if (!largest || (largest.file_size && largest.file_size > MAX_PROFILE_PHOTO_BYTES)) {
+      return undefined
+    }
+
+    const file = await botApi<{ file_path?: string; file_size?: number }>('getFile', {
+      file_id: largest.file_id,
+    })
+    if (
+      !file.file_path ||
+      file.file_path.includes('..') ||
+      (file.file_size && file.file_size > MAX_PROFILE_PHOTO_BYTES)
+    ) {
+      return undefined
+    }
+
+    const response = await fetch(
+      `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${encodeURI(file.file_path)}`,
+      { redirect: 'error', signal: AbortSignal.timeout(2_500) },
+    )
+    const declaredLength = Number(response.headers.get('content-length'))
+    if (!response.ok || (Number.isFinite(declaredLength) && declaredLength > MAX_PROFILE_PHOTO_BYTES)) {
+      return undefined
+    }
+    return readTelegramFileLimited(response)
+  } catch {
+    return undefined
+  }
+}
+
 async function isActiveMember(chatId: string, userId: number): Promise<boolean> {
   try {
     const member = await botApi<{ status: string }>('getChatMember', {

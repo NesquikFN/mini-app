@@ -305,15 +305,25 @@ export async function loadParticipantAvatar(photoUrl?: string): Promise<string |
 
     const body = await readLimitedBody(response, MAX_AVATAR_BYTES)
     if (!body) return undefined
-    const avatar = await sharp(body, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+    return normalizeParticipantAvatar(body)
+  } catch {
+    // Фото профілю — прикраса. Timeout, старий URL чи битий файл не
+    // повинні заважати поділитись подією: лишається безпечний ініціал.
+    return undefined
+  }
+}
+
+/** Будь-яке вже довірено отримане фото перетворюємо на малий PNG перед
+ * вставкою в SVG. Так ні JPEG, ні Telegram SVG не потрапляють туди сирими. */
+export async function normalizeParticipantAvatar(buffer: Buffer): Promise<string | undefined> {
+  try {
+    const avatar = await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
       .rotate()
       .resize(128, 128, { fit: 'cover', position: 'attention' })
       .png({ compressionLevel: 9 })
       .toBuffer()
     return `data:image/png;base64,${avatar.toString('base64')}`
   } catch {
-    // Фото профілю — прикраса. Timeout, старий URL чи битий файл не
-    // повинні заважати поділитись подією: лишається безпечний ініціал.
     return undefined
   }
 }
@@ -401,8 +411,8 @@ function backgroundSvg(width: number, height: number, hasCover: boolean): string
  * зсував би все нижче й наїжджав на ряд з аватарками (саме це й ловив
  * візуальний прогін). Тепер довжина назви на решту макета не впливає.
  */
-const TITLE_TOP = 210
-const META_TOP = 420
+const TITLE_TOP = 286
+const META_TOP = 452
 const BOTTOM_ROW_Y = 556
 
 function chatCardSvg(input: ShareCardInput): string {
@@ -412,8 +422,8 @@ function chatCardSvg(input: ShareCardInput): string {
   // і третій рядок заголовка наїжджав би на них.
   const titleLines = input.hideDetails
     ? ['Закрита подія DormHub']
-    : wrapText(input.title, 2, 24)
-  const titleSize = titleLines.length >= 2 ? 68 : 78
+    : wrapText(input.title, 2, 22)
+  const titleSize = titleLines.length >= 2 ? 74 : 92
 
   const meta = input.hideDetails
     ? []
@@ -461,9 +471,8 @@ function chatCardSvg(input: ShareCardInput): string {
   ${titleLines
     .map(
       (line, index) =>
-        `<text x="${width - 72}" y="${TITLE_TOP + index * (titleSize + 12)}" font-family="DejaVu Sans, sans-serif"
-               font-size="${titleSize}" font-weight="800" fill="#ffffff" letter-spacing="-2"
-               text-anchor="end">${escapeXml(line)}</text>`,
+        `<text x="72" y="${TITLE_TOP + index * (titleSize + 12)}" font-family="DejaVu Sans, sans-serif"
+               font-size="${titleSize}" font-weight="800" fill="#ffffff" letter-spacing="-2">${escapeXml(line)}</text>`,
     )
     .join('')}
 
@@ -497,8 +506,8 @@ function storyCardSvg(input: ShareCardInput): string {
   const titleLines = input.hideDetails
     ? ['Закрита', 'подія DormHub']
     : wrapText(input.title, 4, 18)
-  const titleSize = titleLines.length >= 4 ? 92 : 104
-  const titleTop = 560
+  const titleSize = titleLines.length >= 4 ? 100 : 116
+  const titleTop = 900
 
   const meta = input.hideDetails
     ? []
@@ -547,9 +556,9 @@ function storyCardSvg(input: ShareCardInput): string {
   ${titleLines
     .map(
       (line, index) =>
-        `<text x="${width - 72}" y="${titleTop + index * (titleSize + 16)}"
+        `<text x="${width / 2}" y="${titleTop + index * (titleSize + 16)}"
                font-family="DejaVu Sans, sans-serif" font-size="${titleSize}" font-weight="800"
-               fill="#ffffff" text-anchor="end" letter-spacing="-2">${escapeXml(line)}</text>`,
+               fill="#ffffff" text-anchor="middle" letter-spacing="-2">${escapeXml(line)}</text>`,
     )
     .join('')}
 
