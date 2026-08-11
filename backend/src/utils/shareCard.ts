@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 import sharp from 'sharp'
+import { Resvg } from '@resvg/resvg-js'
 import { env } from '../config/env'
 import { MAX_INPUT_PIXELS } from './uploads'
 
@@ -16,7 +17,8 @@ import { MAX_INPUT_PIXELS } from './uploads'
  *    замість них малюється кружок з ініціалом;
  *  - sharp обмежений limitInputPixels, як і в uploads.ts.
  *
- * SVG рендериться через sharp (resvg), без браузера й без мережі.
+ * SVG рендериться через resvg з явно переданими локальними шрифтами,
+ * без браузера й без мережі.
  */
 
 export type ShareCardFormat = 'chat' | 'story'
@@ -64,6 +66,14 @@ export interface ShareCardInput {
 const ACCENT = '#ff7a00'
 const VIP_GOLD = '#fbbf24'
 const GPU_BLUE = '#3b82f6'
+
+// Railway-образ не зобов'язаний мати системні шрифти. Resvg отримує
+// файли явно й не завантажує системні — результат однаковий локально та
+// в production, а українська кирилиця не перетворюється на квадрати.
+const CARD_FONT_FILES = [
+  require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf'),
+  require.resolve('dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf'),
+]
 
 /**
  * XML-екранування для всього, що вставляється в SVG. Без нього назва
@@ -483,19 +493,21 @@ export async function renderShareCard(
       ? chatCardSvg({ ...input, hasCover: Boolean(cover) })
       : storyCardSvg({ ...input, hasCover: Boolean(cover) }),
   )
+  const overlay = new Resvg(svg, {
+    font: {
+      fontFiles: CARD_FONT_FILES,
+      loadSystemFonts: false,
+      defaultFontFamily: 'DejaVu Sans',
+      sansSerifFamily: 'DejaVu Sans',
+    },
+    textRendering: 2,
+  }).render().asPng()
 
-  const base = cover
-    ? sharp(cover, { limitInputPixels: MAX_INPUT_PIXELS })
-    : sharp({
-        create: {
-          width,
-          height,
-          channels: 3,
-          background: { r: 0, g: 0, b: 0 },
-        },
-      })
-
-  const composed = base.composite([{ input: svg, top: 0, left: 0 }])
+  const composed = cover
+    ? sharp(cover, { limitInputPixels: MAX_INPUT_PIXELS }).composite([
+        { input: overlay, top: 0, left: 0 },
+      ])
+    : sharp(overlay, { limitInputPixels: MAX_INPUT_PIXELS })
 
   // Chat-картку віддаємо в JPEG — саме цього вимагає Bot API для
   // InlineQueryResultPhoto (photo_url має бути JPEG до 5 МБ).

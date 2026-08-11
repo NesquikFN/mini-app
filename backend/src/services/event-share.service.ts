@@ -85,6 +85,9 @@ export function shareCardFingerprint(
   locked: boolean,
 ): string {
   const parts = [
+    // Версія рендера входить у ключ, щоб після зміни шрифтів Railway
+    // Volume не продовжував віддавати старі картки з квадратами.
+    'share-card-v2-bundled-fonts',
     event.id,
     event.title,
     event.date,

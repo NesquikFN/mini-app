@@ -139,6 +139,15 @@ describe('share card rendering', () => {
     assert.equal(meta.width, SHARE_CARD_SIZES.chat.width)
   })
 
+  it('renders real Cyrillic glyphs without relying on system fonts', async () => {
+    // Однакова довжина рядків навмисна: tofu-квадрати дали б однакове
+    // зображення, а вбудований DejaVu має різні контури цих літер.
+    const first = await renderShareCard(cardInput({ title: 'АБВГ' }), 'chat')
+    const second = await renderShareCard(cardInput({ title: 'ҐЄІЇ' }), 'chat')
+
+    assert.ok(!first.equals(second), 'Cyrillic letters must render as glyphs, not identical boxes')
+  })
+
   it('wraps and truncates long text deterministically', () => {
     assert.deepEqual(wrapText('одне два три', 2, 8), ['одне два', 'три'])
     assert.equal(wrapText('слово', 2, 10).length, 1)

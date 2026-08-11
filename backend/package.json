@@ -15,7 +15,9 @@
     "test:integration": "BOT_TOKEN=integration-test-bot-token-do-not-use-in-prod tsx --test \"src/__tests__/**/*.test.ts\""
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "cors": "^2.8.6",
+    "dejavu-fonts-ttf": "^2.37.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.2",
