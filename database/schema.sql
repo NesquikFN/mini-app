@@ -269,6 +269,50 @@ create index if not exists idx_notification_log_created_at on notification_log (
 create index if not exists idx_notification_log_chat_id on notification_log (chat_id);
 
 -- =========================================================
+-- Швидкі плани «Хто зі мною?» (див. migrations/0027_quick_plans.sql)
+-- =========================================================
+-- Короткоживучі спонтанні активності на сьогодні — навмисно окремі від
+-- events: немає ні обкладинки, ні ліміту учасників, ні дати, а VIP/ГПУ
+-- на їх видимість не впливають. Життєвий цикл — через expires_at.
+create table if not exists quick_plans (
+  id uuid primary key default gen_random_uuid(),
+  creator_id uuid not null references users (id) on delete cascade,
+  text varchar(180) not null,
+  category text not null,
+  is_online boolean not null default false,
+  -- Завжди з users.dormitory_id автора на боці backend, ніколи з тіла
+  -- запиту. null для онлайн-плану — такий план глобальний.
+  dormitory_id uuid references dormitories (id),
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  constraint quick_plans_text_length check (char_length(btrim(text)) between 10 and 180),
+  constraint quick_plans_category_valid
+    check (category in ('sport', 'study', 'food', 'walk', 'games', 'other')),
+  constraint quick_plans_dormitory_matches_format
+    check ((is_online and dormitory_id is null) or (not is_online and dormitory_id is not null))
+);
+
+create index if not exists idx_quick_plans_expires_at on quick_plans (expires_at);
+create index if not exists idx_quick_plans_dormitory_id on quick_plans (dormitory_id);
+create index if not exists idx_quick_plans_is_online on quick_plans (is_online);
+create index if not exists idx_quick_plans_creator_id on quick_plans (creator_id);
+
+create table if not exists quick_plan_participants (
+  id uuid primary key default gen_random_uuid(),
+  plan_id uuid not null references quick_plans (id) on delete cascade,
+  user_id uuid not null references users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  -- Робить повторний «Я з вами» ідемпотентним замість дубля.
+  constraint quick_plan_participants_unique unique (plan_id, user_id)
+);
+
+create index if not exists idx_quick_plan_participants_plan_id on quick_plan_participants (plan_id);
+create index if not exists idx_quick_plan_participants_user_id on quick_plan_participants (user_id);
+
+alter table quick_plans enable row level security;
+alter table quick_plan_participants enable row level security;
+
+-- =========================================================
 -- Атомарна функція приєднання до події (захист від race condition)
 -- =========================================================
 -- Проблема: без цієї функції backend мусив би виконати

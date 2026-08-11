@@ -78,3 +78,15 @@ export function isEventPast(isoDate: string, time: string, now = new Date()): bo
   const eventDateTime = `${isoDate}T${time.slice(0, 5)}`
   return eventDateTime < current
 }
+
+/** Скільки лишилось до `expiresAt` (швидкі плани), у людському вигляді.
+ * Хвилинна точність: план живе години, тож секунди лише смикали б цифру. */
+export function formatTimeLeft(expiresAt: string, now = Date.now()): string {
+  const minutesLeft = Math.floor((new Date(expiresAt).getTime() - now) / 60_000)
+  if (minutesLeft <= 0) return 'Завершується'
+  if (minutesLeft < 60) return `${minutesLeft} хв`
+
+  const hours = Math.floor(minutesLeft / 60)
+  const minutes = minutesLeft % 60
+  return minutes === 0 ? `${hours} год` : `${hours} год ${minutes} хв`
+}

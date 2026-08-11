@@ -37,6 +37,12 @@ export const RATE_LIMITS = {
   templateLaunchPerHour: 10,
   /** Завантаження обкладинок (диск на Railway Volume). */
   imageUploadPerHour: 20,
+  /** Створення швидкого плану. Стеля активних планів (3) і так обмежує
+   * кількість — цей ліміт додатково стримує «створив → видалив → створив». */
+  createQuickPlanPerHour: 15,
+  /** Відгук/скасування відгуку на швидкий план: кожен join шле DM автору,
+   * тож join/leave по колу не повинні перетворитись на спам. */
+  quickPlanJoinPerHour: 60,
   /** Адмінські ендпоїнти, що самі ходять у Telegram Bot API. */
   telegramProbePerHour: 60,
 } as const
@@ -108,4 +114,14 @@ export const imageUploadRateLimiter = buildLimiter({
 export const telegramProbeRateLimiter = buildLimiter({
   windowMs: HOUR,
   limit: RATE_LIMITS.telegramProbePerHour,
+})
+
+export const createQuickPlanRateLimiter = buildLimiter({
+  windowMs: HOUR,
+  limit: RATE_LIMITS.createQuickPlanPerHour,
+})
+
+export const quickPlanJoinRateLimiter = buildLimiter({
+  windowMs: HOUR,
+  limit: RATE_LIMITS.quickPlanJoinPerHour,
 })

@@ -12,9 +12,14 @@ import {
   notificationSettingsSchema,
   notificationLogQuerySchema,
 } from '../validation/admin.schemas'
+import { quickPlanIdParamSchema } from '../validation/quick-plan.schemas'
 import { settingsRepository } from '../repositories/settings.repository'
 import { notificationLogRepository } from '../repositories/notification-log.repository'
 import * as telegramNotifications from '../services/telegram-notifications.service'
+import * as quickPlansService from '../services/quick-plans.service'
+
+/** Скільки останніх активних планів показує адмінський блок-огляд. */
+const ADMIN_QUICK_PLANS_LIMIT = 5
 
 /** Досяжний лише якщо requireTelegramAuth + requireAdmin уже пропустили
  * запит — сама наявність відповіді 200 тут і є перевіркою. */
@@ -187,6 +192,18 @@ export async function addGpu(req: Request, res: Response): Promise<void> {
 export async function removeGpu(req: Request, res: Response): Promise<void> {
   const { userId } = adminUserIdParamSchema.parse(req.params)
   await adminService.removeGpu(userId)
+  res.json({ success: true })
+}
+
+/** Компактний блок «Активні швидкі плани» на головній сторінці адмінки —
+ * останні кілька записів плюс загальна кількість активних. */
+export async function listQuickPlans(req: Request, res: Response): Promise<void> {
+  res.json(await quickPlansService.listQuickPlansForAdmin(req.user.id, ADMIN_QUICK_PLANS_LIMIT))
+}
+
+export async function deleteQuickPlan(req: Request, res: Response): Promise<void> {
+  const { id } = quickPlanIdParamSchema.parse(req.params)
+  await quickPlansService.deleteQuickPlanAsAdmin(id)
   res.json({ success: true })
 }
 

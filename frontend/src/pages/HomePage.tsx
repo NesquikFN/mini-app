@@ -7,6 +7,7 @@ import { EventCard } from '../components/EventCard'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { DormitorySelector } from '../components/DormitorySelector'
+import { QuickPlansSection } from '../components/QuickPlansSection'
 import { SocialLinks } from '../components/SocialLinks'
 import { fetchAppSettings, type SocialLinks as SocialLinksType } from '../services/api'
 import { isEventPast } from '../utils/date'
@@ -60,6 +61,8 @@ export function HomePage() {
           <DormitorySelector />
         </div>
       </div>
+
+      <QuickPlansSection />
 
       {!onlineOnly && !offlineCollapsed && <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">

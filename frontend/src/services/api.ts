@@ -1,4 +1,5 @@
 import type { CreateEventInput, DormEvent } from '../types/event'
+import type { CreateQuickPlanInput, QuickPlan } from '../types/quickPlan'
 import type { AuthUser, PublicUser, SubmitRegistrationInput, UpdateProfileInput } from '../types/user'
 import type { Dormitory } from '../types/dormitory'
 import type { EventsScope } from '../context/EventsContext'
@@ -579,6 +580,55 @@ export async function addGpuByTelegramId(telegramId: number): Promise<GpuListIte
 
 export async function removeGpu(userId: string): Promise<void> {
   await request<{ success: boolean }>(`/admin/gpus/${userId}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------
+// Швидкі плани «Хто зі мною?» — creatorId і dormitoryId навмисно не
+// надсилаються: їх визначає backend із сесії.
+// ---------------------------------------------------------------------
+
+export async function fetchQuickPlans(): Promise<QuickPlan[]> {
+  const data = await request<{ plans: QuickPlan[] }>('/quick-plans')
+  return data.plans
+}
+
+export async function createQuickPlanRequest(input: CreateQuickPlanInput): Promise<QuickPlan> {
+  const data = await request<{ plan: QuickPlan }>('/quick-plans', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return data.plan
+}
+
+export async function deleteQuickPlanRequest(planId: string): Promise<void> {
+  await request<{ success: boolean }>(`/quick-plans/${planId}`, { method: 'DELETE' })
+}
+
+export async function joinQuickPlanRequest(planId: string): Promise<QuickPlan> {
+  const data = await request<{ plan: QuickPlan }>(`/quick-plans/${planId}/join`, {
+    method: 'POST',
+  })
+  return data.plan
+}
+
+export async function leaveQuickPlanRequest(planId: string): Promise<QuickPlan> {
+  const data = await request<{ plan: QuickPlan }>(`/quick-plans/${planId}/leave`, {
+    method: 'DELETE',
+  })
+  return data.plan
+}
+
+export interface AdminQuickPlansResponse {
+  plans: QuickPlan[]
+  total: number
+}
+
+export async function fetchAdminQuickPlans(): Promise<AdminQuickPlansResponse> {
+  return request<AdminQuickPlansResponse>('/admin/quick-plans')
+}
+
+export async function deleteAdminQuickPlan(planId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/quick-plans/${planId}`, { method: 'DELETE' })
 }
 
 export async function fetchEventTemplates(): Promise<EventTemplate[]> {

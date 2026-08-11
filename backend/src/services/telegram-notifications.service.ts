@@ -458,6 +458,38 @@ export async function sendEventReminder(
   )
 }
 
+export interface QuickPlanJoinNotification {
+  planText: string
+  joinerName: string
+}
+
+/**
+ * DM автору швидкого плану, коли хтось натиснув «Я з вами». Навмисно
+ * коротке й без кнопок: план живе кілька годин, і автору потрібне лише
+ * ім'я та нагадування, про який саме план ідеться.
+ *
+ * Текст плану пишуть користувачі, тож він проходить escapeMarkdownV2 як
+ * звичайний рядок (без toTelegramMarkdown) — жодне **форматування** з
+ * тексту плану не інтерпретується, а посилання не стають активними
+ * сутностями через розмітку.
+ */
+export async function sendQuickPlanJoinNotification(
+  chatId: string,
+  { planText, joinerName }: QuickPlanJoinNotification,
+): Promise<void> {
+  const text = [
+    `🙋 *${escapeMarkdownV2(joinerName)}* відгукнувся на ваш план\\!`,
+    `📝 ${escapeMarkdownV2(planText)}`,
+  ].join('\n')
+
+  await sendAndLog('quick_plan_join', chatId, () =>
+    botApi('sendMessage', {
+      chat_id: chatId,
+      text: text.slice(0, 4096),
+      parse_mode: 'MarkdownV2',
+    }))
+}
+
 /** Особисте підтвердження після успішного приєднання. Посилання
  * надсилаються окремими Telegram-кнопками, якщо організатор їх указав. */
 export async function sendEventJoinConfirmation(

@@ -8,6 +8,7 @@ export type NotificationKind =
   | 'start_greeting'
   | 'notifications_off_confirmation'
   | 'registration_approved'
+  | 'quick_plan_join'
 
 export interface NewNotificationLogEntry {
   chatId: string
