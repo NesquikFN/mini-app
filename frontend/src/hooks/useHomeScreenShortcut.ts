@@ -43,18 +43,37 @@ export interface HomeScreenShortcut {
  * Уся робота з Telegram і localStorage замкнена тут — HomePage лише
  * підключає хук і віддає результат компоненту банера.
  */
+/** Версія Bot API, у якій з'явились методи головного екрана. */
+const HOME_SCREEN_MIN_VERSION = '8.0'
+
+/**
+ * Чи справді клієнт уміє працювати з головним екраном.
+ *
+ * Наявність самих методів нічого не доводить: telegram-web-app.js
+ * оголошує їх завжди — і в старому клієнті, і у звичайному браузері, —
+ * а при виклику кидає WebAppMethodUnsupported. Перевірено на живому
+ * деплої: поза Telegram version === '6.0', при цьому
+ * typeof checkHomeScreenStatus === 'function'.
+ *
+ * Тому єдина надійна перевірка — isVersionAtLeast, той самий підхід, що
+ * вже використовує ShareEventSheet для shareMessage/shareToStory. Вона ж
+ * і відсікає локальну розробку в браузері.
+ */
+function supportsHomeScreenApi(): boolean {
+  const webApp = getTelegramWebApp()
+  if (!webApp?.checkHomeScreenStatus || !webApp.addToHomeScreen) return false
+  if (typeof webApp.isVersionAtLeast !== 'function') return false
+  return webApp.isVersionAtLeast(HOME_SCREEN_MIN_VERSION)
+}
+
 /**
  * Чи взагалі є сенс питати Telegram про статус ярлика. Усе тут —
  * синхронні читання, тож відповідь відома ще до першого рендера і не
  * потребує setState всередині ефекту.
- *
- * Звичайний браузер (локальна розробка через DEV_AUTH) і клієнти до
- * Bot API 8.0 відсіюються тут-таки: у них немає ні методу, ні самого
- * головного екрана.
  */
 function canAskTelegram(): boolean {
   if (!isRunningInTelegram()) return false
-  if (!getTelegramWebApp()?.checkHomeScreenStatus) return false
+  if (!supportsHomeScreenApi()) return false
   // Ярлик уже додано або людина відмовилась — статус нічого не змінить.
   return !isAlreadyAdded() && !isDismissed()
 }
@@ -116,9 +135,17 @@ export function useHomeScreenShortcut(): HomeScreenShortcut {
 
     webApp.onEvent?.('homeScreenChecked', handleChecked)
     webApp.onEvent?.('homeScreenAdded', handleAdded)
-    // Callback і подія дублюють один одного навмисно: різні клієнти
-    // відповідають по-різному, а resolveStatus усе одно спрацює один раз.
-    webApp.checkHomeScreenStatus(resolveStatus)
+    try {
+      // Callback і подія дублюють один одного навмисно: різні клієнти
+      // відповідають по-різному, а resolveStatus усе одно спрацює один раз.
+      webApp.checkHomeScreenStatus(resolveStatus)
+    } catch {
+      // Підстраховка на випадок клієнта, який рапортує потрібну версію,
+      // але все одно кидає WebAppMethodUnsupported. Кинутий метод — це
+      // рівно те саме, що відповідь `unsupported`, тож і обробляємо його
+      // тим самим шляхом: банер не з'явиться, HomePage не впаде.
+      resolveStatus('unsupported')
+    }
 
     return () => {
       active = false
@@ -129,16 +156,20 @@ export function useHomeScreenShortcut(): HomeScreenShortcut {
 
   const addToHomeScreen = useCallback(() => {
     const webApp = getTelegramWebApp()
-    if (!webApp?.addToHomeScreen) {
+    if (!webApp?.addToHomeScreen || !supportsHomeScreenApi()) {
       // Функція недоступна — тихо прибираємо банер, без помилки.
       setIsVisible(false)
       return
     }
-    // Синхронно, прямо з тапу: нативний діалог Telegram інакше не
-    // відкриється. Успіх підтверджує лише подія homeScreenAdded, тож
-    // банер тут навмисно не ховаємо — інакше вийшов би фальшивий успіх
-    // для того, хто діалог закрив.
-    webApp.addToHomeScreen()
+    try {
+      // Синхронно, прямо з тапу: нативний діалог Telegram інакше не
+      // відкриється. Успіх підтверджує лише подія homeScreenAdded, тож
+      // банер тут навмисно не ховаємо — інакше вийшов би фальшивий успіх
+      // для того, хто діалог закрив.
+      webApp.addToHomeScreen()
+    } catch {
+      setIsVisible(false)
+    }
   }, [])
 
   const dismiss = useCallback(() => {

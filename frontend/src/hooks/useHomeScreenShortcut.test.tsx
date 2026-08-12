@@ -135,10 +135,21 @@ describe('статуси Telegram', () => {
     expect(bannerVisible()).toBe(false)
   })
 
-  it('клієнт без методу (до Bot API 8.0) — банера немає', () => {
+  it('клієнт без методу взагалі — банера немає', () => {
     seedVisits(VISITS_BEFORE_PROMPT - 1)
     renderHarness({ supportsHomeScreen: false })
     expect(bannerVisible()).toBe(false)
+  })
+
+  it('клієнт до Bot API 8.0 — метод є, але кидає; банера немає і нічого не падає', () => {
+    // Саме так поводиться справжній telegram-web-app.js: методи оголошені
+    // завжди, а на версії нижче 8.0 кидають WebAppMethodUnsupported.
+    seedVisits(VISITS_BEFORE_PROMPT - 1)
+    const webApp = renderHarness({ version: '7.10', status: 'missed' })
+
+    expect(bannerVisible()).toBe(false)
+    // Навіть не намагаємось питати — версію перевірено заздалегідь.
+    expect(webApp.checkHomeScreenStatus).not.toHaveBeenCalled()
   })
 
   it('статус, що прийшов подією homeScreenChecked, теж враховується', () => {
@@ -223,6 +234,21 @@ describe('відмова', () => {
 describe('середовище', () => {
   it('у звичайному браузері банер не показується', () => {
     seedVisits(VISITS_BEFORE_PROMPT - 1)
+    // Ключовий момент: поза Telegram window.Telegram.WebApp усе одно
+    // існує — telegram-web-app.js підключено скриптом в index.html і він
+    // рапортує version === '6.0'. Перевірено на живому деплої, тому
+    // самої лише наявності об'єкта для гейта недостатньо.
+    const webApp = renderHarness({ version: '6.0', status: 'missed' })
+
+    expect(bannerVisible()).toBe(false)
+    expect(webApp.checkHomeScreenStatus).not.toHaveBeenCalled()
+    // Відвідування теж не рахуємо — лічильник має сенс лише там, де
+    // пропозиція взагалі може з'явитись.
+    expect(localStorage.getItem('dormhub_home_visits_v1')).toBe(String(VISITS_BEFORE_PROMPT - 1))
+  })
+
+  it('без Telegram SDK узагалі банер не показується', () => {
+    seedVisits(VISITS_BEFORE_PROMPT - 1)
     removeWebApp()
 
     render(
@@ -232,7 +258,6 @@ describe('середовище', () => {
     )
 
     expect(bannerVisible()).toBe(false)
-    // Відвідування теж не рахуємо — лічильник має жити лише в Telegram.
     expect(localStorage.getItem('dormhub_home_visits_v1')).toBe(String(VISITS_BEFORE_PROMPT - 1))
   })
 
