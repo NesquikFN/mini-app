@@ -26,5 +26,13 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Тести й тестова обв'язка ніколи не проходять через Fast Refresh,
+    // тож вимога «в модулі лише компоненти» для них позбавлена сенсу.
+    files: ['src/test/**/*.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
   prettierConfig,
 )

@@ -9,6 +9,8 @@ import { LoadingState } from '../components/LoadingState'
 import { DormitorySelector } from '../components/DormitorySelector'
 import { QuickPlansSection } from '../components/QuickPlansSection'
 import { SocialLinks } from '../components/SocialLinks'
+import { AddToHomeScreenBanner } from '../components/AddToHomeScreenBanner'
+import { useHomeScreenShortcut } from '../hooks/useHomeScreenShortcut'
 import { fetchAppSettings, type SocialLinks as SocialLinksType } from '../services/api'
 import { isEventPast } from '../utils/date'
 import { NO_DORMITORY_ID } from '../types/dormitory'
@@ -18,6 +20,7 @@ const GPU_BOT_URL = 'https://t.me/gpubsmu_bot'
 export function HomePage() {
   const { events, status, errorMessage, reload } = useEvents()
   const { user } = useCurrentUser()
+  const homeScreenShortcut = useHomeScreenShortcut()
   const [socialLinks, setSocialLinks] = useState<SocialLinksType>()
 
   useEffect(() => {
@@ -161,6 +164,8 @@ export function HomePage() {
           <MessageCircle size={15} /> Відкрити @gpubsmu_bot
         </span>
       </a>
+
+      <AddToHomeScreenBanner {...homeScreenShortcut} />
     </div>
   )
 }

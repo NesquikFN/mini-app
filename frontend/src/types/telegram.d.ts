@@ -79,6 +79,59 @@ interface TelegramWebApp {
   /** Bot API 6.2+. Fallback for clients without disableVerticalSwipes —
    * shows an "are you sure?" prompt before the app actually closes. */
   enableClosingConfirmation?(): void
+  /**
+   * Bot API 8.0+. Просить користувача додати Mini App на головний екран
+   * телефона. Показує нативний діалог, тож викликати можна лише у
+   * відповідь на явний тап користувача.
+   *
+   * Підтвердження приходить окремою подією `homeScreenAdded` — і лише
+   * якщо пристрій узагалі вміє про це повідомляти. Те, що метод
+   * повернувся, ще не означає, що ярлик додано.
+   */
+  addToHomeScreen?(): void
+  /**
+   * Bot API 8.0+. Перевіряє, чи підтримується додавання на головний
+   * екран і чи ярлик уже додано. Callback отримує один аргумент —
+   * статус. Без callback результат приходить подією `homeScreenChecked`.
+   */
+  checkHomeScreenStatus?(callback?: (status: TelegramHomeScreenStatus) => void): void
+  /** Bot API 6.1+. Підписка на подію клієнта. */
+  onEvent?<E extends keyof TelegramWebAppEventMap>(
+    eventType: E,
+    eventHandler: TelegramWebAppEventMap[E],
+  ): void
+  /** Bot API 6.1+. Знімає раніше встановлений обробник — той самий
+   * eventHandler, що передавали в onEvent. */
+  offEvent?<E extends keyof TelegramWebAppEventMap>(
+    eventType: E,
+    eventHandler: TelegramWebAppEventMap[E],
+  ): void
+}
+
+/**
+ * Bot API 8.0+. Статус ярлика Mini App на головному екрані:
+ *  - `unsupported` — клієнт або пристрій не вміє додавати ярлики;
+ *  - `unknown` — додавання підтримується, але стан визначити не вдалося;
+ *  - `added` — ярлик уже є;
+ *  - `missed` — ярлика немає, додати можна.
+ */
+export type TelegramHomeScreenStatus = 'unsupported' | 'unknown' | 'added' | 'missed'
+
+/** Аргумент обробника події `homeScreenChecked`. */
+export interface TelegramHomeScreenCheckedEvent {
+  status: TelegramHomeScreenStatus
+}
+
+/**
+ * Події WebApp, які використовує цей застосунок. Мапа, а не union назв:
+ * так onEvent/offEvent типізують ще й сигнатуру обробника, а не саму лише
+ * назву події.
+ */
+interface TelegramWebAppEventMap {
+  /** Ярлик успішно додано. Обробник не отримує параметрів. */
+  homeScreenAdded: () => void
+  /** Результат checkHomeScreenStatus, якщо його викликали без callback. */
+  homeScreenChecked: (event: TelegramHomeScreenCheckedEvent) => void
 }
 
 /** Bot API 7.8+. Параметри shareToStory — назви полів точно як в
