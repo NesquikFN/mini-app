@@ -1,5 +1,9 @@
 import { eventsRepository } from '../repositories/events.repository'
-import { NOTIFICATION_CONCURRENCY, sendEventReminder } from './telegram-notifications.service'
+import {
+  NOTIFICATION_CONCURRENCY,
+  isTransientTelegramFailure,
+  sendEventReminder,
+} from './telegram-notifications.service'
 import { kyivTimestamp } from '../utils/kyivTime'
 import { mapWithConcurrency } from '../utils/concurrency'
 
@@ -23,20 +27,35 @@ export async function sendDueReminders(): Promise<void> {
   for (const event of dueEvents) {
     const requiredRole = event.vipOnly ? 'vip' : event.gpuOnly ? 'gpu' : undefined
     const telegramIds = await eventsRepository.getParticipantTelegramIds(event.id, requiredRole)
+
+    let delivered = 0
+    let transientFailures = 0
     await mapWithConcurrency(telegramIds, NOTIFICATION_CONCURRENCY, async (telegramId) => {
       try {
         await sendEventReminder(String(telegramId), event)
+        delivered += 1
       } catch (error) {
+        if (isTransientTelegramFailure(error)) transientFailures += 1
         console.error(
           `Не вдалося надіслати нагадування про подію ${event.id} користувачу ${telegramId}:`,
           error,
         )
       }
     })
-    // Marked sent even if every individual DM above failed (e.g. bot
-    // blocked) — this is a best-effort reminder, not a guaranteed
-    // delivery; retrying the same event on every future poll forever
-    // would be worse than silently giving up once.
+
+    // Не дійшло взагалі нікому, і причина тимчасова (429, 5xx, обрив
+    // мережі) — лишаємо reminder_sent_at порожнім, щоб наступний полл
+    // спробував ще раз. Продублювати нагадування це не може: його не
+    // отримав жоден учасник. Вічного циклу теж немає — щойно подія
+    // почалась, findDueForReminder перестає її повертати, тож спроб рівно
+    // стільки, скільки поллів влазить у 30-хвилинне вікно.
+    if (delivered === 0 && transientFailures > 0) continue
+
+    // В усіх інших випадках подія вважається обробленою: або нагадування
+    // дійшло, або кожна відмова остаточна (бот заблокований, чат
+    // видалений) і повторювати її марно. Часткова доставка теж
+    // зараховується — краще, ніж надіслати вдруге тим, хто вже отримав;
+    // хто саме не отримав, видно в notification_log.
     await eventsRepository.markReminderSent(event.id)
   }
 }

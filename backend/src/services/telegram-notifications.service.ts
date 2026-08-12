@@ -62,6 +62,41 @@ interface TelegramApiResponse<T> {
   parameters?: { retry_after?: number }
 }
 
+/**
+ * Помилка Bot API разом із HTTP-статусом, який повернув Telegram. Назовні
+ * (в API застосунку) це та сама 502 TELEGRAM_API_ERROR, що й була, але
+ * всередині статус дозволяє відрізнити остаточну відмову від тимчасової:
+ * 403 «бот заблокований» повторювати марно, 429 і 5xx — навпаки, єдиний
+ * випадок, коли повтор має сенс.
+ */
+export class TelegramApiError extends AppError {
+  readonly telegramStatus: number
+
+  constructor(telegramStatus: number, message: string) {
+    super(502, 'TELEGRAM_API_ERROR', message)
+    this.name = 'TelegramApiError'
+    this.telegramStatus = telegramStatus
+  }
+}
+
+/**
+ * Чи має сенс повторити виклик пізніше.
+ *
+ * Невідома помилка (обрив мережі, DNS, таймаут fetch — усе, що не наш
+ * AppError) вважається тимчасовою: до Telegram ми в такому разі навіть
+ * не достукалися, тож судити про долю повідомлення не можемо.
+ *
+ * BOT_TOKEN_NOT_CONFIGURED свідомо НЕ тимчасова: поки змінну не задали,
+ * повтори нічого не змінять.
+ */
+export function isTransientTelegramFailure(error: unknown): boolean {
+  if (error instanceof TelegramApiError) {
+    return error.telegramStatus === 429 || error.telegramStatus >= 500
+  }
+  if (error instanceof AppError) return false
+  return true
+}
+
 async function callBotApi<T>(
   method: string,
   body?: Record<string, unknown>,
@@ -101,7 +136,7 @@ async function botApi<T>(method: string, body?: Record<string, unknown>): Promis
   }
 
   if (!response.ok || !payload.ok || payload.result === undefined) {
-    throw new AppError(502, 'TELEGRAM_API_ERROR', payload.description ?? 'Помилка Telegram API')
+    throw new TelegramApiError(response.status, payload.description ?? 'Помилка Telegram API')
   }
   return payload.result
 }
@@ -292,6 +327,12 @@ export async function getTelegramProfilePhoto(telegramUserId: number): Promise<B
   }
 }
 
+/**
+ * false означає рівно одне: Telegram відповів, і ця людина в чаті не
+ * складається. Тимчасовий збій (429, 5xx, обрив мережі) навмисно летить
+ * далі виключенням — інакше під час недоступності Bot API адмін бачив би
+ * порожній список чатів і вирішив, що бота звідусіль вигнали.
+ */
 async function isActiveMember(chatId: string, userId: number): Promise<boolean> {
   try {
     const member = await botApi<{ status: string }>('getChatMember', {
@@ -299,7 +340,8 @@ async function isActiveMember(chatId: string, userId: number): Promise<boolean> 
       user_id: userId,
     })
     return ACTIVE_MEMBER_STATUSES.includes(member.status)
-  } catch {
+  } catch (error) {
+    if (isTransientTelegramFailure(error)) throw error
     return false
   }
 }
