@@ -10,12 +10,15 @@ export type NotificationKind =
   | 'registration_approved'
   | 'quick_plan_join'
   | 'waitlist_promoted'
+  | 'poll_broadcast'
 
 export interface NewNotificationLogEntry {
   chatId: string
   kind: NotificationKind
   eventId?: string
   eventTitle?: string
+  pollId?: string
+  pollQuestion?: string
   success: boolean
   errorMessage?: string
 }
@@ -29,6 +32,8 @@ export interface NotificationLogEntry {
   kind: NotificationKind
   eventId?: string
   eventTitle?: string
+  pollId?: string
+  pollQuestion?: string
   success: boolean
   errorMessage?: string
   createdAt: string
@@ -41,6 +46,8 @@ interface NotificationLogRow {
   kind: NotificationKind
   event_id: string | null
   event_title: string | null
+  poll_id: string | null
+  poll_question: string | null
   success: boolean
   error_message: string | null
   created_at: string
@@ -54,6 +61,8 @@ function toEntry(row: NotificationLogRow): NotificationLogEntry {
     kind: row.kind,
     eventId: row.event_id ?? undefined,
     eventTitle: row.event_title ?? undefined,
+    pollId: row.poll_id ?? undefined,
+    pollQuestion: row.poll_question ?? undefined,
     success: row.success,
     errorMessage: row.error_message ?? undefined,
     createdAt: row.created_at,
@@ -73,13 +82,16 @@ const LIST_SELECT = `
 export const notificationLogRepository = {
   async log(entry: NewNotificationLogEntry): Promise<void> {
     await query(
-      `insert into notification_log (chat_id, kind, event_id, event_title, success, error_message)
-       values ($1, $2, $3, $4, $5, $6)`,
+      `insert into notification_log
+         (chat_id, kind, event_id, event_title, poll_id, poll_question, success, error_message)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         entry.chatId,
         entry.kind,
         entry.eventId ?? null,
         entry.eventTitle ?? null,
+        entry.pollId ?? null,
+        entry.pollQuestion ?? null,
         entry.success,
         entry.errorMessage ?? null,
       ],

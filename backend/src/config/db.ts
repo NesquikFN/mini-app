@@ -28,3 +28,26 @@ export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
 ): Promise<pg.QueryResult<T>> {
   return pool.query<T>(text, params)
 }
+
+/** Явна транзакція для тих нечастих випадків, коли кілька операторів
+ * мають застосуватись усі разом або жодного (наприклад, заміна повного
+ * набору варіантів опитування при редагуванні). Решта коду свідомо
+ * обходиться без транзакцій — або одним атомарним оператором (upsert,
+ * CTE, `for update`), або стільки-плоскими операціями, де проміжний стан
+ * не шкодить. */
+export async function withTransaction<T>(
+  fn: (client: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await fn(client)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}

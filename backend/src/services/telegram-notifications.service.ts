@@ -153,11 +153,20 @@ async function sendAndLog(
   chatId: string,
   send: () => Promise<void>,
   event?: { id: string; title: string },
+  poll?: { id: string; question: string },
 ): Promise<void> {
   try {
     await send()
     await notificationLogRepository
-      .log({ chatId, kind, eventId: event?.id, eventTitle: event?.title, success: true })
+      .log({
+        chatId,
+        kind,
+        eventId: event?.id,
+        eventTitle: event?.title,
+        pollId: poll?.id,
+        pollQuestion: poll?.question,
+        success: true,
+      })
       .catch((error: unknown) => console.error('Не вдалося записати журнал сповіщень:', error))
   } catch (error) {
     await notificationLogRepository
@@ -166,7 +175,12 @@ async function sendAndLog(
         kind,
         eventId: event?.id,
         eventTitle: event?.title,
+        pollId: poll?.id,
+        pollQuestion: poll?.question,
         success: false,
+        // Лише error.message від Telegram/AppError — жодних заголовків чи
+        // URL, у якому інакше опинився б BOT_TOKEN, тут немає в принципі
+        // (callBotApi ніколи не кладе URL у payload.description).
         errorMessage: error instanceof Error ? error.message : String(error),
       })
       .catch((logError: unknown) => console.error('Не вдалося записати журнал сповіщень:', logError))
@@ -209,6 +223,15 @@ export function buildMiniAppDeepLink(
 export async function buildEventDeepLink(eventId: string): Promise<string> {
   const botUsername = await getBotUsername()
   return buildMiniAppDeepLink(botUsername, `event_${eventId}`)
+}
+
+/** Той самий шаблон, що й buildEventDeepLink: t.me/<bot>?startapp=poll_<uuid>
+ * відкриває Mini App прямо на HomePage (префікс poll_ читає
+ * StartAppRedirect на frontend), не окрему сторінку — опитування не має
+ * власного маршруту. */
+export async function buildPollDeepLink(pollId: string): Promise<string> {
+  const botUsername = await getBotUsername()
+  return buildMiniAppDeepLink(botUsername, `poll_${pollId}`)
 }
 
 /**
@@ -689,6 +712,57 @@ export async function sendQuickPlanJoinNotification(
       text: text.slice(0, 4096),
       parse_mode: 'MarkdownV2',
     }))
+}
+
+export interface PollBroadcastMessage {
+  id: string
+  question: string
+  options: string[]
+}
+
+/**
+ * Особисте повідомлення розсилки опитування «Що організувати наступним?».
+ * Навмисно НЕ Telegram sendPoll: голосування має лишатись усередині
+ * DormHub (результати в Postgres, один голос на схваленого користувача,
+ * можливість змінити відповідь до завершення) — sendPoll дав би Telegram
+ * власне, паралельне й непов'язане голосування.
+ *
+ * Запитання й варіанти — текст, який вписав адмін (Zod-схема обмежує
+ * довжину й кількість, але не escaping), тож проходять через
+ * escapeMarkdownV2 як звичайний рядок, без toTelegramMarkdown.
+ */
+export async function sendPollBroadcastMessage(
+  chatId: string,
+  poll: PollBroadcastMessage,
+): Promise<void> {
+  const optionsList = poll.options
+    .map((option, index) => `${index + 1}\\. ${escapeMarkdownV2(option)}`)
+    .join('\n')
+  const text = [
+    '📊 *Що організувати наступним?*',
+    escapeMarkdownV2(poll.question),
+    optionsList,
+  ].join('\n\n')
+
+  await sendAndLog(
+    'poll_broadcast',
+    chatId,
+    async () => {
+      await botApi('sendMessage', {
+        chat_id: chatId,
+        text: text.slice(0, 4096),
+        parse_mode: 'MarkdownV2',
+        reply_markup: {
+          inline_keyboard: [[{
+            text: 'Проголосувати в DormHub',
+            url: await buildPollDeepLink(poll.id),
+          }]],
+        },
+      })
+    },
+    undefined,
+    { id: poll.id, question: poll.question },
+  )
 }
 
 /** Особисте підтвердження після успішного приєднання. Посилання

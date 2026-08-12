@@ -34,10 +34,22 @@ import { AdminRegistrationsPage } from './pages/admin/AdminRegistrationsPage'
 import { AdminRegistrationDetailPage } from './pages/admin/AdminRegistrationDetailPage'
 import { EventTemplatesPage } from './pages/EventTemplatesPage'
 import { getTelegramStartParam, getTelegramWebApp } from './services/telegram'
+import { setPendingPollId } from './services/pollDeepLink'
 
-/** Jumps straight to an event when the Mini App was opened via the
+/**
+ * Jumps straight to an event when the Mini App was opened via the
  * "🎉 Приєднатися" button on a group announcement (a t.me/<bot>?startapp=
- * deep link) — see sendEventAnnouncement in the backend. */
+ * deep link) — see sendEventAnnouncement in the backend.
+ *
+ * The same start_param also carries `poll_<uuid>` from the "Проголосувати
+ * в DormHub" button of a poll broadcast (sendPollBroadcastMessage). Unlike
+ * events, polls have no dedicated route — HomePage already renders the
+ * single active poll, so this just hands the id to PollSection (via
+ * pollDeepLink) and makes sure we're actually on "/". An invalid or
+ * already-finished pollId is not resolved here at all: PollSection only
+ * scrolls/highlights if its own loaded active poll matches, so a stale id
+ * silently does nothing instead of breaking the app.
+ */
 function StartAppRedirect() {
   const navigate = useNavigate()
   const handled = useRef(false)
@@ -50,11 +62,20 @@ function StartAppRedirect() {
     if (handled.current) return
     handled.current = true
 
-    const match = getTelegramStartParam()?.match(/^event_([0-9a-fA-F-]{36})$/)
-    if (!match) return
+    const startParam = getTelegramStartParam()
+    const eventMatch = startParam?.match(/^event_([0-9a-fA-F-]{36})$/)
+    if (eventMatch) {
+      navigate(`/events/${eventMatch[1]}`)
+      getTelegramWebApp()?.expand()
+      return
+    }
 
-    navigate(`/events/${match[1]}`)
-    getTelegramWebApp()?.expand()
+    const pollMatch = startParam?.match(/^poll_([0-9a-fA-F-]{36})$/)
+    if (pollMatch) {
+      setPendingPollId(pollMatch[1])
+      navigate('/')
+      getTelegramWebApp()?.expand()
+    }
   }, [navigate])
 
   return null

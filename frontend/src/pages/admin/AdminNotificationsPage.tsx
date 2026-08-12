@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Bell, Link2, RefreshCw } from 'lucide-react'
 import { Button } from '../../components/Button'
 import { LoadingState } from '../../components/LoadingState'
+import { AdminPollsSection } from '../../components/AdminPollsSection'
 import {
   fetchAdminNotificationChats,
   fetchAdminNotificationTopics,
@@ -185,6 +186,8 @@ export function AdminNotificationsPage() {
 
       {message && <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">{message}</p>}
       {error && <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</p>}
+
+      <AdminPollsSection />
 
       <SocialLinksSection />
     </div>

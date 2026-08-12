@@ -2,6 +2,7 @@ import type { CreateEventInput, DormEvent } from '../types/event'
 import type { CreateQuickPlanInput, QuickPlan } from '../types/quickPlan'
 import type { AuthUser, PublicUser, SubmitRegistrationInput, UpdateProfileInput } from '../types/user'
 import type { Dormitory } from '../types/dormitory'
+import type { AdminPoll, Poll, PollAudience, PollBroadcastReport } from '../types/poll'
 import type { EventsScope } from '../context/EventsContext'
 import type {
   AdminStats,
@@ -709,6 +710,85 @@ export async function fetchAdminQuickPlans(): Promise<AdminQuickPlansResponse> {
 
 export async function deleteAdminQuickPlan(planId: string): Promise<void> {
   await request<{ success: boolean }>(`/admin/quick-plans/${planId}`, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------
+// Опитування «Що організувати наступним?»
+// ---------------------------------------------------------------------
+
+export async function fetchActivePoll(): Promise<Poll | null> {
+  const data = await request<{ poll: Poll | null }>('/polls/active')
+  return data.poll
+}
+
+export async function votePollRequest(pollId: string, optionId: string): Promise<Poll> {
+  const data = await request<{ poll: Poll }>(`/polls/${pollId}/vote`, {
+    method: 'POST',
+    body: JSON.stringify({ optionId }),
+  })
+  return data.poll
+}
+
+export interface PollInput {
+  question: string
+  options: string[]
+  endsAt?: string | null
+}
+
+export async function fetchAdminPolls(): Promise<AdminPoll[]> {
+  const data = await request<{ polls: AdminPoll[] }>('/admin/polls')
+  return data.polls
+}
+
+export async function createAdminPoll(input: PollInput): Promise<AdminPoll> {
+  const data = await request<{ poll: AdminPoll }>('/admin/polls', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return data.poll
+}
+
+export async function updateAdminPoll(id: string, input: PollInput): Promise<AdminPoll> {
+  const data = await request<{ poll: AdminPoll }>(`/admin/polls/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+  return data.poll
+}
+
+export async function publishAdminPoll(id: string): Promise<AdminPoll> {
+  const data = await request<{ poll: AdminPoll }>(`/admin/polls/${id}/publish`, { method: 'POST' })
+  return data.poll
+}
+
+export async function finishAdminPoll(id: string): Promise<AdminPoll> {
+  const data = await request<{ poll: AdminPoll }>(`/admin/polls/${id}/finish`, { method: 'POST' })
+  return data.poll
+}
+
+export async function deleteAdminPoll(id: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/polls/${id}`, { method: 'DELETE' })
+}
+
+export async function fetchPollAudienceCount(
+  id: string,
+  audience: PollAudience,
+): Promise<number> {
+  const data = await request<{ audience: PollAudience; count: number }>(
+    `/admin/polls/${id}/audience-count?audience=${audience}`,
+  )
+  return data.count
+}
+
+export async function broadcastAdminPoll(
+  id: string,
+  audience: PollAudience,
+  resend = false,
+): Promise<PollBroadcastReport> {
+  return request<PollBroadcastReport>(`/admin/polls/${id}/broadcast`, {
+    method: 'POST',
+    body: JSON.stringify({ audience, confirm: true, resend }),
+  })
 }
 
 export async function fetchEventTemplates(): Promise<EventTemplate[]> {

@@ -8,6 +8,7 @@ import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { DormitorySelector } from '../components/DormitorySelector'
 import { QuickPlansSection } from '../components/QuickPlansSection'
+import { PollSection } from '../components/PollSection'
 import { SocialLinks } from '../components/SocialLinks'
 import { AddToHomeScreenBanner } from '../components/AddToHomeScreenBanner'
 import { useHomeScreenShortcut } from '../hooks/useHomeScreenShortcut'
@@ -66,6 +67,8 @@ export function HomePage() {
       </div>
 
       <QuickPlansSection />
+
+      <PollSection />
 
       {!onlineOnly && !offlineCollapsed && <section className="flex flex-col gap-3 border-t border-[var(--surface-border)] pt-5">
         <div className="flex items-center justify-between">

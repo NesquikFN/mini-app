@@ -233,6 +233,39 @@ export const usersRepository = {
     return rows.map((row) => Number(row.telegram_id))
   },
 
+  /**
+   * Аудиторія масової розсилки опитувань. 'all' — усі схвалені
+   * незаблоковані користувачі; 'subscribers' — той самий підмножина, що
+   * й getSubscribedTelegramIds (notify_new_events = true), без
+   * фільтра гуртожитку — опитування не прив'язане до конкретного
+   * гуртожитку, на відміну від анонсів подій.
+   */
+  async getBroadcastAudienceTelegramIds(audience: 'all' | 'subscribers'): Promise<number[]> {
+    const conditions = [
+      `registration_status = 'approved'`,
+      'banned_permanently = false',
+      '(banned_until is null or banned_until <= now())',
+    ]
+    if (audience === 'subscribers') conditions.push('notify_new_events = true')
+    const { rows } = await query<{ telegram_id: string }>(
+      `select telegram_id from users where ${conditions.join(' and ')}`,
+    )
+    return rows.map((row) => Number(row.telegram_id))
+  },
+
+  async countBroadcastAudience(audience: 'all' | 'subscribers'): Promise<number> {
+    const conditions = [
+      `registration_status = 'approved'`,
+      'banned_permanently = false',
+      '(banned_until is null or banned_until <= now())',
+    ]
+    if (audience === 'subscribers') conditions.push('notify_new_events = true')
+    const { rows } = await query<{ count: string }>(
+      `select count(*) from users where ${conditions.join(' and ')}`,
+    )
+    return Number(rows[0].count)
+  },
+
   async getAllUsers(): Promise<AdminUserView[]> {
     const { rows } = await query<UserRow>('select * from users order by created_at desc')
     return rows.map(toAdminUserView)

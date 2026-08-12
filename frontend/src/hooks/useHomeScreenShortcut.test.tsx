@@ -21,11 +21,13 @@ import {
 vi.mock('../services/api', () => ({
   fetchAppSettings: () => Promise.resolve({}),
   fetchQuickPlans: () => Promise.resolve([]),
+  fetchActivePoll: () => Promise.resolve(null),
   getErrorMessage: () => 'error',
   createQuickPlanRequest: () => Promise.resolve(),
   deleteQuickPlanRequest: () => Promise.resolve(),
   joinQuickPlanRequest: () => Promise.resolve(),
   leaveQuickPlanRequest: () => Promise.resolve(),
+  votePollRequest: () => Promise.resolve(),
   updateMyDormitory: () => Promise.resolve(),
 }))
 

@@ -24,6 +24,9 @@ export type NotificationKind =
   | 'start_greeting'
   | 'notifications_off_confirmation'
   | 'registration_approved'
+  | 'quick_plan_join'
+  | 'waitlist_promoted'
+  | 'poll_broadcast'
 
 export interface NotificationLogEntry {
   id: string
@@ -32,6 +35,8 @@ export interface NotificationLogEntry {
   kind: NotificationKind
   eventId?: string
   eventTitle?: string
+  pollId?: string
+  pollQuestion?: string
   success: boolean
   errorMessage?: string
   createdAt: string

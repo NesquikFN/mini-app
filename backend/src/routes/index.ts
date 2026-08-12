@@ -6,6 +6,7 @@ import * as eventShareController from '../controllers/event-share.controller'
 import { eventsRouter } from './events.routes'
 import { eventTemplatesRouter } from './event-templates.routes'
 import { quickPlansRouter } from './quick-plans.routes'
+import { pollsRouter } from './polls.routes'
 import { meRouter } from './me.routes'
 import { dormitoriesRouter } from './dormitories.routes'
 import { usersRouter } from './users.routes'
@@ -51,6 +52,7 @@ apiRouter.use('/dormitories', ...authenticated, dormitoriesRouter)
 apiRouter.use('/events', ...approved, eventsRouter)
 apiRouter.use('/event-templates', ...approved, eventTemplatesRouter)
 apiRouter.use('/quick-plans', ...approved, quickPlansRouter)
+apiRouter.use('/polls', ...approved, pollsRouter)
 apiRouter.use('/users', ...approved, usersRouter)
 apiRouter.use('/app-settings', ...approved, appSettingsRouter)
 

@@ -51,6 +51,11 @@ export const RATE_LIMITS = {
    * піти в Bot API, тож повторні тапи не повинні молотити ні диск, ні
    * Telegram. */
   eventSharePerHour: 40,
+  /** Розсилка опитування в особисті повідомлення — потенційно сотні DM
+   * за один виклик, тож суворіший за будь-який інший адмінський ліміт:
+   * випадковий подвійний клік не повинен запустити другу хвилю
+   * повідомлень (додатково до гейта POLL_ALREADY_BROADCAST). */
+  pollBroadcastPerHour: 3,
 } as const
 
 /** Стабільний ключ: id користувача для автентифікованих запитів, інакше
@@ -175,4 +180,9 @@ export const createQuickPlanRateLimiter = buildPersistentLimiter('quick-plan-cre
 export const quickPlanJoinRateLimiter = buildPersistentLimiter('quick-plan-join', {
   windowMs: HOUR,
   limit: RATE_LIMITS.quickPlanJoinPerHour,
+})
+
+export const pollBroadcastRateLimiter = buildPersistentLimiter('poll-broadcast', {
+  windowMs: HOUR,
+  limit: RATE_LIMITS.pollBroadcastPerHour,
 })

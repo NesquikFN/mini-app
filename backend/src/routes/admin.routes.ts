@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import * as adminController from '../controllers/admin.controller'
 import * as adminRegistrationsController from '../controllers/admin-registrations.controller'
-import { telegramProbeRateLimiter } from '../middleware/rateLimit'
+import * as adminPollsController from '../controllers/admin-polls.controller'
+import { pollBroadcastRateLimiter, telegramProbeRateLimiter } from '../middleware/rateLimit'
 
 export const adminRouter = Router()
 
@@ -50,6 +51,17 @@ adminRouter.delete('/gpus/:userId', adminController.removeGpu)
 
 adminRouter.get('/quick-plans', adminController.listQuickPlans)
 adminRouter.delete('/quick-plans/:id', adminController.deleteQuickPlan)
+
+adminRouter.get('/polls', adminPollsController.listPolls)
+adminRouter.post('/polls', adminPollsController.createPoll)
+adminRouter.put('/polls/:id', adminPollsController.updatePoll)
+adminRouter.post('/polls/:id/publish', adminPollsController.publishPoll)
+adminRouter.post('/polls/:id/finish', adminPollsController.finishPoll)
+adminRouter.delete('/polls/:id', adminPollsController.deletePoll)
+adminRouter.get('/polls/:id/audience-count', adminPollsController.getAudienceCount)
+// Розсилка — окремий суворий ліміт (RATE_LIMITS.pollBroadcastPerHour),
+// щоб випадковий подвійний клік не запустив другу хвилю DM усім одразу.
+adminRouter.post('/polls/:id/broadcast', pollBroadcastRateLimiter, adminPollsController.broadcastPoll)
 
 adminRouter.get('/registrations', adminRegistrationsController.list)
 adminRouter.get('/registrations/:userId', adminRegistrationsController.getDetail)

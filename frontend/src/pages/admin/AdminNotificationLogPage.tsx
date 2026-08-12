@@ -20,6 +20,9 @@ const KIND_LABELS: Record<NotificationKind, string> = {
   start_greeting: 'Привітання /start',
   notifications_off_confirmation: 'Підтвердження /notifications_off',
   registration_approved: 'Схвалення реєстрації',
+  quick_plan_join: 'Відгук на швидкий план',
+  waitlist_promoted: 'Просування з листа очікування',
+  poll_broadcast: 'Розсилка опитування',
 }
 
 export function AdminNotificationLogPage() {
@@ -160,6 +163,12 @@ function LogRow({ entry }: { entry: NotificationLogEntry }) {
           ) : (
             <span className="font-medium">{entry.eventTitle}</span>
           )}
+        </p>
+      )}
+
+      {entry.pollQuestion && (
+        <p className="text-xs text-[var(--text-secondary)]">
+          Опитування: <span className="font-medium">{entry.pollQuestion}</span>
         </p>
       )}
 

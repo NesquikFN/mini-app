@@ -637,3 +637,79 @@ create table if not exists rate_limit_hits (
 );
 create index if not exists idx_rate_limit_hits_expires_at on rate_limit_hits (expires_at);
 alter table rate_limit_hits enable row level security;
+
+-- =========================================================
+-- Опитування «Що організувати наступним?» (див. migrations/0030_polls.sql)
+-- =========================================================
+create table if not exists polls (
+  id uuid primary key default gen_random_uuid(),
+  question varchar(240) not null,
+  status text not null default 'draft' check (status in ('draft', 'active', 'finished')),
+  ends_at timestamptz,
+  created_by uuid not null references users (id),
+  created_at timestamptz not null default now(),
+  published_at timestamptz,
+  finished_at timestamptz,
+  constraint polls_question_not_blank check (char_length(btrim(question)) > 0)
+);
+
+-- Одночасно опубліковане (активне) може бути лише одне опитування.
+create unique index if not exists idx_polls_single_active
+  on polls ((status))
+  where status = 'active';
+
+create index if not exists idx_polls_status on polls (status);
+create index if not exists idx_polls_created_by on polls (created_by);
+
+create table if not exists poll_options (
+  id uuid primary key default gen_random_uuid(),
+  poll_id uuid not null references polls (id) on delete cascade,
+  text varchar(120) not null,
+  position integer not null check (position >= 0),
+  constraint poll_options_text_not_blank check (char_length(btrim(text)) > 0),
+  constraint poll_options_unique_position unique (poll_id, position)
+);
+
+create index if not exists idx_poll_options_poll_id on poll_options (poll_id);
+
+create table if not exists poll_votes (
+  poll_id uuid not null references polls (id) on delete cascade,
+  option_id uuid not null references poll_options (id) on delete cascade,
+  user_id uuid not null references users (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint poll_votes_unique unique (poll_id, user_id)
+);
+
+create index if not exists idx_poll_votes_poll_id on poll_votes (poll_id);
+create index if not exists idx_poll_votes_option_id on poll_votes (option_id);
+create index if not exists idx_poll_votes_poll_option on poll_votes (poll_id, option_id);
+
+create table if not exists poll_broadcasts (
+  id uuid primary key default gen_random_uuid(),
+  poll_id uuid not null references polls (id) on delete cascade,
+  audience text not null check (audience in ('all', 'subscribers')),
+  targeted integer not null default 0,
+  sent integer not null default 0,
+  failed integer not null default 0,
+  skipped integer not null default 0,
+  started_by uuid not null references users (id),
+  started_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index if not exists idx_poll_broadcasts_poll_id on poll_broadcasts (poll_id);
+create index if not exists idx_poll_broadcasts_poll_audience
+  on poll_broadcasts (poll_id, audience, completed_at desc);
+
+alter table notification_log
+  add column if not exists poll_id uuid references polls (id) on delete set null;
+alter table notification_log
+  add column if not exists poll_question text;
+
+create index if not exists idx_notification_log_poll_id on notification_log (poll_id);
+
+alter table polls enable row level security;
+alter table poll_options enable row level security;
+alter table poll_votes enable row level security;
+alter table poll_broadcasts enable row level security;
