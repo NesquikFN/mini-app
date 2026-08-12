@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction } from 'express'
-import { rateLimit, ipKeyGenerator, type Options } from 'express-rate-limit'
+import { rateLimit, ipKeyGenerator, MemoryStore, type Options, type Store } from 'express-rate-limit'
 import { AppError } from '../utils/AppError'
+import { env } from '../config/env'
+import { PostgresRateLimitStore } from './rateLimitStore'
 
 /**
  * Ліміти запитів. Дві осі навмисно розділені:
@@ -70,6 +72,28 @@ function rejectOverLimit(_req: Request, _res: Response, next: NextFunction): voi
   )
 }
 
+/**
+ * Сховище лічильників для лімітів, які мають пережити рестарт процесу.
+ *
+ * Годинні продуктові ліміти в MemoryStore були фікцією: будь-який деплой
+ * чи перезапуск обнуляв їх усім одночасно, тож «10 подій на годину»
+ * трималося рівно до наступного релізу. Вони переїхали в Postgres
+ * (rate_limit_hits, migrations/0029).
+ *
+ * Хвилинний антифлуд і auth свідомо лишаються в пам'яті: вікно коротке,
+ * перезапуск ініціює не клієнт (обійти ліміт через нього не можна), а
+ * похід у БД на КОЖЕН запит до /api коштував би більше, ніж дає.
+ *
+ * У тестах store завжди в пам'яті — security-тести навмисно ганяють
+ * справжні лімітери зі справжніми значеннями, а тестовий DATABASE_URL
+ * вказує в мертвий порт (див. __security__/testEnv.ts). Ліміти, ключі й
+ * саме middleware при цьому ті самі, що в проді; відрізняється лише те,
+ * де лежить лічильник.
+ */
+function persistentStore(name: string): Store {
+  return env.NODE_ENV === 'test' ? new MemoryStore() : new PostgresRateLimitStore(name)
+}
+
 function buildLimiter(options: Partial<Options>) {
   return rateLimit({
     // Конфігурацію лімітера назовні не публікуємо.
@@ -79,6 +103,24 @@ function buildLimiter(options: Partial<Options>) {
     keyGenerator: userOrIpKey,
     ...options,
   })
+}
+
+/**
+ * Лімітер із лічильником у Postgres.
+ *
+ * passOnStoreError: якщо запит до rate_limit_hits упав, запит
+ * пропускається без урахування ліміту (помилка при цьому потрапляє в лог
+ * — express-rate-limit логує її сам). Альтернатива — 500 на створенні
+ * події через недоступну БД, що гірше й безглуздо: усі ці ендпоїнти й
+ * так одразу після лімітера йдуть у ту саму базу, тож справжній збій БД
+ * зупинить запит наступним кроком, з нормальною помилкою.
+ *
+ * Практично це важливо рівно в одному випадку: якщо migrations/0029 ще
+ * не застосована, застосунок працює як раніше (ліміт не рахується), а не
+ * падає на кожному POST /api/events.
+ */
+function buildPersistentLimiter(name: string, options: Partial<Options>) {
+  return buildLimiter({ ...options, store: persistentStore(name), passOnStoreError: true })
 }
 
 /** Весь /api, за IP. Стоїть до автентифікації, тому ключ завжди IP. */
@@ -100,37 +142,37 @@ export const authRateLimiter = buildLimiter({
   keyGenerator: (req: Request) => `ip:${ipKeyGenerator(req.ip ?? '')}`,
 })
 
-export const createEventRateLimiter = buildLimiter({
+export const createEventRateLimiter = buildPersistentLimiter('create-event', {
   windowMs: HOUR,
   limit: RATE_LIMITS.createEventPerHour,
 })
 
-export const templateLaunchRateLimiter = buildLimiter({
+export const templateLaunchRateLimiter = buildPersistentLimiter('template-launch', {
   windowMs: HOUR,
   limit: RATE_LIMITS.templateLaunchPerHour,
 })
 
-export const imageUploadRateLimiter = buildLimiter({
+export const imageUploadRateLimiter = buildPersistentLimiter('image-upload', {
   windowMs: HOUR,
   limit: RATE_LIMITS.imageUploadPerHour,
 })
 
-export const telegramProbeRateLimiter = buildLimiter({
+export const telegramProbeRateLimiter = buildPersistentLimiter('telegram-probe', {
   windowMs: HOUR,
   limit: RATE_LIMITS.telegramProbePerHour,
 })
 
-export const eventShareRateLimiter = buildLimiter({
+export const eventShareRateLimiter = buildPersistentLimiter('event-share', {
   windowMs: HOUR,
   limit: RATE_LIMITS.eventSharePerHour,
 })
 
-export const createQuickPlanRateLimiter = buildLimiter({
+export const createQuickPlanRateLimiter = buildPersistentLimiter('quick-plan-create', {
   windowMs: HOUR,
   limit: RATE_LIMITS.createQuickPlanPerHour,
 })
 
-export const quickPlanJoinRateLimiter = buildLimiter({
+export const quickPlanJoinRateLimiter = buildPersistentLimiter('quick-plan-join', {
   windowMs: HOUR,
   limit: RATE_LIMITS.quickPlanJoinPerHour,
 })

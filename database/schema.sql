@@ -623,3 +623,17 @@ create table if not exists telegram_topics (
   updated_at timestamptz not null default now(),
   primary key (chat_id, thread_id)
 );
+
+-- =========================================================
+-- Лічильники обмеження запитів (див. migrations/0029_rate_limit_hits.sql)
+-- =========================================================
+-- Тільки годинні продуктові ліміти. Хвилинний антифлуд і auth свідомо
+-- лишаються в пам'яті процесу — там коротке вікно й зайвий запит до БД
+-- на кожен HTTP-запит коштує більше, ніж дає.
+create table if not exists rate_limit_hits (
+  key text primary key,
+  hits integer not null,
+  expires_at timestamptz not null
+);
+create index if not exists idx_rate_limit_hits_expires_at on rate_limit_hits (expires_at);
+alter table rate_limit_hits enable row level security;
