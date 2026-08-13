@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CalendarDays, ChevronDown, ChevronUp, Clock, Home, Hourglass, MapPin, Trash2, UserX } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Home,
+  Hourglass,
+  MapPin,
+  RotateCcw,
+  ShieldAlert,
+  Star,
+  Trash2,
+  UserX,
+} from 'lucide-react'
 import { Button } from '../../components/Button'
 import { UserRow } from '../../components/UserRow'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -15,11 +28,14 @@ import {
   fetchAdminEventDetail,
   fetchAdminEventWaitlist,
   getErrorMessage,
+  removeAdminEventRating,
   removeAdminEventWaitlistEntry,
   removeAdminParticipant,
+  restoreAdminEventRating,
 } from '../../services/api'
-import type { AdminEventDetail } from '../../types/admin'
+import type { AdminEventDetail, AdminEventRatingEntry } from '../../types/admin'
 import type { PublicUser } from '../../types/user'
+import { EVENT_RATING_TAG_LABELS } from '../../types/eventRating'
 
 type Status = 'loading' | 'success' | 'error'
 
@@ -43,6 +59,8 @@ export function AdminEventDetailPage() {
   const [showWaitlist, setShowWaitlist] = useState(false)
   const [waitlistPendingRemoval, setWaitlistPendingRemoval] = useState<PublicUser | null>(null)
   const [removingWaitlist, setRemovingWaitlist] = useState(false)
+  const [showRatings, setShowRatings] = useState(false)
+  const [moderatingRatingId, setModeratingRatingId] = useState<string | null>(null)
 
   const loadWaitlist = useCallback(() => {
     if (!id) return
@@ -139,6 +157,23 @@ export function AdminEventDetailPage() {
       setActionError(getErrorMessage(error))
     } finally {
       setRemovingWaitlist(false)
+    }
+  }
+
+  async function handleToggleModeration(rating: AdminEventRatingEntry) {
+    setModeratingRatingId(rating.id)
+    setActionError(null)
+    try {
+      if (rating.moderatedAt) {
+        await restoreAdminEventRating(rating.id)
+      } else {
+        await removeAdminEventRating(rating.id)
+      }
+      load()
+    } catch (error) {
+      setActionError(getErrorMessage(error))
+    } finally {
+      setModeratingRatingId(null)
     }
   }
 
@@ -253,6 +288,87 @@ export function AdminEventDetailPage() {
                   </div>
                   <Button variant="outline" onClick={() => setWaitlistPendingRemoval(entry)}>
                     <UserX size={14} /> Прибрати
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {detail.ratings.length > 0 && (
+        <section className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+          <button
+            type="button"
+            onClick={() => setShowRatings((current) => !current)}
+            className="flex items-center justify-between gap-2"
+          >
+            <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+              <Star size={15} className="text-[var(--accent)]" /> Оцінки · {detail.ratings.length}
+            </h2>
+            <span className="text-[var(--accent)]">
+              {showRatings ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </span>
+          </button>
+
+          {showRatings && (
+            <div className="flex flex-col gap-2">
+              {detail.ratings.map((rating) => (
+                <div
+                  key={rating.id}
+                  className={`flex flex-col gap-2 rounded-xl border p-3 ${
+                    rating.moderatedAt
+                      ? 'border-red-500/30 bg-red-500/5'
+                      : 'border-[var(--surface-border)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                        {rating.userName}
+                      </p>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        {new Date(rating.createdAt).toLocaleString('uk-UA', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--accent-soft-bg)] px-2.5 py-1 text-xs font-bold text-[var(--accent)]">
+                      <Star size={12} /> {rating.rating}
+                    </span>
+                  </div>
+
+                  {rating.tags.length > 0 && (
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {rating.tags.map((tag) => EVENT_RATING_TAG_LABELS[tag]).join(', ')}
+                    </p>
+                  )}
+
+                  {rating.moderatedAt && (
+                    <p className="inline-flex items-center gap-1.5 text-xs font-medium text-red-400">
+                      <ShieldAlert size={13} /> Виключено з рейтингу
+                    </p>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    loading={moderatingRatingId === rating.id}
+                    disabled={moderatingRatingId !== null && moderatingRatingId !== rating.id}
+                    onClick={() => handleToggleModeration(rating)}
+                  >
+                    {rating.moderatedAt ? (
+                      <>
+                        <RotateCcw size={14} /> Відновити
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert size={14} /> Виключити як підозрілу
+                      </>
+                    )}
                   </Button>
                 </div>
               ))}

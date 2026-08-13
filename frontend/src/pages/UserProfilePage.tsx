@@ -10,12 +10,15 @@ import { PageHeader } from '../components/PageHeader'
 import { InstagramIcon } from '../components/InstagramIcon'
 import { isEventPast } from '../utils/date'
 import { RoleBadges } from '../components/RoleBadges'
+import { OrganizerReputationCard } from '../components/OrganizerReputationCard'
 import { useDormitories } from '../hooks/useDormitories'
 import {
+  fetchOrganizerReputation,
   fetchPublicUser,
   getErrorMessage,
   type PublicProfileResponse,
 } from '../services/api'
+import type { OrganizerReputation } from '../types/eventRating'
 
 type LoadStatus = 'loading' | 'success' | 'error'
 
@@ -23,6 +26,7 @@ export function UserProfilePage() {
   const { id } = useParams<{ id: string }>()
   const { getDormitoryName } = useDormitories()
   const [profile, setProfile] = useState<PublicProfileResponse | null>(null)
+  const [reputation, setReputation] = useState<OrganizerReputation | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -37,6 +41,12 @@ export function UserProfilePage() {
         setStatus('error')
         setErrorMessage(getErrorMessage(error))
       })
+    // Репутація — окремий, необов'язковий для сторінки запит: якщо він
+    // не вдасться, профіль однаково лишається робочим, лише без бейджа
+    // й блоку репутації.
+    fetchOrganizerReputation(id)
+      .then(setReputation)
+      .catch(() => setReputation(null))
   }, [id])
 
   useEffect(() => {
@@ -94,6 +104,7 @@ export function UserProfilePage() {
                   isHost={profile.isHost}
                   isVip={profile.isVip}
                   isGpu={profile.isGpu}
+                  isReliableOrganizer={reputation?.isReliableOrganizer}
                   centered
                 />
               </div>
@@ -126,6 +137,8 @@ export function UserProfilePage() {
                 </p>
               )}
             </section>
+
+            {reputation && <OrganizerReputationCard reputation={reputation} />}
 
             <section className="flex flex-col gap-3">
               <h2 className="text-base font-semibold text-[var(--text-primary)]">

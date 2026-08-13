@@ -11,6 +11,7 @@ import {
   MapPin,
   MonitorPlay,
   PartyPopper,
+  ShieldCheck,
   Users,
 } from 'lucide-react'
 import type { DormEvent } from '../types/event'
@@ -76,6 +77,15 @@ export function EventCard({ event }: { event: DormEvent }) {
           {event.gpuOnly && (
             <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-blue-400/30 bg-black/65 px-3 py-2 text-[11px] font-bold text-blue-300 backdrop-blur-md">
               <BadgeCheck size={13} /> ГПУ
+            </span>
+          )}
+          {event.creatorReliable && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-black/65 px-3 py-2 text-[11px] font-bold text-emerald-300 backdrop-blur-md ${
+                event.vipOnly || event.gpuOnly ? '' : 'ml-auto'
+              }`}
+            >
+              <ShieldCheck size={13} /> Надійний організатор
             </span>
           )}
         </div>

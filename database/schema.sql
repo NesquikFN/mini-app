@@ -104,6 +104,8 @@ create table if not exists events (
   max_participants integer not null,
   -- Дедуплікація нагадувань "за 30 хвилин" (event-reminders.service.ts).
   reminder_sent_at timestamptz,
+  -- Дедуплікація нагадування "Як пройшла подія?" (event-rating-reminders.service.ts).
+  rating_reminder_sent_at timestamptz,
   -- Гуртожиток, до якого належить подія — завжди береться з creator's
   -- users.dormitory_id на backend, ніколи з клієнтського запиту (див.
   -- events.service.createEvent). NOT NULL: кожна подія завжди належить
@@ -123,6 +125,9 @@ create index if not exists idx_events_gpu_only_date on events (date) where is_gp
 create index if not exists idx_events_reminder_pending
   on events (date, time)
   where reminder_sent_at is null;
+create index if not exists idx_events_rating_reminder_pending
+  on events (date, time)
+  where rating_reminder_sent_at is null;
 
 -- =========================================================
 -- Регулярні шаблони ігор для адмін-панелі
@@ -713,3 +718,40 @@ alter table polls enable row level security;
 alter table poll_options enable row level security;
 alter table poll_votes enable row level security;
 alter table poll_broadcasts enable row level security;
+
+-- =========================================================
+-- Репутація організаторів (див. migrations/0031_event_ratings.sql)
+-- =========================================================
+create table if not exists event_ratings (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references users (id) on delete cascade,
+  organizer_id uuid not null references users (id) on delete cascade,
+  rating smallint not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  moderated_at timestamptz,
+  removed_by uuid references users (id) on delete set null,
+  constraint event_ratings_unique unique (event_id, user_id),
+  constraint event_ratings_rating_range check (rating between 1 and 5)
+);
+
+create index if not exists idx_event_ratings_event_id on event_ratings (event_id);
+create index if not exists idx_event_ratings_organizer_id on event_ratings (organizer_id);
+create index if not exists idx_event_ratings_organizer_valid
+  on event_ratings (organizer_id)
+  where moderated_at is null;
+
+create table if not exists event_rating_tags (
+  rating_id uuid not null references event_ratings (id) on delete cascade,
+  tag text not null,
+  constraint event_rating_tags_pkey primary key (rating_id, tag),
+  constraint event_rating_tags_valid check (
+    tag in ('well_organized', 'good_atmosphere', 'started_on_time', 'friendly_participants', 'want_more')
+  )
+);
+
+create index if not exists idx_event_rating_tags_rating_id on event_rating_tags (rating_id);
+
+alter table event_ratings enable row level security;
+alter table event_rating_tags enable row level security;

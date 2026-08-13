@@ -77,3 +77,19 @@ export function addDaysToISODate(isoDate: string, days: number): string {
   const utcDate = new Date(Date.UTC(year, month - 1, day + days))
   return `${utcDate.getUTCFullYear()}-${String(utcDate.getUTCMonth() + 1).padStart(2, '0')}-${String(utcDate.getUTCDate()).padStart(2, '0')}`
 }
+
+/**
+ * Чи можна ще оцінити подію: вона вже завершилась (те саме порівняння,
+ * що й isKyivDateTimeInPast), і з моменту завершення не минуло більше
+ * `windowDays` днів. `now` — параметр лише для тестів (щоб не залежати
+ * від справжнього годинника); у продовому коді завжди kyivNow().
+ */
+export function isRatingWindowOpen(date: string, time: string, windowDays: number, now = kyivNow()): boolean {
+  const nowKey = `${now.date}T${now.time}`
+  const eventKey = `${date}T${time.slice(0, 5)}`
+  if (eventKey >= nowKey) return false // ще не завершилась
+
+  const deadlineDate = addDaysToISODate(date, windowDays)
+  const deadlineKey = `${deadlineDate}T${time.slice(0, 5)}`
+  return nowKey <= deadlineKey
+}

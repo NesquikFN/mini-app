@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Ban, CalendarX, Trash2, UserRoundCheck } from 'lucide-react'
+import { Ban, CalendarX, ShieldCheck, Star, Trash2, UserRoundCheck } from 'lucide-react'
 import { Avatar } from '../../components/Avatar'
 import { EventCard } from '../../components/EventCard'
 import { Button } from '../../components/Button'
@@ -17,7 +17,7 @@ import {
   unbanAdminUser,
   type BanDuration,
 } from '../../services/api'
-import type { AdminUserDetail } from '../../types/admin'
+import type { AdminOrganizerReputation, AdminUserDetail } from '../../types/admin'
 
 type Status = 'loading' | 'success' | 'error'
 
@@ -78,7 +78,7 @@ export function AdminUserDetailPage() {
     )
   }
 
-  const { user, stats, createdEvents, participatingEvents } = detail
+  const { user, stats, createdEvents, participatingEvents, organizerReputation } = detail
   const isBanned =
     user.bannedPermanently ||
     (user.bannedUntil ? new Date(user.bannedUntil).getTime() > now : false)
@@ -178,6 +178,8 @@ export function AdminUserDetailPage() {
         <StatBlock label="Бере участь" value={stats.participatingEvents} />
       </div>
 
+      <OrganizerReputationSection reputation={organizerReputation} />
+
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">Створені події</h2>
         {createdEvents.length === 0 ? (
@@ -236,5 +238,60 @@ function StatBlock({ label, value }: { label: string; value: number }) {
       <p className="text-xl font-semibold text-[var(--text-primary)]">{value}</p>
       <p className="mt-1 text-xs text-[var(--text-secondary)]">{label}</p>
     </div>
+  )
+}
+
+/** На відміну від публічного профілю, тут середню оцінку показуємо
+ * завжди (коли є хоч одна) — адміну потрібна повна картина, а не
+ * версія, приховану через MIN_RATINGS_FOR_PUBLIC_AVERAGE. */
+function OrganizerReputationSection({ reputation }: { reputation: AdminOrganizerReputation }) {
+  const maxCount = Math.max(1, ...reputation.distribution)
+
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+          <Star size={16} className="text-[var(--accent)]" /> Репутація організатора
+        </h2>
+        {reputation.isReliableOrganizer ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-400">
+            <ShieldCheck size={13} /> Надійний
+          </span>
+        ) : (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--surface-card-alt)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]">
+            Ще не кваліфікується
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <StatBlock
+          label="Середня оцінка"
+          value={reputation.averageRating ?? 0}
+        />
+        <StatBlock label="Оцінок" value={reputation.ratingsCount} />
+        <StatBlock label="Завершених подій" value={reputation.completedEventsCount} />
+      </div>
+
+      {reputation.ratingsCount > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {reputation.distribution.map((count, index) => {
+            const value = index + 1
+            return (
+              <div key={value} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                <span className="w-3 shrink-0 text-right font-semibold">{value}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--surface-card-alt)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--accent)]"
+                    style={{ width: `${(count / maxCount) * 100}%` }}
+                  />
+                </div>
+                <span className="w-6 shrink-0 text-right">{count}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }

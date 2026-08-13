@@ -1,9 +1,11 @@
 import { Router, raw } from 'express'
 import * as eventsController from '../controllers/events.controller'
+import * as eventRatingsController from '../controllers/event-ratings.controller'
 import {
   createEventRateLimiter,
   eventShareRateLimiter,
   imageUploadRateLimiter,
+  submitEventRatingRateLimiter,
 } from '../middleware/rateLimit'
 import * as eventShareController from '../controllers/event-share.controller'
 import { MAX_IMAGE_UPLOAD_BYTES, UPLOAD_CONTENT_TYPES } from '../utils/uploads'
@@ -39,3 +41,8 @@ eventsRouter.post('/:id/waitlist', eventsController.joinWaitlist)
 eventsRouter.delete('/:id/waitlist', eventsController.leaveWaitlist)
 eventsRouter.get('/:id/waitlist', eventsController.getWaitlist)
 eventsRouter.delete('/:id/waitlist/:userId', eventsController.removeFromWaitlist)
+
+// Коротка оцінка завершеної події — право оцінювати (учасник, не
+// організатор, подія завершена, у межах 7 днів) перевіряє сервіс, не тут.
+eventsRouter.get('/:id/rating', eventRatingsController.getMyRating)
+eventsRouter.put('/:id/rating', submitEventRatingRateLimiter, eventRatingsController.submitRating)

@@ -3,6 +3,7 @@ import type { CreateQuickPlanInput, QuickPlan } from '../types/quickPlan'
 import type { AuthUser, PublicUser, SubmitRegistrationInput, UpdateProfileInput } from '../types/user'
 import type { Dormitory } from '../types/dormitory'
 import type { AdminPoll, Poll, PollAudience, PollBroadcastReport } from '../types/poll'
+import type { EventRatingSelfResponse, EventRatingTag, OrganizerReputation } from '../types/eventRating'
 import type { EventsScope } from '../context/EventsContext'
 import type {
   AdminStats,
@@ -411,6 +412,29 @@ export async function fetchPublicUser(id: string): Promise<PublicProfileResponse
   return request<PublicProfileResponse>(`/users/${id}`)
 }
 
+export async function fetchOrganizerReputation(userId: string): Promise<OrganizerReputation> {
+  return request<OrganizerReputation>(`/users/${userId}/organizer-reputation`)
+}
+
+// --- Коротка оцінка завершеної події ---------------------------------
+// userId/organizerId ніколи не надсилаються: backend сам визначає обидва
+// із сесії й самої події.
+
+export async function fetchMyEventRating(eventId: string): Promise<EventRatingSelfResponse> {
+  return request<EventRatingSelfResponse>(`/events/${eventId}/rating`)
+}
+
+export async function submitEventRating(
+  eventId: string,
+  rating: number,
+  tags: EventRatingTag[],
+): Promise<EventRatingSelfResponse> {
+  return request<EventRatingSelfResponse>(`/events/${eventId}/rating`, {
+    method: 'PUT',
+    body: JSON.stringify({ rating, tags }),
+  })
+}
+
 export async function updateMyDormitory(dormitoryId: string): Promise<AuthUser> {
   const data = await request<MeResponse>('/me', {
     method: 'PATCH',
@@ -583,6 +607,16 @@ export async function fetchAdminEvents(
 
 export async function fetchAdminEventDetail(id: string): Promise<AdminEventDetail> {
   return request<AdminEventDetail>(`/admin/events/${id}`)
+}
+
+/** Виключає оцінку з рейтингу (підозріла) — рядок лишається видимим
+ * адміну, лише перестає враховуватись у репутації організатора. */
+export async function removeAdminEventRating(ratingId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/event-ratings/${ratingId}`, { method: 'DELETE' })
+}
+
+export async function restoreAdminEventRating(ratingId: string): Promise<void> {
+  await request<{ success: boolean }>(`/admin/event-ratings/${ratingId}/restore`, { method: 'POST' })
 }
 
 export async function deleteAdminEvent(id: string): Promise<void> {

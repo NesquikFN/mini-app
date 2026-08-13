@@ -33,6 +33,11 @@ adminRouter.delete('/events/:id/participants/:userId', adminController.removePar
 adminRouter.get('/events/:id/waitlist', adminController.getEventWaitlist)
 adminRouter.delete('/events/:id/waitlist/:userId', adminController.removeFromEventWaitlist)
 
+// Модерація оцінок — id самої оцінки (глобально унікальний), а не
+// вкладено під подію, для симетрії з рештою плоских адмінських маршрутів.
+adminRouter.delete('/event-ratings/:id', adminController.removeEventRating)
+adminRouter.post('/event-ratings/:id/restore', adminController.restoreEventRating)
+
 adminRouter.get('/admins', adminController.listAdmins)
 adminRouter.post('/admins', adminController.addAdmin)
 adminRouter.delete('/admins/:userId', adminController.removeAdmin)

@@ -1,5 +1,6 @@
 import type { PublicUser, RegistrationStatus } from './user'
 import type { DormEvent } from './event'
+import type { EventRatingTag } from './eventRating'
 
 export interface AdminStats {
   users: number
@@ -27,6 +28,7 @@ export type NotificationKind =
   | 'quick_plan_join'
   | 'waitlist_promoted'
   | 'poll_broadcast'
+  | 'event_rating_request'
 
 export interface NotificationLogEntry {
   id: string
@@ -87,6 +89,15 @@ export interface AdminUsersResponse {
   pagination: Pagination
 }
 
+export interface AdminOrganizerReputation {
+  averageRating?: number
+  ratingsCount: number
+  completedEventsCount: number
+  /** Кількість оцінок 1..5 — індекс 0 відповідає оцінці 1. */
+  distribution: [number, number, number, number, number]
+  isReliableOrganizer: boolean
+}
+
 export interface AdminUserDetail {
   user: AdminUserView
   stats: {
@@ -95,6 +106,19 @@ export interface AdminUserDetail {
   }
   createdEvents: DormEvent[]
   participatingEvents: DormEvent[]
+  organizerReputation: AdminOrganizerReputation
+}
+
+export interface AdminEventRatingEntry {
+  id: string
+  userId: string
+  userName: string
+  rating: number
+  tags: EventRatingTag[]
+  createdAt: string
+  updatedAt: string
+  moderatedAt?: string
+  removedBy?: string
 }
 
 export type AdminEventDateFilter = 'today' | 'week' | 'all'
@@ -121,6 +145,7 @@ export interface AdminEventDetail {
   event: DormEvent
   creator: PublicUser
   participants: PublicUser[]
+  ratings: AdminEventRatingEntry[]
 }
 
 export interface RegistrationListItem {

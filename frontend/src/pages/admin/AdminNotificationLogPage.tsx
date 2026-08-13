@@ -23,6 +23,7 @@ const KIND_LABELS: Record<NotificationKind, string> = {
   quick_plan_join: 'Відгук на швидкий план',
   waitlist_promoted: 'Просування з листа очікування',
   poll_broadcast: 'Розсилка опитування',
+  event_rating_request: 'Запит оцінити подію',
 }
 
 export function AdminNotificationLogPage() {

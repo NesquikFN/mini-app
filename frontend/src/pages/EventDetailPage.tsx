@@ -14,6 +14,8 @@ import { ShareEventSheet } from '../components/ShareEventSheet'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { FormattedText } from '../components/FormattedText'
 import { ParticipantProfileRow } from '../components/ParticipantProfileRow'
+import { EventRatingSection } from '../components/EventRatingSection'
+import { ReliableOrganizerBadge } from '../components/ReliableOrganizerBadge'
 import { formatEventDate, formatEventTime, isEventPast } from '../utils/date'
 import {
   fetchEventDetail,
@@ -327,6 +329,7 @@ export function EventDetailPage() {
             Подію завершено та перенесено в архів
           </div>
         )}
+        {isArchived && <EventRatingSection eventId={event.id} />}
         {event.vipOnly && (
           <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-400">
             <Crown size={18} /> Подія тільки для VIP
@@ -348,9 +351,12 @@ export function EventDetailPage() {
             )}
             {membersStatus === 'success' && members && <UserRow user={members.creator} />}
           </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--accent)]/35 bg-[var(--accent-soft-bg)] px-3 py-1.5 text-xs font-bold tracking-wide text-[var(--accent)]">
-            <Crown size={14} /> ОРГАНІЗАТОР
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent)]/35 bg-[var(--accent-soft-bg)] px-3 py-1.5 text-xs font-bold tracking-wide text-[var(--accent)]">
+              <Crown size={14} /> ОРГАНІЗАТОР
+            </span>
+            {event.creatorReliable && <ReliableOrganizerBadge compact />}
+          </div>
         </section>
 
         <section className="flex flex-col gap-3">

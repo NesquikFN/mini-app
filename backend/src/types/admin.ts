@@ -1,5 +1,6 @@
 import type { AdminUserView, PublicUser, RegistrationStatus } from './user'
 import type { EventResponse } from '../services/events.service'
+import type { AdminEventRatingEntry, AdminOrganizerReputation } from './eventRating'
 
 export interface AdminStats {
   users: number
@@ -36,6 +37,9 @@ export interface AdminUserDetail {
   }
   createdEvents: EventResponse[]
   participatingEvents: EventResponse[]
+  /** Репутація як організатора — присутня незалежно від того, створював
+   * цей користувач події чи ні (нулі, якщо не створював). */
+  organizerReputation: AdminOrganizerReputation
 }
 
 export interface AdminEventListItem {
@@ -60,6 +64,9 @@ export interface AdminEventDetail {
   event: EventResponse
   creator: PublicUser
   participants: PublicUser[]
+  /** Без анонімізації — саме для адмінки, звичайний користувач цей
+   * список ніколи не отримує. */
+  ratings: AdminEventRatingEntry[]
 }
 
 export interface AdminListItem extends AdminUserView {

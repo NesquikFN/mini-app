@@ -647,6 +647,36 @@ export async function sendEventReminder(
 }
 
 /**
+ * DM 30–60 хв після завершення події (event-rating-reminders.service.ts)
+ * із пропозицією лишити коротку оцінку. Кнопка веде на саму подію тим
+ * самим deep link, що й анонс/нагадування — EventDetailPage сама показує
+ * форму оцінки, коли подія вже архівна, тож для розсилки не потрібен
+ * окремий тип deep link.
+ */
+export async function sendEventRatingRequest(
+  chatId: string,
+  event: Pick<Event, 'id' | 'title'>,
+): Promise<void> {
+  const text = escapeMarkdownV2(`⭐ Як пройшла подія «${event.title}»?`)
+
+  await sendAndLog(
+    'event_rating_request',
+    chatId,
+    async () => {
+      await botApi('sendMessage', {
+        chat_id: chatId,
+        text,
+        parse_mode: 'MarkdownV2',
+        reply_markup: {
+          inline_keyboard: [[{ text: '⭐ Оцінити в DormHub', url: await buildEventDeepLink(event.id) }]],
+        },
+      })
+    },
+    { id: event.id, title: event.title },
+  )
+}
+
+/**
  * DM тому, кого черга автоматично перевела в учасники. Кнопка веде в
  * саму подію тим самим deep link, що й анонс — людина потрапляє одразу
  * на потрібний екран, а не в загальний список.

@@ -11,6 +11,7 @@ export type NotificationKind =
   | 'quick_plan_join'
   | 'waitlist_promoted'
   | 'poll_broadcast'
+  | 'event_rating_request'
 
 export interface NewNotificationLogEntry {
   chatId: string

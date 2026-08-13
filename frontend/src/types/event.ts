@@ -31,6 +31,9 @@ export interface DormEvent {
   waitlistCount?: number
   /** Позиція поточного користувача в черзі (1-based), якщо він у ній. */
   viewerWaitlistPosition?: number
+  /** Автоматичний бейдж «Надійний організатор» творця події — рахується
+   * на бекенді з актуальних даних, ніде не зберігається. */
+  creatorReliable?: boolean
 }
 
 export interface CreateEventInput {

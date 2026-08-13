@@ -27,6 +27,7 @@ import { mapWithConcurrency } from '../utils/concurrency'
 import { vipsRepository } from '../repositories/vips.repository'
 import { gpusRepository } from '../repositories/gpus.repository'
 import { NO_DORMITORY_ID } from '../types/dormitory'
+import { getReliableOrganizerFlags } from './organizer-reputation.service'
 
 export interface EventResponse {
   id: string
@@ -60,6 +61,11 @@ export interface EventResponse {
   waitlistCount: number
   /** Позиція саме цього глядача в черзі (1-based), якщо він у ній. */
   viewerWaitlistPosition?: number
+  /** Автоматичний бейдж «Надійний організатор» творця цієї події —
+   * рахується на льоту (organizer-reputation.service.ts), ніде не
+   * зберігається. Завжди заповнений тим самим batch-проходом, що й
+   * participantPreview/waitlistCount, щоб EventCard не робив N+1. */
+  creatorReliable: boolean
 }
 
 export interface UserEvents {
@@ -91,6 +97,7 @@ function toEventResponse(event: Event): EventResponse {
     // Реальні значення домальовує attachParticipantPreviews разом із
     // прев'ю учасників — тими самими batch-запитами, без N+1.
     waitlistCount: 0,
+    creatorReliable: false,
   }
 }
 
@@ -107,13 +114,15 @@ async function attachParticipantPreviews(
 ): Promise<EventResponse[]> {
   if (events.length === 0) return events
   const eventIds = events.map((event) => event.id)
+  const creatorIds = [...new Set(events.map((event) => event.creatorId))]
 
-  const [previews, waitlistCounts, viewerPositions] = await Promise.all([
+  const [previews, waitlistCounts, viewerPositions, reliableFlags] = await Promise.all([
     eventsRepository.findParticipantPreviews(eventIds),
     eventsRepository.findWaitlistCounts(eventIds),
     viewerId
       ? eventsRepository.findWaitlistPositions(eventIds, viewerId)
       : Promise.resolve(new Map<string, number>()),
+    getReliableOrganizerFlags(creatorIds),
   ])
 
   return events.map((event) => ({
@@ -121,6 +130,7 @@ async function attachParticipantPreviews(
     participantPreview: previews.get(event.id) ?? [],
     waitlistCount: waitlistCounts.get(event.id) ?? 0,
     viewerWaitlistPosition: viewerPositions.get(event.id),
+    creatorReliable: reliableFlags.get(event.creatorId) ?? false,
   }))
 }
 
@@ -653,16 +663,21 @@ export async function listEventsForUser(
   const eventIds = [
     ...new Set([...createdResponses, ...participatingResponses].map((event) => event.id)),
   ]
-  const [previews, waitlistCounts, viewerPositions] = await Promise.all([
+  const creatorIds = [
+    ...new Set([...createdResponses, ...participatingResponses].map((event) => event.creatorId)),
+  ]
+  const [previews, waitlistCounts, viewerPositions, reliableFlags] = await Promise.all([
     eventsRepository.findParticipantPreviews(eventIds),
     eventsRepository.findWaitlistCounts(eventIds),
     eventsRepository.findWaitlistPositions(eventIds, viewerId),
+    getReliableOrganizerFlags(creatorIds),
   ])
   const withPreview = (event: EventResponse): EventResponse => ({
     ...event,
     participantPreview: previews.get(event.id) ?? [],
     waitlistCount: waitlistCounts.get(event.id) ?? 0,
     viewerWaitlistPosition: viewerPositions.get(event.id),
+    creatorReliable: reliableFlags.get(event.creatorId) ?? false,
   })
 
   return {

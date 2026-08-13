@@ -56,6 +56,10 @@ export const RATE_LIMITS = {
    * випадковий подвійний клік не повинен запустити другу хвилю
    * повідомлень (додатково до гейта POLL_ALREADY_BROADCAST). */
   pollBroadcastPerHour: 3,
+  /** Оцінка події: PUT спрацьовує і на перший голос, і на зміну — щедрий
+   * ліміт (людина не оцінює десятки подій щогодини), лише проти
+   * автоматизованого спаму. */
+  submitEventRatingPerHour: 30,
 } as const
 
 /** Стабільний ключ: id користувача для автентифікованих запитів, інакше
@@ -185,4 +189,9 @@ export const quickPlanJoinRateLimiter = buildPersistentLimiter('quick-plan-join'
 export const pollBroadcastRateLimiter = buildPersistentLimiter('poll-broadcast', {
   windowMs: HOUR,
   limit: RATE_LIMITS.pollBroadcastPerHour,
+})
+
+export const submitEventRatingRateLimiter = buildPersistentLimiter('submit-event-rating', {
+  windowMs: HOUR,
+  limit: RATE_LIMITS.submitEventRatingPerHour,
 })

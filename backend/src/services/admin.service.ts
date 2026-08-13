@@ -5,6 +5,8 @@ import { gpusRepository } from '../repositories/gpus.repository'
 import { usersRepository } from '../repositories/users.repository'
 import { eventsRepository, type EventDateFilter } from '../repositories/events.repository'
 import * as eventsService from './events.service'
+import * as eventRatingsService from './event-ratings.service'
+import { getAdminOrganizerReputation } from './organizer-reputation.service'
 import { AppError } from '../utils/AppError'
 import type { AdminUserView } from '../types/user'
 import type {
@@ -60,7 +62,10 @@ export async function getUserDetail(id: string): Promise<AdminUserDetail> {
     throw new AppError(404, 'USER_NOT_FOUND', 'Користувача не знайдено')
   }
 
-  const { created, participating } = await eventsService.listEventsForUser(id, id, true)
+  const [{ created, participating }, organizerReputation] = await Promise.all([
+    eventsService.listEventsForUser(id, id, true),
+    getAdminOrganizerReputation(id),
+  ])
 
   return {
     user,
@@ -70,6 +75,7 @@ export async function getUserDetail(id: string): Promise<AdminUserDetail> {
     },
     createdEvents: created,
     participatingEvents: participating,
+    organizerReputation,
   }
 }
 
@@ -201,8 +207,11 @@ export async function listEvents(
 
 export async function getEventDetail(id: string): Promise<AdminEventDetail> {
   const event = await eventsService.getEvent(id)
-  const { creator, participants } = await eventsService.getEventMembers(event)
-  return { event, creator, participants }
+  const [{ creator, participants }, ratings] = await Promise.all([
+    eventsService.getEventMembers(event),
+    eventRatingsService.getEventRatingsForAdmin(id),
+  ])
+  return { event, creator, participants, ratings }
 }
 
 export async function deleteEvent(id: string): Promise<void> {

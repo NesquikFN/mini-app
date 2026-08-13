@@ -1,15 +1,24 @@
 import { BadgeCheck, Crown, ShieldCheck, Sparkles } from 'lucide-react'
+import { ReliableOrganizerBadge } from './ReliableOrganizerBadge'
 
 interface RoleBadgesProps {
   isAdmin?: boolean
   isHost?: boolean
   isVip?: boolean
   isGpu?: boolean
+  isReliableOrganizer?: boolean
   centered?: boolean
 }
 
-export function RoleBadges({ isAdmin, isHost, isVip, isGpu, centered = false }: RoleBadgesProps) {
-  if (!isAdmin && !isHost && !isVip && !isGpu) return null
+export function RoleBadges({
+  isAdmin,
+  isHost,
+  isVip,
+  isGpu,
+  isReliableOrganizer,
+  centered = false,
+}: RoleBadgesProps) {
+  if (!isAdmin && !isHost && !isVip && !isGpu && !isReliableOrganizer) return null
 
   return (
     <div className={`flex flex-wrap gap-1.5 ${centered ? 'justify-center' : ''}`}>
@@ -33,6 +42,7 @@ export function RoleBadges({ isAdmin, isHost, isVip, isGpu, centered = false }: 
           <BadgeCheck size={13} /> ГПУ
         </span>
       )}
+      {isReliableOrganizer && <ReliableOrganizerBadge />}
     </div>
   )
 }

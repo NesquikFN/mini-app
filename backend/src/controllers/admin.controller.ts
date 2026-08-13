@@ -13,11 +13,13 @@ import {
   notificationLogQuerySchema,
 } from '../validation/admin.schemas'
 import { quickPlanIdParamSchema } from '../validation/quick-plan.schemas'
+import { eventRatingIdParamSchema } from '../validation/event-rating.schemas'
 import { settingsRepository } from '../repositories/settings.repository'
 import { notificationLogRepository } from '../repositories/notification-log.repository'
 import * as telegramNotifications from '../services/telegram-notifications.service'
 import * as quickPlansService from '../services/quick-plans.service'
 import * as eventsService from '../services/events.service'
+import * as eventRatingsService from '../services/event-ratings.service'
 
 /** Скільки останніх активних планів показує адмінський блок-огляд. */
 const ADMIN_QUICK_PLANS_LIMIT = 5
@@ -218,6 +220,21 @@ export async function listQuickPlans(req: Request, res: Response): Promise<void>
 export async function deleteQuickPlan(req: Request, res: Response): Promise<void> {
   const { id } = quickPlanIdParamSchema.parse(req.params)
   await quickPlansService.deleteQuickPlanAsAdmin(id)
+  res.json({ success: true })
+}
+
+/** Виключення підозрілої оцінки з рейтингу організатора — рядок
+ * лишається (адмін і надалі бачить, хто й що оцінив у getEventDetail),
+ * просто перестає враховуватись у жодній агрегації репутації. */
+export async function removeEventRating(req: Request, res: Response): Promise<void> {
+  const { id } = eventRatingIdParamSchema.parse(req.params)
+  await eventRatingsService.moderateRating(id, req.user.id)
+  res.json({ success: true })
+}
+
+export async function restoreEventRating(req: Request, res: Response): Promise<void> {
+  const { id } = eventRatingIdParamSchema.parse(req.params)
+  await eventRatingsService.restoreRating(id)
   res.json({ success: true })
 }
 
