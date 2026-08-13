@@ -6,7 +6,7 @@ import {
 } from '../repositories/event-templates.repository'
 import { AppError } from '../utils/AppError'
 import type { Event } from '../types/event'
-import type { PublicUser } from '../types/user'
+import type { AuthUser, PublicUser } from '../types/user'
 import type { EventTemplate } from '../types/admin'
 import type {
   CreateEventInput,
@@ -20,6 +20,7 @@ import {
   buildEventDeepLink,
   sendEventAnnouncement,
   sendEventJoinConfirmation,
+  sendEventOrganizerJoinNotification,
   sendWaitlistPromotionMessage,
   NOTIFICATION_CONCURRENCY,
 } from './telegram-notifications.service'
@@ -28,6 +29,7 @@ import { vipsRepository } from '../repositories/vips.repository'
 import { gpusRepository } from '../repositories/gpus.repository'
 import { NO_DORMITORY_ID } from '../types/dormitory'
 import { getReliableOrganizerFlags } from './organizer-reputation.service'
+import { userNotificationSettingsRepository } from '../repositories/user-notification-settings.repository'
 
 export interface EventResponse {
   id: string
@@ -346,25 +348,34 @@ export async function announceEvent(event: EventResponse): Promise<void> {
 
   // Онлайн-подія доступна всім гуртожиткам — сповіщаємо всіх підписників.
   // Офлайн-подія лишається в межах свого гуртожитку — так само й тут.
-  const requiredRole = event.vipOnly ? 'vip' : event.gpuOnly ? 'gpu' : undefined
-  const subscriberIds = await usersRepository.getSubscribedTelegramIds(
-    event.isOnline ? undefined : event.dormitoryId,
-    requiredRole,
-  )
-  // Обмежена паралельність замість Promise.all по всьому списку: інакше
-  // одна створена подія відкриває стільки одночасних запитів до Telegram,
-  // скільки є підписників, і впирається в ліміти Bot API.
-  await mapWithConcurrency(subscriberIds, NOTIFICATION_CONCURRENCY, async (telegramId) => {
-    try {
-      await sendEventAnnouncement(String(telegramId), event, creatorInfo, undefined, true)
-    } catch (error) {
-      // Невдача для одного отримувача не повинна ламати створення події.
-      console.error(
-        `Не вдалося надіслати особисте сповіщення про подію користувачу ${telegramId}:`,
-        error,
-      )
-    }
-  })
+  //
+  // Увесь блок — в одному try/catch, а не лише відправка кожному
+  // отримувачу: якщо впаде сам запит списку підписників (а не окреме
+  // повідомлення), подія вже зафіксована в БД, і створення однаково не
+  // повинно перетворюватись на 500 через це.
+  try {
+    const requiredRole = event.vipOnly ? 'vip' : event.gpuOnly ? 'gpu' : undefined
+    const subscriberIds = await usersRepository.getSubscribedTelegramIds(
+      event.isOnline ? undefined : event.dormitoryId,
+      requiredRole,
+    )
+    // Обмежена паралельність замість Promise.all по всьому списку: інакше
+    // одна створена подія відкриває стільки одночасних запитів до Telegram,
+    // скільки є підписників, і впирається в ліміти Bot API.
+    await mapWithConcurrency(subscriberIds, NOTIFICATION_CONCURRENCY, async (telegramId) => {
+      try {
+        await sendEventAnnouncement(String(telegramId), event, creatorInfo, undefined, true)
+      } catch (error) {
+        // Невдача для одного отримувача не повинна ламати створення події.
+        console.error(
+          `Не вдалося надіслати особисте сповіщення про подію користувачу ${telegramId}:`,
+          error,
+        )
+      }
+    })
+  } catch (error) {
+    console.error('Не вдалося розіслати особисті сповіщення про подію:', error)
+  }
 }
 
 /**
@@ -512,7 +523,10 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
   const participant = await usersRepository.getUserById(userId)
   // Перевірка ліміту місць і повторного приєднання відбувається
   // атомарно всередині PostgreSQL-функції join_event (repository),
-  // тому тут немає окремого "прочитати → перевірити → вставити".
+  // тому тут немає окремого "прочитати → перевірити → вставити". Якщо
+  // приєднання не відбулось (уже учасник, немає місць тощо), функція
+  // кидає виняток раніше, ніж виконання дійде до коду нижче — тож жодне
+  // сповіщення звідси не піде на невдалий чи повторний join.
   await eventsRepository.addParticipant(eventId, userId)
   // participantPreview у відповіді дозволяє EventsProvider оновити
   // avatar-стек на картці, підмінивши лише цю подію в списку — без
@@ -521,12 +535,67 @@ export async function joinEvent(eventId: string, userId: string): Promise<EventR
     toEventResponse(await getEventOrThrow(eventId)),
     userId,
   )
-  if (participant) {
-    await sendEventJoinConfirmation(String(participant.telegramId), response).catch((error) => {
-      console.error(`Не вдалося надіслати підтвердження приєднання користувачу ${userId}:`, error)
-    })
-  }
+
+  // Два незалежні best-effort сповіщення: збій одного (Telegram недоступний,
+  // бот заблокований) не повинен ні відкотити вже зафіксоване приєднання,
+  // ні завадити іншому. Кожне гейтиться власним перемикачем отримувача.
+  await Promise.all([
+    notifyParticipantOfJoin(participant, response),
+    notifyOrganizerOfJoin(event.creatorId, participant, response),
+  ])
+
   return response
+}
+
+/**
+ * Уся функція — best-effort: приєднання вже зафіксоване в БД до її
+ * виклику, тож жодна помилка тут (збій самої перевірки перемикача,
+ * недоступний Telegram) не повинна перетворювати вдалий join на 500.
+ */
+async function notifyParticipantOfJoin(
+  participant: AuthUser | null,
+  event: EventResponse,
+): Promise<void> {
+  if (!participant) return
+  try {
+    const settings = await userNotificationSettingsRepository.getEffective(participant.id)
+    if (!settings.joinConfirmationEnabled) return
+    await sendEventJoinConfirmation(String(participant.telegramId), event)
+  } catch (error) {
+    console.error(`Не вдалося надіслати підтвердження приєднання користувачу ${participant.id}:`, error)
+  }
+}
+
+/**
+ * Організатору не надсилаємо, якщо він приєднався до власної події —
+ * структурно неможливо для звичайних подій (творець автоприєднується
+ * при створенні, тож повторний join впав би на ALREADY_JOINED раніше,
+ * ніж виконання дійшло б сюди), але перевірка лишається як явний,
+ * недвозначний запобіжник, а не мовчазне припущення.
+ *
+ * Уся функція — best-effort, як і notifyParticipantOfJoin: жодна її
+ * помилка не повинна перетворювати вдалий join на 500.
+ */
+async function notifyOrganizerOfJoin(
+  organizerId: string,
+  joiner: AuthUser | null,
+  event: EventResponse,
+): Promise<void> {
+  if (!joiner || joiner.id === organizerId) return
+  try {
+    const [organizer, settings] = await Promise.all([
+      usersRepository.getUserById(organizerId),
+      userNotificationSettingsRepository.getEffective(organizerId),
+    ])
+    if (!organizer || !settings.organizerJoinEnabled) return
+    await sendEventOrganizerJoinNotification(
+      String(organizer.telegramId),
+      event,
+      joiner.nickname ?? joiner.firstName,
+    )
+  } catch (error) {
+    console.error(`Не вдалося сповістити організатора події ${event.id} про нового учасника:`, error)
+  }
 }
 
 export async function leaveEvent(eventId: string, userId: string): Promise<EventResponse> {

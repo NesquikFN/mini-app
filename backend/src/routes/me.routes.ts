@@ -15,3 +15,6 @@ meRouter.post('/registration', meController.submitRegistration)
 
 meRouter.patch('/', requireApprovedUser, meController.updateMe)
 meRouter.get('/events', requireApprovedUser, meController.getMyEvents)
+
+meRouter.get('/notifications', requireApprovedUser, meController.getMyNotificationSettings)
+meRouter.patch('/notifications', requireApprovedUser, meController.updateMyNotificationSettings)

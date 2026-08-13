@@ -2,7 +2,9 @@ import type { Request, Response } from 'express'
 import * as eventsService from '../services/events.service'
 import * as usersService from '../services/users.service'
 import * as registrationService from '../services/registration.service'
+import * as notificationSettingsService from '../services/notification-settings.service'
 import { updateMeSchema, submitRegistrationSchema } from '../validation/user.schemas'
+import { updateNotificationSettingsSchema } from '../validation/notification-settings.schemas'
 
 export async function getMe(req: Request, res: Response): Promise<void> {
   res.json({ user: await usersService.withRoles(req.user) })
@@ -41,4 +43,13 @@ export async function submitRegistration(req: Request, res: Response): Promise<v
   const input = submitRegistrationSchema.parse(req.body)
   const user = await registrationService.submitRegistration(req.user.id, input)
   res.json({ user: await usersService.withRoles(user) })
+}
+
+export async function getMyNotificationSettings(req: Request, res: Response): Promise<void> {
+  res.json(await notificationSettingsService.getMyNotificationSettings(req.user.id))
+}
+
+export async function updateMyNotificationSettings(req: Request, res: Response): Promise<void> {
+  const input = updateNotificationSettingsSchema.parse(req.body)
+  res.json(await notificationSettingsService.updateMyNotificationSettings(req.user.id, input))
 }

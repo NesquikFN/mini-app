@@ -9,6 +9,7 @@ import { EmptyState } from '../components/EmptyState'
 import { LoadingState } from '../components/LoadingState'
 import { InstagramIcon } from '../components/InstagramIcon'
 import { RoleBadges } from '../components/RoleBadges'
+import { NotificationSettingsCard } from '../components/NotificationSettingsCard'
 import { isEventPast } from '../utils/date'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useAdminStatus } from '../hooks/useAdminStatus'
@@ -158,6 +159,8 @@ export function ProfilePage() {
                 Адмін-панель
               </Link>
             )}
+
+            <NotificationSettingsCard />
 
             <div className="grid grid-cols-2 gap-3">
               <StatCard

@@ -755,3 +755,19 @@ create index if not exists idx_event_rating_tags_rating_id on event_rating_tags 
 
 alter table event_ratings enable row level security;
 alter table event_rating_tags enable row level security;
+
+-- =========================================================
+-- Особисті налаштування сповіщень (див. migrations/0032_user_notification_settings.sql)
+-- =========================================================
+-- "Нові події" лишається в users.notify_new_events (уже використовується
+-- announceEvent, аудиторією розсилки опитувань і командою /notifications_off) —
+-- ця таблиця додає лише дві справді нові настройки.
+create table if not exists user_notification_settings (
+  user_id uuid primary key references users (id) on delete cascade,
+  join_confirmation_enabled boolean not null default true,
+  organizer_join_enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table user_notification_settings enable row level security;

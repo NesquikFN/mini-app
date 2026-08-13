@@ -29,6 +29,8 @@ export type NotificationKind =
   | 'waitlist_promoted'
   | 'poll_broadcast'
   | 'event_rating_request'
+  | 'quick_plan_announcement'
+  | 'organizer_join_notification'
 
 export interface NotificationLogEntry {
   id: string

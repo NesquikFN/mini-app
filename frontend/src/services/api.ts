@@ -472,6 +472,25 @@ export async function fetchDormitories(): Promise<Dormitory[]> {
   return data.dormitories
 }
 
+export interface PersonalNotificationSettings {
+  newEventsEnabled: boolean
+  joinConfirmationEnabled: boolean
+  organizerJoinEnabled: boolean
+}
+
+export function fetchMyNotificationSettings(): Promise<PersonalNotificationSettings> {
+  return request<PersonalNotificationSettings>('/me/notifications')
+}
+
+export function updateMyNotificationSettings(
+  patch: Partial<PersonalNotificationSettings>,
+): Promise<PersonalNotificationSettings> {
+  return request<PersonalNotificationSettings>('/me/notifications', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
+
 export async function fetchMyEvents(): Promise<MyEventsResponse> {
   return request<MyEventsResponse>('/me/events')
 }

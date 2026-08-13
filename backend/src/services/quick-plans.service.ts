@@ -12,7 +12,12 @@ import type {
   QuickPlanResponse,
 } from '../types/quick-plan'
 import type { CreateQuickPlanInput } from '../validation/quick-plan.schemas'
-import { sendQuickPlanJoinNotification } from './telegram-notifications.service'
+import {
+  NOTIFICATION_CONCURRENCY,
+  sendQuickPlanAnnouncement,
+  sendQuickPlanJoinNotification,
+} from './telegram-notifications.service'
+import { mapWithConcurrency } from '../utils/concurrency'
 
 /** Стеля активних планів на одного автора — головний антиспам-запобіжник
  * (окремо від rate limit, який обмежує лише темп, а не кількість). */
@@ -168,7 +173,44 @@ export async function createQuickPlan(
     expiresAt: resolveExpiresAt(input.lifetime),
   })
 
-  return toResponse(plan, creatorId)
+  const response = await toResponse(plan, creatorId)
+  await announceQuickPlan(plan)
+  return response
+}
+
+/**
+ * Особисті DM підписникам notify_new_events — той самий принцип
+ * гуртожитку/глобальності, що й у events.service.announceEvent
+ * (offline-план бачить лише свій гуртожиток, online — усі). На відміну
+ * від подій, групового анонсу тут немає: швидкий план живе кілька годин
+ * і не має "офіційного" каналу для такого. requiredRole завжди
+ * undefined — VIP/ГПУ на швидкі плани не впливають.
+ */
+async function announceQuickPlan(plan: QuickPlanWithParticipants): Promise<void> {
+  // Увесь блок в одному try/catch, а не лише відправка кожному
+  // отримувачу: план уже зафіксований у БД, і його створення не повинно
+  // перетворюватись на 500 через збій самого запиту списку підписників.
+  try {
+    const subscriberIds = await usersRepository.getSubscribedTelegramIds(
+      plan.isOnline ? undefined : plan.dormitoryId,
+    )
+    await mapWithConcurrency(subscriberIds, NOTIFICATION_CONCURRENCY, async (telegramId) => {
+      try {
+        await sendQuickPlanAnnouncement(String(telegramId), {
+          id: plan.id,
+          text: plan.text,
+          category: plan.category,
+        })
+      } catch (error) {
+        console.error(
+          `Не вдалося надіслати особисте сповіщення про план ${plan.id} користувачу ${telegramId}:`,
+          error,
+        )
+      }
+    })
+  } catch (error) {
+    console.error(`Не вдалося розіслати сповіщення про новий план ${plan.id}:`, error)
+  }
 }
 
 /**

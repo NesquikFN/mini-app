@@ -8,6 +8,7 @@ import {
 } from '../repositories/notification-log.repository'
 import type { EventResponse } from './events.service'
 import type { Event } from '../types/event'
+import type { QuickPlanCategory } from '../types/quick-plan'
 import { sleep } from '../utils/concurrency'
 import { isUserBanned } from '../utils/ban'
 
@@ -795,21 +796,24 @@ export async function sendPollBroadcastMessage(
   )
 }
 
-/** Особисте підтвердження після успішного приєднання. Посилання
- * надсилаються окремими Telegram-кнопками, якщо організатор їх указав. */
+/** Особисте підтвердження після успішного приєднання: дата/час і місце
+ * (або "Онлайн") тим самим форматом, що й sendEventAnnouncement, плюс
+ * кнопки на гру/чат, якщо організатор їх указав. */
 export async function sendEventJoinConfirmation(
   chatId: string,
-  event: Pick<EventResponse, 'id' | 'title' | 'gameUrl' | 'groupUrl'>,
+  event: Pick<EventResponse, 'id' | 'title' | 'date' | 'time' | 'location' | 'isOnline' | 'gameUrl' | 'groupUrl'>,
 ): Promise<void> {
   const buttons: Array<Array<{ text: string; url: string }>> = []
   if (event.gameUrl) buttons.push([{ text: '🎮 Відкрити гру', url: event.gameUrl }])
   if (event.groupUrl) buttons.push([{ text: '💬 Відкрити чат', url: event.groupUrl }])
 
+  const location = event.isOnline ? 'Онлайн' : event.location
   const text = [
-    `✅ Ви приєдналися до події «${event.title}»!`,
-    buttons.length > 0
-      ? 'Посилання від організатора доступні нижче.'
-      : 'Організатор поки не додав посилань.',
+    '✅ Ти успішно приєднався!',
+    `🎉 ${event.title}`,
+    `📅 ${event.date} о ${event.time.slice(0, 5)}`,
+    `📍 ${location}`,
+    'До зустрічі!',
   ].map(escapeMarkdownV2).join('\n')
 
   await sendAndLog(
@@ -821,6 +825,72 @@ export async function sendEventJoinConfirmation(
       parse_mode: 'MarkdownV2',
       ...(buttons.length > 0 ? { reply_markup: { inline_keyboard: buttons } } : {}),
     }),
+    { id: event.id, title: event.title },
+  )
+}
+
+export interface QuickPlanAnnouncement {
+  id: string
+  text: string
+  category: QuickPlanCategory
+}
+
+const QUICK_PLAN_CATEGORY_EMOJI: Record<QuickPlanCategory, string> = {
+  sport: '⚽',
+  study: '📚',
+  food: '🍕',
+  walk: '🚶',
+  games: '🎮',
+  other: '✨',
+}
+
+/**
+ * Особисте сповіщення про новий швидкий план «Хто зі мною?» — той самий
+ * принцип, що й особиста версія sendEventAnnouncement (підписники
+ * notify_new_events свого гуртожитку чи всі для онлайн-плану), лише без
+ * групового чату: швидкий план — спонтанна річ на кілька годин, для якої
+ * в застосунку немає поняття "анонс у групу".
+ */
+export async function sendQuickPlanAnnouncement(
+  chatId: string,
+  plan: QuickPlanAnnouncement,
+): Promise<void> {
+  const emoji = QUICK_PLAN_CATEGORY_EMOJI[plan.category] ?? '✨'
+  const text = [
+    'Хтось шукає компанію 👀',
+    '',
+    `${emoji} ${escapeMarkdownV2(plan.text)}`,
+    '',
+    escapeMarkdownV2('Відкривай DormHub, щоб приєднатися.'),
+  ].join('\n')
+
+  await sendAndLog('quick_plan_announcement', chatId, () =>
+    botApi('sendMessage', {
+      chat_id: chatId,
+      text: text.slice(0, 4096),
+      parse_mode: 'MarkdownV2',
+    }))
+}
+
+/** Сповіщення організатору про нового учасника — надсилається лише
+ * ПІСЛЯ успішного запису участі (викликається з events.service.joinEvent
+ * після того, як addParticipant уже завершився без помилки). */
+export async function sendEventOrganizerJoinNotification(
+  chatId: string,
+  event: Pick<EventResponse, 'id' | 'title' | 'participants' | 'maxParticipants'>,
+  joinerName: string,
+): Promise<void> {
+  const text = [
+    'До твоєї події приєднався новий учасник 🙌',
+    `👤 ${escapeMarkdownV2(joinerName)}`,
+    `🎉 ${escapeMarkdownV2(event.title)}`,
+    escapeMarkdownV2(`Учасників: ${event.participants.length} / ${event.maxParticipants}`),
+  ].join('\n')
+
+  await sendAndLog(
+    'organizer_join_notification',
+    chatId,
+    () => botApi('sendMessage', { chat_id: chatId, text: text.slice(0, 4096), parse_mode: 'MarkdownV2' }),
     { id: event.id, title: event.title },
   )
 }
