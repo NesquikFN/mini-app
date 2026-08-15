@@ -476,6 +476,9 @@ export interface PersonalNotificationSettings {
   newEventsEnabled: boolean
   joinConfirmationEnabled: boolean
   organizerJoinEnabled: boolean
+  /** Стосується лише адмінів (DM про нову заявку на реєстрацію) — за
+   * замовчуванням вимкнено, перемикач лише в розділі «Заявки». */
+  newRegistrationsEnabled: boolean
 }
 
 export function fetchMyNotificationSettings(): Promise<PersonalNotificationSettings> {

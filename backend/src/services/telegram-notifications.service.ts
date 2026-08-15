@@ -497,6 +497,37 @@ export async function sendRegistrationApprovedMessage(chatId: string): Promise<v
     }))
 }
 
+export interface NewRegistrantInfo {
+  firstName: string
+  lastName?: string
+  age?: number
+  faculty?: string
+}
+
+/** DM адміну, який сам увімкнув перемикач у розділі "Заявки", коли хтось
+ * подає нову заявку на реєстрацію. Ім'я заявника з тіла заявки (не з
+ * Telegram initData), тож проходить escapeMarkdownV2 як звичайний рядок. */
+export async function sendNewRegistrationNotification(
+  chatId: string,
+  applicant: NewRegistrantInfo,
+): Promise<void> {
+  const fullName = [applicant.firstName, applicant.lastName].filter(Boolean).join(' ')
+  const details = [
+    applicant.faculty ? escapeMarkdownV2(applicant.faculty) : undefined,
+    applicant.age !== undefined ? escapeMarkdownV2(`${applicant.age} років`) : undefined,
+  ].filter(Boolean).join(' · ')
+
+  const text = [
+    '📝 Нова заявка на реєстрацію',
+    `👤 ${escapeMarkdownV2(fullName)}`,
+    details ? `🎓 ${details}` : '',
+    escapeMarkdownV2('Розглянь у розділі «Заявки».'),
+  ].filter(Boolean).join('\n')
+
+  await sendAndLog('registration_submitted', chatId, () =>
+    botApi('sendMessage', { chat_id: chatId, text: text.slice(0, 4096), parse_mode: 'MarkdownV2' }))
+}
+
 /**
  * Chats come from our own registry (kept current by the webhook); the
  * requesting admin's membership is still checked live via getChatMember

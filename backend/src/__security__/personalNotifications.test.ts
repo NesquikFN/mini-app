@@ -439,6 +439,7 @@ describe('GET/PATCH /api/me/notifications', () => {
       newEventsEnabled: true,
       joinConfirmationEnabled: true,
       organizerJoinEnabled: true,
+      newRegistrationsEnabled: false,
     })
   })
 
@@ -449,6 +450,7 @@ describe('GET/PATCH /api/me/notifications', () => {
       user_id: user.id,
       join_confirmation_enabled: false,
       organizer_join_enabled: true,
+      notify_new_registrations: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }))
@@ -456,6 +458,7 @@ describe('GET/PATCH /api/me/notifications', () => {
       user_id: user.id,
       join_confirmation_enabled: false,
       organizer_join_enabled: true,
+      notify_new_registrations: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }))
@@ -471,6 +474,7 @@ describe('GET/PATCH /api/me/notifications', () => {
     assert.deepEqual(upsert.mock.calls[0].arguments[1], {
       joinConfirmationEnabled: false,
       organizerJoinEnabled: undefined,
+      notifyNewRegistrations: undefined,
     })
   })
 

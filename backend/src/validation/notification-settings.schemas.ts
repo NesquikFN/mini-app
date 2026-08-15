@@ -8,6 +8,11 @@ export const updateNotificationSettingsSchema = z
     newEventsEnabled: z.boolean().optional(),
     joinConfirmationEnabled: z.boolean().optional(),
     organizerJoinEnabled: z.boolean().optional(),
+    // Стосується лише адмінів (розсилка сама відсіює решту через
+    // admin_users), але поле доступне будь-кому — так само, як і решта
+    // цього ресурсу: не над-інженеримо окремою перевіркою ролі заради
+    // перемикача, який для не-адміна просто нічого не робить.
+    newRegistrationsEnabled: z.boolean().optional(),
   })
   .refine((value) => Object.values(value).some((item) => item !== undefined), {
     message: 'Немає що оновлювати',

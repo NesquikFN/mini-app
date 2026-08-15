@@ -1,10 +1,13 @@
 import { registrationsRepository } from '../repositories/registrations.repository'
 import { toAuthUser } from '../repositories/users.repository'
+import { userNotificationSettingsRepository } from '../repositories/user-notification-settings.repository'
 import { AppError } from '../utils/AppError'
+import { mapWithConcurrency } from '../utils/concurrency'
 import type { AuthUser, RegistrationStatus } from '../types/user'
 import type { RegistrationDetail, RegistrationsResponse } from '../types/admin'
 import type { SubmitRegistrationInput } from '../validation/user.schemas'
 import * as telegramNotifications from './telegram-notifications.service'
+import { NOTIFICATION_CONCURRENCY } from './telegram-notifications.service'
 
 function buildPagination(page: number, limit: number, total: number) {
   return { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) }
@@ -20,7 +23,35 @@ export async function submitRegistration(
     instagram: input.instagram ?? null,
     bio: input.bio ?? null,
   })
+
+  // Заявка вже збережена — помилка розсилки (сама вибірка підписників чи
+  // окреме повідомлення) не повинна перетворювати вдалу подачу на 500.
+  await notifyAdminsOfNewRegistration(userId, {
+    firstName: updated.first_name,
+    lastName: updated.last_name ?? undefined,
+    age: updated.age ?? undefined,
+    faculty: updated.faculty ?? undefined,
+  }).catch((error: unknown) => {
+    console.error('Не вдалося сповістити адмінів про нову заявку:', error)
+  })
+
   return toAuthUser(updated)
+}
+
+async function notifyAdminsOfNewRegistration(
+  applicantId: string,
+  applicant: telegramNotifications.NewRegistrantInfo,
+): Promise<void> {
+  const telegramIds = await userNotificationSettingsRepository.getNewRegistrationSubscriberTelegramIds(
+    applicantId,
+  )
+  await mapWithConcurrency(telegramIds, NOTIFICATION_CONCURRENCY, async (telegramId) => {
+    try {
+      await telegramNotifications.sendNewRegistrationNotification(String(telegramId), applicant)
+    } catch (error) {
+      console.error(`Не вдалося сповістити адміна ${telegramId} про нову заявку:`, error)
+    }
+  })
 }
 
 export async function listRegistrations(

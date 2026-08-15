@@ -26,6 +26,7 @@ const KIND_LABELS: Record<NotificationKind, string> = {
   event_rating_request: 'Запит оцінити подію',
   quick_plan_announcement: 'Сповіщення про новий швидкий план',
   organizer_join_notification: 'Сповіщення організатора про учасника',
+  registration_submitted: 'Сповіщення про нову заявку',
 }
 
 export function AdminNotificationLogPage() {

@@ -7,14 +7,15 @@ export interface NotificationSettingsResponse {
   newEventsEnabled: boolean
   joinConfirmationEnabled: boolean
   organizerJoinEnabled: boolean
+  newRegistrationsEnabled: boolean
 }
 
 /**
  * Фасад над двома джерелами: users.notify_new_events (уже існуюче,
  * розділене з announceEvent/аудиторією опитувань/командою бота — див.
- * коментар у migrations/0032) і новою user_notification_settings (лише
- * дві справді нові настройки). Для клієнта це один ресурс, для бекенду —
- * без дублювання існуючого прапорця.
+ * коментар у migrations/0032) і user_notification_settings (три справді
+ * нові настройки, остання — 0033). Для клієнта це один ресурс, для
+ * бекенду — без дублювання існуючого прапорця.
  */
 export async function getMyNotificationSettings(userId: string): Promise<NotificationSettingsResponse> {
   const [user, settings] = await Promise.all([
@@ -28,6 +29,7 @@ export async function getMyNotificationSettings(userId: string): Promise<Notific
     newEventsEnabled: user.notifyNewEvents,
     joinConfirmationEnabled: settings.joinConfirmationEnabled,
     organizerJoinEnabled: settings.organizerJoinEnabled,
+    newRegistrationsEnabled: settings.notifyNewRegistrations,
   }
 }
 
@@ -39,11 +41,16 @@ export async function updateMyNotificationSettings(
   if (input.newEventsEnabled !== undefined) {
     tasks.push(usersRepository.setNotifyNewEvents(userId, input.newEventsEnabled))
   }
-  if (input.joinConfirmationEnabled !== undefined || input.organizerJoinEnabled !== undefined) {
+  if (
+    input.joinConfirmationEnabled !== undefined ||
+    input.organizerJoinEnabled !== undefined ||
+    input.newRegistrationsEnabled !== undefined
+  ) {
     tasks.push(
       userNotificationSettingsRepository.upsert(userId, {
         joinConfirmationEnabled: input.joinConfirmationEnabled,
         organizerJoinEnabled: input.organizerJoinEnabled,
+        notifyNewRegistrations: input.newRegistrationsEnabled,
       }),
     )
   }

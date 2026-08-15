@@ -771,3 +771,9 @@ create table if not exists user_notification_settings (
 );
 
 alter table user_notification_settings enable row level security;
+
+-- Сповіщення адмінам про нову заявку на реєстрацію (див.
+-- migrations/0033_registration_notifications.sql) — за замовчуванням
+-- вимкнено, вмикається самим адміном у розділі "Заявки".
+alter table user_notification_settings
+  add column if not exists notify_new_registrations boolean not null default false;

@@ -31,6 +31,7 @@ export type NotificationKind =
   | 'event_rating_request'
   | 'quick_plan_announcement'
   | 'organizer_join_notification'
+  | 'registration_submitted'
 
 export interface NotificationLogEntry {
   id: string

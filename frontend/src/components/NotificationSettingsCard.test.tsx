@@ -17,6 +17,7 @@ function fakeSettings(overrides: Partial<PersonalNotificationSettings> = {}): Pe
     newEventsEnabled: true,
     joinConfirmationEnabled: true,
     organizerJoinEnabled: true,
+    newRegistrationsEnabled: false,
     ...overrides,
   }
 }

@@ -7,7 +7,9 @@ import {
   type PersonalNotificationSettings,
 } from '../services/api'
 
-type SettingKey = keyof PersonalNotificationSettings
+// Свідомо вужче за PersonalNotificationSettings: newRegistrationsEnabled
+// стосується лише адмінів і показується в розділі «Заявки», а не тут.
+type SettingKey = 'newEventsEnabled' | 'joinConfirmationEnabled' | 'organizerJoinEnabled'
 
 const LABELS: Record<SettingKey, string> = {
   newEventsEnabled: 'Нові події',
